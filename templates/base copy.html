@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}My Research System{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+    <header class="mb-4">
+        <h1>Research Funding System</h1>
+        <nav>
+            <a href="/">Home</a> |
+            <a href="{% url 'screening:list' %}">Screening</a> |
+            <a href="{% url 'institutions:list' %}">Institutions</a>
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <footer class="mt-5 text-muted">
+        &copy; 2025 Research Management Platform
+    </footer>
+</body>
+</html>

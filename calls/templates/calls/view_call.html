@@ -1,0 +1,122 @@
+
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+
+{% block title %}View Call: {{ call.title }} - Climas{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px; margin: 3rem auto;">
+    <h3 class="mb-4">View Call: {{ call.title }}</h3>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Call Details</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-3">Title</dt>
+                        <dd class="col-sm-9">{{ call.title }}</dd>
+
+                        <dt class="col-sm-3">Description</dt>
+                        <dd class="col-sm-9">{{ call.description }}</dd>
+
+                        <dt class="col-sm-3">Status</dt>
+                        <dd class="col-sm-9">
+                            <span class="badge bg-{{ call.status.color|default:'secondary' }}">{{ call.status.name }}</span>
+                        </dd>
+
+                        <dt class="col-sm-3">Opening Date</dt>
+                        <dd class="col-sm-9">{{ call.opening_datetime|date:"M d, Y H:i" }}</dd>
+
+                        <dt class="col-sm-3">Closing Date</dt>
+                        <dd class="col-sm-9">{{ call.closing_datetime|date:"M d, Y H:i" }}</dd>
+
+                        <dt class="col-sm-3">Coordinator</dt>
+                        <dd class="col-sm-9">{{ call.coordinator.user.get_full_name }}</dd>
+
+                        <dt class="col-sm-3">Created</dt>
+                        <dd class="col-sm-9">{{ call.created_at|date:"M d, Y H:i" }}</dd>
+
+                        <dt class="col-sm-3">Last Updated</dt>
+                        <dd class="col-sm-9">{{ call.updated_at|date:"M d, Y H:i" }}</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Update Status Form -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Update Status</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="id_status" class="form-label">New Status</label>
+                            <select name="status" class="form-select" required>
+                                <option value="">-- Select Status --</option>
+                                {% for status in statuses %}
+                                    <option value="{{ status.id }}" {% if status.id == call.status.id %}selected{% endif %}>
+                                        {{ status.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Update Status</button>
+                        <a href="{% url 'calls:coordinator_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <!-- Quick Actions -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'calls:setup_call' call.pk %}" class="btn btn-outline-primary">Setup Form</a>
+                        <a href="{% url 'calls:coordinator_dashboard' %}" class="btn btn-outline-secondary">Back to Dashboard</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Expressions
+                            <span class="badge bg-primary rounded-pill">0</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Evaluations
+                            <span class="badge bg-success rounded-pill">0</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Budget Items
+                            <span class="badge bg-warning rounded-pill">0</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

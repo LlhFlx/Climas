@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Crear Convocatoria – Climas{% endblock %}
+
+{% block content %}
+<h1>Crear Nueva Convocatoria</h1>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit" class="button button-primary">Guardar</button>
+</form>
+{% endblock %}

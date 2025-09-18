@@ -1,0 +1,71 @@
+<div class="row">
+    <!-- Calls Section -->
+    <div class="col-md-6 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4>My Calls</h4>
+            <a href="{% url 'calls:create_call' %}" class="btn btn-primary btn-sm">+ New Call</a>
+        </div>
+        {% if calls %}
+            <div class="list-group">
+                {% for call in calls %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="me-3">
+                                <h6 class="mb-1"><strong>{{ call.title }}</strong></h6>
+                                <span class="badge bg-{{ call.status.color|default:'secondary' }} text-white">
+                                    {{ call.status.name }}
+                                </span>
+                                <br>
+                                <small class="text-muted">
+                                    {{ call.opening_datetime|date:"M d, Y" }} -> {{ call.closing_datetime|date:"M d, Y" }}
+                                </small>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <a href="{% url 'calls:setup_call' call.pk %}" class="btn btn-outline-primary btn-sm me-2">Setup Form</a>
+                            <a href="{% url 'calls:view_call' call.pk %}" class="btn btn-primary btn-sm">View</a>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                No calls found. <a href="{% url 'calls:create_call' %}">Create your first call</a>.
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Shared Questions Section -->
+    <div class="col-md-6 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4>Shared Questions</h4>
+            <a href="{% url 'calls:create_shared_question' %}" class="btn btn-secondary btn-sm">+ New Question</a>
+        </div>
+        {% if shared_questions %}
+            <div class="list-group">
+                {% for q in shared_questions %}
+                    <div class="list-group-item d-flex justify-content-between align-items-start">
+                        <div>
+                            <div>{{ q.question }}</div>
+                            <small class="text-muted">({{ q.get_target_category_display }})</small>
+                        </div>
+                        <div class="d-flex align-items-center ms-2">
+                            {% if not q.is_active %}
+                                <span class="badge bg-danger me-2">Inactive</span>
+                            {% endif %}
+                            <a href="{% url 'calls:edit_shared_question' q.id %}" class="btn btn-outline-primary btn-sm me-1">Edit</a>
+                            <form method="post" action="{% url 'calls:delete_shared_question' q.id %}" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this question?')">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                No shared questions yet. <a href="{% url 'calls:create_shared_question' %}">Create one</a>.
+            </div>
+        {% endif %}
+    </div>
+</div>

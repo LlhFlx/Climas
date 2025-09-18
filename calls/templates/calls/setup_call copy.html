@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Configurar Plantillas – {{ call.title }}{% endblock %}
+
+{% block content %}
+<div x-data="templateBuilder()">
+  <h1>Configurar Plantillas para "{{ call.title }}"</h1>
+
+  <ul class="tabs">
+    <li :class="{ active: activeTab === 'proponent' }">
+      <a @click.prevent="activeTab = 'proponent'">Formulario del Proponente</a>
+    </li>
+    <li :class="{ active: activeTab === 'evaluation' }">
+      <a @click.prevent="activeTab = 'evaluation'">Plantilla de Evaluación</a>
+    </li>
+  </ul>
+
+  <!-- Proponent Form Builder -->
+  <div x-show="activeTab === 'proponent'" class="section">
+    <h3>Preguntas para el Proponente</h3>
+    <template x-for="(q, index) in proponentQuestions" :key="index">
+      <div class="card">
+        <select x-model="q.field_type" class="u-full-width">
+          <option value="text">Texto largo</option>
+          <option value="short_text">Texto corto</option>
+          <option value="number">Número</option>
+          <option value="boolean">Sí/No</option>
+          <option value="dropdown">Desplegable</option>
+          <option value="radio">Opción múltiple</option>
+        </select>
+        <input type="text" placeholder="Pregunta" x-model="q.question" class="u-full-width">
+        <button type="button" @click="removeQuestion('proponent', index)" class="button button-outline">Eliminar</button>
+      </div>
+    </template>
+    <button type="button" @click="addQuestion('proponent')" class="button">+ Añadir Pregunta</button>
+  </div>
+
+  <!-- Evaluation Template Builder -->
+  <div x-show="activeTab === 'evaluation'" class="section">
+    <h3>Preguntas para Evaluadores</h3>
+    <template x-for="(q, index) in evaluationQuestions" :key="index">
+      <div class="card">
+        <select x-model="q.field_type" class="u-full-width">
+          <option value="text">Texto largo</option>
+          <option value="short_text">Texto corto</option>
+          <option value="number">Número</option>
+          <option value="boolean">Sí/No</option>
+          <option value="dropdown">Desplegable</option>
+          <option value="radio">Opción múltiple</option>
+        </select>
+        <input type="text" placeholder="Pregunta" x-model="q.question" class="u-full-width">
+        <input type="number" step="0.1" placeholder="Puntuación Máxima" x-model="q.max_score" class="u-full-width">
+        <button type="button" @click="removeQuestion('evaluation', index)" class="button button-outline">Eliminar</button>
+      </div>
+    </template>
+    <button type="button" @click="addQuestion('evaluation')" class="button">+ Añadir Pregunta</button>
+  </div>
+
+  <button @click="saveTemplates" class="button button-primary">Publicar Convocatoria</button>
+</div>
+
+<script>
+function templateBuilder() {
+  return {
+    activeTab: 'proponent',
+    proponentQuestions: [],
+    evaluationQuestions: [],
+
+    addQuestion(type) {
+      const arr = type === 'proponent' ? this.proponentQuestions : this.evaluationQuestions;
+      arr.push({
+        question: '',
+        field_type: 'text',
+        max_score: 5.0
+      });
+    },
+
+    removeQuestion(type, index) {
+      const arr = type === 'proponent' ? this.proponentQuestions : this.evaluationQuestions;
+      arr.splice(index, 1);
+    },
+
+    async saveTemplates() {
+      const response = await fetch('{% url "calls:api_save_call_templates" call.pk %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify({
+          proponent_questions: this.proponentQuestions,
+          evaluation_questions: this.evaluationQuestions
+        })
+      });
+
+      if (response.ok) {
+        window.location.href = '{% url "calls:call_detail" call.pk %}';
+      } else {
+        const data = await response.json();
+        alert('Error: ' + data.error);
+      }
+    }
+  }
+}
+</script>
+{% endblock %}

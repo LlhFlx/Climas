@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}Researcher Dashboard - Climas{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Researcher Dashboard</h2>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <h3 class="mb-3">Open Calls</h3>
+    {% if open_calls %}
+        <div class="row">
+            {% for call in open_calls %}
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ call.title }}</h5>
+                            <p class="card-text">{{ call.description|truncatewords:20 }}</p>
+                            <p class="text-muted small">
+                                <strong>Opens:</strong> {{ call.opening_datetime|date:"M d, Y" }}<br>
+                                <strong>Closes:</strong> {{ call.closing_datetime|date:"M d, Y" }}
+                            </p>
+                            <a href="{% url 'calls:apply_call' call.pk %}" class="btn btn-primary">Apply Now</a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            No open calls at this time.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

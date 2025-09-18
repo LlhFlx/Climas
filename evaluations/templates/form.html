@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Evaluar: {{ expression.project_title }}{% endblock %}
+
+{% block content %}
+<h2>Evaluación – {{ expression.project_title }}</h2>
+
+<form method="post">
+  {% csrf_token %}
+  {% for item in items %}
+    <div class="evaluation-item">
+      <h4>{{ item.question }}</h4>
+      {% if item.field_type == 'text' %}
+        <textarea name="value_{{ item.id }}" class="u-full-width"></textarea>
+      {% elif item.field_type == 'boolean' %}
+        <label><input type="checkbox" name="value_{{ item.id }}"> Sí</label>
+      {% elif item.field_type == 'dropdown' %}
+        <select name="value_{{ item.id }}" class="u-full-width">
+          {% for opt in item.get_options %}
+            <option value="{{ opt }}">{{ opt }}</option>
+          {% endfor %}
+        </select>
+      {% endif %}
+      <label>Puntuación (0–{{ item.max_score }})</label>
+      <input type="number" name="score_{{ item.id }}" step="0.1" min="0" max="{{ item.max_score }}" required>
+      <label>Comentarios</label>
+      <textarea name="comment_{{ item.id }}" class="u-full-width"></textarea>
+    </div>
+  {% endfor %}
+  <button type="submit" class="button button-primary">Enviar Evaluación</button>
+</form>
+{% endblock %}

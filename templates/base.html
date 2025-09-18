@@ -1,0 +1,202 @@
+{% load widget_tweaks %}
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="es" x-data="{ darkMode: false }" :class="{ 'dark': darkMode }">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Climas{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Alpine.js -->
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+    <style>
+        body.dark {
+            background-color: #1a1a1a;
+            color: #f8f9fa;
+        }
+
+        body.dark .navbar {
+            background-color: #212529 !important;
+            color: #f8f9fa;
+        }
+
+        body.dark .navbar-light .navbar-nav .nav-link,
+        body.dark .navbar-light .navbar-brand,
+        body.dark .navbar-light .navbar-text {
+            color: #f8f9fa !important;
+        }
+
+        body.dark .navbar-light .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+        }
+
+        body.dark .dropdown-menu {
+            background-color: #343a40 !important;
+            color: #f8f9fa !important;
+        }
+
+        body.dark .dropdown-item {
+            color: #f8f9fa !important;
+        }
+
+        body.dark .dropdown-item:hover,
+        body.dark .dropdown-item:focus {
+            background-color: #495057 !important;
+            color: #ffffff !important;
+        }
+
+        body.dark .alert {
+            background-color: #343a40;
+            border-color: #495057;
+            color: #f8f9fa;
+        }
+
+        body.dark .form-control,
+        body.dark .form-select {
+            background-color: #343a40;
+            border-color: #495057;
+            color: #f8f9fa;
+        }
+
+        body.dark .form-control:focus,
+        body.dark .form-select:focus {
+            background-color: #343a40;
+            border-color: #6c757d;
+            color: #f8f9fa;
+        }
+
+        body.dark .btn-outline-primary {
+            color: #0d6efd;
+            border-color: #0d6efd;
+        }
+
+        body.dark .btn-outline-primary:hover {
+            background-color: #0d6efd;
+            color: #fff;
+        }
+
+        body.dark .list-group-item {
+            background-color: #212529;
+            border-color: #343a40;
+            color: #f8f9fa;
+        }
+
+        body.dark .badge {
+            color: #fff;
+        }
+
+        /* Header image scaling */
+        header img {
+            max-width: 800px;   /* limit width */
+            width: 100%;        /* responsive */
+            height: auto;
+        }
+
+        /* Footer styling */
+        footer {
+            margin-top: 2rem;
+            padding: 1rem 0;
+            background-color: #f8f9fa;
+        }
+
+        body.dark footer {
+            background-color: #212529;
+        }
+
+        footer img {
+            max-width: 800px;   /* same as header */
+            width: 50%;        /* responsive */
+            height: auto;       /* keep proportions */
+        }
+
+        .list-group-item.cursor-pointer {
+            cursor: pointer;
+        }
+
+        .list-group-item.cursor-pointer:hover {
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body :class="{ 'dark': darkMode }" class="alpinejs">
+    <!-- Header Image -->
+    <header class="text-center py-2">
+        <img src="{% static 'images/CABEZOTE-CONVOCATORIAS.jpg' %}" alt="Header Image" class="img-fluid">
+    </header>
+
+    <!-- Navbar (normal flow, not fixed) -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'calls:coordinator_dashboard' %}">Climas</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'calls:coordinator_dashboard' %}">Dashboard</a>
+                    </li>
+                </ul>
+                
+                <!-- Dark Mode Toggle -->
+                <div class="form-check form-switch me-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="darkModeToggle" x-model="darkMode">
+                    <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
+                </div>
+
+                <!-- User Dropdown -->
+                {% if user.is_authenticated %}
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
+                            {{ user.username }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                            <li><a class="dropdown-item" href="{% url 'accounts:profile' %}">Profile</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="post" action="{% url 'accounts:logout' %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item">Logout</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                {% else %}
+                    <a class="btn btn-outline-primary" href="{% url 'accounts:login' %}">Login</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center">
+        <img src="{% static 'images/LOGO-FINAL-CLIMAS-HUBDescriptivo.png' %}" alt="Footer Image" class="img-fluid">
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

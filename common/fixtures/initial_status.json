@@ -1,0 +1,14 @@
+[
+  {
+    "model": "common.status",
+    "fields": { "name": "Borrador", "is_active": true }
+  },
+  {
+    "model": "common.status",
+    "fields": { "name": "Abierta", "is_active": true }
+  },
+  {
+    "model": "common.status",
+    "fields": { "name": "Cerrada", "is_active": true }
+  }
+]
