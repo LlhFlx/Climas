@@ -32,7 +32,8 @@ class Call(TimestampMixin, CreatedByMixin, models.Model):
 
     title = models.TextField(
         unique=True,
-        verbose_name="Titulo"
+        verbose_name="Titulo",
+        max_length=255
     )
     description = models.TextField(
         verbose_name="Descripcion"
