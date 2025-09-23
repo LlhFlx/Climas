@@ -7,7 +7,7 @@ class StrategicEffect(TimestampMixin, CreatedByMixin, models.Model):
     Efecto estrategico predefinido en la documentacion.
     """
     name = models.CharField(
-        max_length=250,
+        max_length=500,
         unique=True,
         verbose_name="Nombre"
     )
