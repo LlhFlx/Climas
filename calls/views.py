@@ -8,7 +8,7 @@ from django.core.serializers import serialize
 from .models import Call
 from .forms import CallForm, SharedQuestionForm
 from proponent_forms.models import SharedQuestion
-from common.models import Status
+from common.models import Status, Scale
 from proponent_forms.models import ProponentForm, ProponentFormQuestion, ProponentResponse # For setup_call
 # from proponent_forms.models import ProponentForm, ProponentFormQuestion  
 from .forms import SharedQuestionForm  # For create_shared_question
@@ -267,7 +267,7 @@ def create_institution_page(request):
                     created_by=request.user
                 )
                 messages.success(request, f'Institución "{institution.name}" creada exitosamente.')
-                # Redirect back to the calling page (you'll pass this via URL)
+                # Redirect back to the calling page (passed via URL)
                 return redirect(request.GET.get('return_url', 'calls:researcher_dashboard'))
             except Exception as e:
                 messages.error(request, str(e))
@@ -771,9 +771,11 @@ def apply_call(request, call_pk):
     documents = ExpressionDocument.objects.filter(expression=expression)
     institution_types = InstitutionType.objects.filter(is_active=True).order_by('name')
     people = Person.objects.filter(created_by__isnull=False).order_by('first_name', 'first_last_name')
+    scale_choices = Scale.objects.filter(is_active=True).order_by('name')
 
     # Initialize post_data here — always exists, even on GET
     post_data = {}
+    doc_form = ExpressionDocumentForm()
 
     if request.method == 'POST':
 
@@ -939,6 +941,7 @@ def apply_call(request, call_pk):
                 print('Budget', request.POST)
                 BudgetItem.objects.filter(expression=expression).delete()
                 budget_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('budget_item_category_'))
+                total_budget = 0
                 for index in budget_indices:
                     category_id = request.POST.get(f'budget_item_category_{index}')
                     period_id = request.POST.get(f'budget_item_period_{index}')
@@ -958,12 +961,33 @@ def apply_call(request, call_pk):
                                 amount=amount,
                                 notes=notes
                             )
+                            total_budget += amount
                         except ValueError as e:
                             messages.error(request, f"Invalid amount in budget item {int(index)+1}: {e}")
                         except BudgetCategory.DoesNotExist:
                             messages.error(request, f"Invalid category in budget item {int(index)+1}")
                         except BudgetPeriod.DoesNotExist:
                             messages.error(request, f"Invalid period in budget item {int(index)+1}")
+                
+                
+                MAX_BUDGET = 900000000
+                if total_budget > MAX_BUDGET:
+                    messages.error(request, "El presupuesto total no puede exceder los $900.000.000 COP.")
+                    return render(request, 'calls/apply_call.html', post_data)
+
+                if total_budget <= 250000000:
+                    scale = Scale.objects.get(name='S')
+                elif total_budget <= 500000000:
+                    scale = Scale.objects.get(name='M')
+                else:
+                    scale = Scale.objects.get(name='B')
+                print(f"Total budget is {total_budget}, therefore scale is {scale}")
+                expression.scale = scale
+
+                # Handle scale from hidden field (in case JS is bypassed)
+                scale_name = request.POST.get('scale')
+                if scale_name and scale_name in ['S', 'M', 'B']:
+                    expression.scale = Scale.objects.get(name=scale_name)
 
                 # Documents
                 print('Documents', request.POST)
@@ -978,10 +1002,23 @@ def apply_call(request, call_pk):
                         else:
                             doc.save()
                             messages.success(request, "File uploaded successfully!")
+                            # Security: Empty file input for next render.
+                            document_form = ExpressionDocumentForm()
                     else:
                         for error in doc_form.non_field_errors():
                             messages.error(request, f"Upload error: {error}")
-                
+                else:
+                    # No file uploaded in this POST, but we might still need to validate
+                    # the form if it's part of the submit. We'll let the form be invalid if required.
+                    # But we don't want to show a "required" error if there's already a document.
+                    # So, if there are existing documents, we make the form NOT required for this submission.
+                    if documents.exists():
+                        # Temporarily make the file field not required for this validation
+                        document_form.fields['file'].required = False
+                        # We don't validate it here because we're not uploading, but we need to pass it to the template
+                        # If the user *did* try to upload, it would have been caught above.
+                    # If there are NO documents, we leave document_form as is (required=True) so it validates
+                    #   if the user tries to submit without uploading.
 
                 # Submit or save
                 if 'submit_application' in request.POST:
@@ -1035,10 +1072,20 @@ def apply_call(request, call_pk):
         'budget_categories': budget_categories,
         'budget_periods': budget_periods,
         'existing_budget_items': existing_budget_items,
+        'scale_choices': scale_choices,
+        'scale_choices_json': json.dumps([
+            {
+                'name': s.name,
+                'description': s.description,
+                'min_amount': float(s.min_amount),
+                'max_amount': float(s.max_amount) if s.max_amount else None
+            } 
+             for s in scale_choices
+        ], cls=DjangoJSONEncoder),
         'documents': documents,
         'document_form': ExpressionDocumentForm(),
         'intersectionality_scopes': IntersectionalityScope.objects.filter(is_active=True).order_by('name'),
-        # ALWAYS pass post_data — even on GET
+        # ALWAYS pass post_data - even on GET
         'post_data': post_data,
     }
 

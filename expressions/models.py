@@ -72,6 +72,14 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
         verbose_name="Fecha de Envío"
     )
 
+    scale = models.ForeignKey(
+        'common.Scale',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Escala del Presupuesto"
+    )
+
     intersectionality_scopes = models.ManyToManyField(
         'intersectionality.IntersectionalityScope',
         blank=True,

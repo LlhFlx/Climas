@@ -101,9 +101,18 @@
         </div>
 
         <!-- Document Upload Section -->
-        <h4 class="mb-3">Supporting Documents</h4>
-        <p class="text-muted">Upload up to one supporting document (PDF, DOCX, DOC). Máx. 10 MB.</p>
+        <h4 class="mb-3">Soporte documental</h4>
+        <p class="text-muted">Suba un documento justificativo (PDF, DOCX, DOC). Máx. 10 MB.</p>
         <div class="mb-4">
+            {% if documents %}
+                <div class="alert alert-info">
+                    <strong>Documento actual:</strong> 
+                    <a href="{% url 'calls:download_expression_document' documents.first.id %}" target="_blank">
+                        {{ documents.first.name }}
+                    </a>
+                    <small class="d-block mt-1">Puede cargar un nuevo archivo para sustituirlo o borrarlo abajo.</small>
+                </div>
+            {% endif %}
             {{ document_form.file.label_tag }}
             {{ document_form.file }}
             {% if document_form.file.errors %}
@@ -117,7 +126,7 @@
         <!-- List Uploaded Documents -->
         {% if documents %}
             <div class="card mb-4">
-                <div class="card-header">Uploaded Files</div>
+                <div class="card-header">Documento cargado</div>
                 <ul class="list-group list-group-flush">
                     {% for doc in documents %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -131,14 +140,14 @@
                             
                                 {% csrf_token %}
                                 <input type="hidden" name="remove_document" value="{{ doc.id }}">
-                                <button type="button" class="btn btn-sm btn-outline-danger remove-document" data-doc-id="{{ doc.id }}">✕ Remove</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-document" data-doc-id="{{ doc.id }}">✕ Borrar</button>
                             
                         </li>
                     {% endfor %}
                 </ul>
             </div>
         {% else %}
-            <div class="alert alert-info">No documents uploaded yet.</div>
+            <div class="alert alert-info">No se ha cargado un documento.</div>
         {% endif %}
         <hr>
         <!-- Dynamic Questions -->
@@ -367,11 +376,12 @@
         <div 
             id="budget-items-container"
             data-budget-item-count="{{ existing_budget_items|length|default:0 }}"
+            data-scale-choices='{{ scale_choices_json|safe }}'
         >
             {% for item in existing_budget_items %}
                 <div class="budget-item-entry card mb-3 p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="fs-6 mb-0">Budget Item {{ forloop.counter }}</h6>
+                        <h6 class="fs-6 mb-0">Ítem de presupuesto {{ forloop.counter }}</h6>
                         <button type="button" class="btn btn-sm btn-outline-danger remove-budget-item">Remove</button>
                     </div>
                     <input type="hidden" name="budget_item_index_{{ forloop.counter0 }}" value="{{ forloop.counter0 }}">
@@ -423,6 +433,11 @@
 
         <div class="mt-3 p-3 bg-light rounded">
             <strong>Total Budget:</strong> <span id="total-budget">$0.00</span>
+        </div>
+        <div class="mt-3 p-3 bg-custom-blue rounded">
+            <strong>Escala del Presupuesto:</strong> 
+            <span id="scale-display" class="badge">Cargando...</span>
+            <input type="hidden" name="scale" value="{{ expression.scale.name|default:'' }}">
         </div>
 
         <hr>
@@ -554,7 +569,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 1. INSTITUTION AUTOCOMPLETE
     // ============================
 
-    // 👇 Reusable function to attach autocomplete to any institution input pair
+    // Reusable function to attach autocomplete to any institution input pair
     function setupInstitutionAutocomplete(searchInput, hiddenIdInput) {
         const container = searchInput.closest('.mb-3');
         
@@ -593,7 +608,7 @@ document.addEventListener('DOMContentLoaded', function() {
             container.appendChild(suggestions);
         });
 
-        // Blur — if user typed something but didn't pick a valid item
+        // Blur: if user typed something but didn't pick a valid item
         searchInput.addEventListener('blur', function () {
             if (this.value && !hiddenIdInput.value) {
                 this.value = '';
@@ -646,7 +661,7 @@ document.addEventListener('DOMContentLoaded', function() {
             container.appendChild(suggestions);
         });
 
-        // Blur — if user typed something but didn't pick a valid item
+        // Blur: if user typed something but didn't pick a valid item
         input.addEventListener('blur', function () {
             if (this.value && !hiddenIdInput.value) {
                 this.value = '';
@@ -865,13 +880,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 div.className = 'budget-item-entry card mb-3 p-3';
                 div.innerHTML = `
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="fs-6 mb-0">Budget Item ${index + 1}</h6>
+                        <h6 class="fs-6 mb-0">Ítem de presupuesto  ${index + 1}</h6>
                         <button type="button" class="btn btn-sm btn-outline-danger remove-budget-item">Remove</button>
                     </div>
                     <input type="hidden" name="budget_item_index_${index}" value="${index}">
                     <div class="row mb-2">
                         <div class="col-md-4">
-                            <label class="form-label">Category *</label>
+                            <label class="form-label">Categoría *</label>
                             <select name="budget_item_category_${index}" class="form-select" required>
                                 <option value="">-- Select Category --</option>
                                 {% for cat in budget_categories %}
@@ -880,7 +895,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Period *</label>
+                            <label class="form-label">Periodo *</label>
                             <select name="budget_item_period_${index}" class="form-select" required>
                                 <option value="">-- Select Period --</option>
                                 {% for period in budget_periods %}
@@ -898,7 +913,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Notes</label>
+                        <label class="form-label">Notas</label>
                         <textarea name="budget_item_notes_${index}" class="form-control" rows="1"></textarea>
                     </div>
                 `;
@@ -931,23 +946,89 @@ document.addEventListener('DOMContentLoaded', function() {
             // ============================
             // 4. BUDGET TOTAL CALCULATION
             // ============================
+
+            const scaleChoicesJson = budgetContainer.getAttribute('data-scale-choices');
+            const scaleChoicesData = JSON.parse(scaleChoicesJson);
+
+            // Build lookup map
+            const scaleMap = {};
+            scaleChoicesData.forEach(s => {
+                scaleMap[s.name] = s;
+            });
             function updateTotal() {
                 let total = 0;
                 document.querySelectorAll('[name^="budget_item_amount_"]').forEach(input => {
-                    const val = parseFloat(input.value);
-                    if (!isNaN(val)) total += val;
+                    const val = parseFloat(input.value) || 0;
+                    total += val;
                 });
-                document.getElementById('total-budget').textContent = `$${total.toFixed(2)}`;
+                document.getElementById('total-budget').textContent = `$${total.toLocaleString('es-CO')}`;
+                updateScale(total); // Pass total to scale updater
             }
 
-            // Listen for changes on any amount input
+            function updateScale(total) {
+                const scaleDisplay = document.getElementById('scale-display');
+                const scaleInput = document.querySelector('input[name="scale"]');
+
+                // Clear previous state
+                scaleDisplay.textContent = 'Cargando...';
+                scaleDisplay.className = 'badge badge-secondary';
+                if (scaleInput) scaleInput.value = '';
+
+                const MAX_BUDGET = 900000000;
+
+                if (total > MAX_BUDGET) {
+                    scaleDisplay.textContent = 'Presupuesto excede el límite permitido (900 millones)';
+                    scaleDisplay.className = 'badge bg-danger';
+                    return;
+                }
+
+                // Assign scale based on total amount
+                let scale = null;
+                if (total <= 250000000) {
+                    scale = scaleMap['S'];
+                } else if (total <= 500000000) {
+                    scale = scaleMap['M'];
+                } else if (total <= 900000000) {
+                    scale = scaleMap['B'];
+                }
+
+                if (scale && scaleInput) {
+                    scaleDisplay.textContent = scale.description || scale.name;
+                    //scaleDisplay.className = `badge bg-${scale.name === 'S' ? 'success' : scale.name === 'M' ? 'warning' : 'danger'}`;
+                    scaleDisplay.className = `badge-${scale.name === 'S' ? 'success-custom' : scale.name === 'M' ? 'warning-custom' : 'danger-custom'}`;
+                    scaleInput.value = scale.name;
+                } else {
+                    scaleDisplay.textContent = 'Sin escala';
+                }
+            }
+
+            // Prevent form submission if over budget
+            document.querySelector('form')?.addEventListener('submit', function(e) {
+                const total = Array.from(document.querySelectorAll('[name^="budget_item_amount_"]'))
+                    .reduce((sum, input) => sum + (parseFloat(input.value) || 0), 0);
+
+                const MAX_BUDGET = 900000000;
+                if (total > MAX_BUDGET) {
+                    e.preventDefault();
+                    alert('El presupuesto total no puede exceder los $900.000.000 COP.');
+                    return;
+                }
+
+                // Ensure hidden scale field has value
+                const scaleInput = document.querySelector('input[name="scale"]');
+                if (scaleInput && !scaleInput.value) {
+                    updateTotal(); // Recalculate scale
+                }
+            });
+
+            // Listen for changes in any budget amount
             budgetContainer.addEventListener('input', function(e) {
                 if (e.target.name.startsWith('budget_item_amount_')) {
                     updateTotal();
                 }
             });
 
-            // Initialize total on page load
+            // Initialize on page load
             updateTotal();
         }
 
@@ -970,7 +1051,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button type="button" class="btn btn-sm btn-outline-danger remove-antecedent">Remove</button>
                     </div>
                     <div class="mb-2">
-                        <label class="form-label">Thematic Axis</label>
+                        <label class="form-label">Eje Temático</label>
                         <select name="team_member_antecedent_axis_${index}" class="form-select" required>
                             <option value="">-- Select Axis --</option>
                             {% for axis in thematic_axes %}
@@ -979,11 +1060,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         </select>
                     </div>
                     <div class="mb-2">
-                        <label class="form-label">Description *</label>
+                        <label class="form-label">Descripción *</label>
                         <textarea name="team_member_antecedent_description_${index}" class="form-control" rows="2" required></textarea>
                     </div>
                     <div class="mb-2">
-                        <label class="form-label">Evidence URL</label>
+                        <label class="form-label">URL Evidencia</label>
                         <input type="url" name="team_member_antecedent_url_${index}" class="form-control">
                     </div>
                 `;
@@ -1047,7 +1128,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.querySelector('form').addEventListener('submit', function(e) {
         console.log("Form submit event triggered!");
-        // If you want to prevent default submission for debugging:
+        // Pevent default submission for debugging:
         // e.preventDefault();
         // console.log("Form data:", new FormData(this));
     });

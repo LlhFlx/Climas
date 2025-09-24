@@ -123,6 +123,85 @@
         .list-group-item.cursor-pointer:hover {
             background-color: #f8f9fa;
         }
+
+        .bg-custom-blue {
+            background-color: #1e5a7d !important;
+        }
+
+        .bg-custom-blue .text-light,
+        .bg-custom-blue .badge,
+        .bg-custom-blue strong,
+        .bg-custom-blue span {
+            color: #fff !important;
+        }
+
+        /* Custom badge colors for bg-custom-blue */
+
+        /* .bg-custom-blue .badge-warning-custom {
+            background-color: #ff9800 !important;
+            color: #212529 !important;
+            font-weight: bold;
+        }
+
+        .bg-custom-blue .badge-danger-custom {
+            background-color: #ff6b6b !important;
+            color: #212529 !important;
+            font-weight: bold;
+        }
+
+        .bg-custom-blue .badge-success-custom {
+            background-color: #4caf50 !important;
+            color: #fff !important;
+            font-weight: bold;
+        } */
+
+        .bg-custom-blue .badge-success-custom,
+        .bg-custom-blue .badge-warning-custom,
+        .bg-custom-blue .badge-danger-custom {
+            background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%) !important;
+            border: 1px solid rgba(255, 255, 255, 0.4) !important;
+            color: #343a40 !important;
+            font-size: 0.8rem !important;
+            font-weight: 500 !important;
+            padding: 0.3rem 0.7rem !important;
+            border-radius: 12px !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05) !important;
+            text-shadow: 0 1px 1px rgba(255, 255, 255, 0.7) !important;
+            backdrop-filter: blur(2px) !important;
+            letter-spacing: -0.02em !important;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+
+        /* Hover effect — subtle lift + glow */
+        .bg-custom-blue .badge-success-custom:hover,
+        .bg-custom-blue .badge-warning-custom:hover,
+        .bg-custom-blue .badge-danger-custom:hover {
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+            border-color: rgba(255, 255, 255, 0.6) !important;
+        }
+
+        /* Color-specific tints (for visual hierarchy) */
+        .bg-custom-blue .badge-success-custom {
+            background: linear-gradient(145deg, #d4edda 0%, #e9ecef 100%) !important;
+            border-color: rgba(220, 237, 218, 0.5) !important;
+            color: #155724 !important;
+            text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6) !important;
+        }
+
+        .bg-custom-blue .badge-warning-custom {
+            background: linear-gradient(145deg, #fff3cd 0%, #fff8e6 100%) !important;
+            border-color: rgba(255, 243, 205, 0.5) !important;
+            color: #856404 !important;
+            text-shadow: 0 1px 1px rgba(255, 255, 255, 0.7) !important;
+        }
+
+        .bg-custom-blue .badge-danger-custom {
+            background: linear-gradient(145deg, #f8d7da 0%, #fde0e2 100%) !important;
+            border-color: rgba(248, 215, 218, 0.5) !important;
+            color: #721c24 !important;
+            text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6) !important;
+        }
     </style>
 </head>
 <body :class="{ 'dark': darkMode }" class="alpinejs">
