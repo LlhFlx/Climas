@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
-from django.http import HttpResponseForbidden, JsonResponse, FileResponse
+from django.http import HttpResponseForbidden, JsonResponse, FileResponse, Http404
 from django.core.serializers import serialize
 from .models import Call
 from .forms import CallForm, SharedQuestionForm
@@ -711,10 +711,15 @@ def researcher_dashboard(request):
 @login_required
 def apply_call(request, call_pk):
     try:
-        call = get_object_or_404(Call, pk=call_pk, status__name='Abierta')
-    except:
-        messages.error(request, "This call is not currently open for applications.")
+        call = get_object_or_404(Call, pk=call_pk)
+        if call.status.name != 'Abierta':
+            messages.error(request, "This call is not currently open for applications.")
+            return redirect('calls:researcher_dashboard')
+    except Http404:
+        messages.error(request, "Call not found.")
         return redirect('calls:researcher_dashboard')
+
+        
     
     # Ensure the user is a researcher
     if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Researcher':
@@ -722,14 +727,27 @@ def apply_call(request, call_pk):
         return redirect('home')
     
     # Get or create Expression for this user + call
+
+    default_axis = ThematicAxis.objects.filter(is_active=True).first()
+    default_country = Country.objects.first()
+    default_status = Status.objects.filter(name='Abierta').first()
+
+    # Validate system configuration before creating
+    if not default_axis or not default_country or not default_status:
+        messages.error(
+            request,
+            "System configuration incomplete: missing thematic axis, country, or status."
+        )
+        return redirect('home')
+
     expression, created = Expression.objects.get_or_create(
         user=request.user.customuser,
         call=call,
         defaults={
-            'thematic_axis': ThematicAxis.objects.first(),  # Default user will change
-            'status': Status.objects.get(name='Abierta'),
+            'thematic_axis': default_axis,
+            'status': default_status,
             'project_title': f'Borrador: {call.title}',
-            'implementation_country': Country.objects.first(),  # Default
+            'implementation_country': default_country,
             'problem': 'Descripción breve del problema a abordar.',
             'general_objective': 'Descripción del objetivo general del proyecto.',
             'methodology': 'Descripción breve de la metodología, el marco ético del proyecto y el abordaje comunitario. Los proyectos deberán basarse en el respeto por las voces, conocimientos, experiencias y realidades locales, promoviendo activamente la inclusión, la diversidad, interseccionalidad y la representación de los saberes y perspectivas de grupos en situación de vulnerabilidad.',
@@ -743,25 +761,34 @@ def apply_call(request, call_pk):
     except ProponentForm.DoesNotExist:
         form_questions = []
 
-    # Get Strategic Effects and other data for the form
+    # Get data for the form
     strategic_effects = StrategicEffect.objects.filter(is_active=True).order_by('name')
     thematic_axes = ThematicAxis.objects.filter(is_active=True)
     countries = Country.objects.all()
-
-    # Get Budget Categories and Periods
     budget_categories = BudgetCategory.objects.filter(is_active=True).order_by('name')
     budget_periods = BudgetPeriod.objects.all().order_by('order', 'name')
-    # Fetch existing budget items for editing
     existing_budget_items = BudgetItem.objects.filter(expression=expression).select_related('category', 'period')
-
-    # --- Document handling ---
     documents = ExpressionDocument.objects.filter(expression=expression)
-    document_form = ExpressionDocumentForm()
+    institution_types = InstitutionType.objects.filter(is_active=True).order_by('name')
+    people = Person.objects.filter(created_by__isnull=False).order_by('first_name', 'first_last_name')
+
+    # Initialize post_data here — always exists, even on GET
+    post_data = {}
 
     if request.method == 'POST':
-        #print("=== DEBUG: POST request received ===")
-        #print("Form data keys:", list(request.POST.keys()))
-        # Capture POST data for form re-population AND processing
+
+        if request.method == "POST" and 'remove_document' in request.POST:
+            print(request.POST)
+            print('XYZ')
+            doc_id = request.POST.get('remove_document')
+            ExpressionDocument.objects.filter(id=doc_id, expression=expression).delete()
+            messages.info(request, "File removed.")
+            print('Done')
+            # Do NOT proceed to form validation, redirect to avoid re-submission
+            #return redirect('calls:apply_call', call_pk=call_pk)
+            return JsonResponse({'success': True})
+        
+        # Capture ALL POST data for re-population
         post_data = {
             'project_title': request.POST.get('project_title', '').strip(),
             'thematic_axis': request.POST.get('thematic_axis'),
@@ -769,242 +796,207 @@ def apply_call(request, call_pk):
             'problem': request.POST.get('problem', '').strip(),
             'general_objective': request.POST.get('general_objective', '').strip(),
             'methodology': request.POST.get('methodology', '').strip(),
-            'funding_eligibility_acceptance': request.POST.get('funding_eligibility_acceptance') == 'on',  # ← Now explicit
+            'funding_eligibility_acceptance': request.POST.get('funding_eligibility_acceptance') == 'on',
+            'primary_institution_id': request.POST.get('primary_institution_id'),
         }
 
-        # Save core Expression fields from the POST data
-        expression.project_title = request.POST.get('project_title', '').strip()
-        expression.thematic_axis_id = request.POST.get('thematic_axis')
-        expression.implementation_country_id = request.POST.get('implementation_country')
-        expression.problem = request.POST.get('problem', '').strip()
-        expression.general_objective = request.POST.get('general_objective', '').strip()
-        expression.methodology = request.POST.get('methodology', '').strip()
-        expression.funding_eligibility_acceptance = request.POST.get('funding_eligibility_acceptance') == 'on'
-        primary_institution_id = request.POST.get('primary_institution_id')
-        if primary_institution_id and primary_institution_id.isdigit():
-            expression.primary_institution_id = int(primary_institution_id)
+        # Populate Expression from POST
+        expression.project_title = post_data['project_title']
+        expression.thematic_axis_id = post_data['thematic_axis']
+        expression.implementation_country_id = post_data['implementation_country']
+        expression.problem = post_data['problem']
+        expression.general_objective = post_data['general_objective']
+        expression.methodology = post_data['methodology']
+        expression.funding_eligibility_acceptance = post_data['funding_eligibility_acceptance']
+        
+        if post_data['primary_institution_id'] and post_data['primary_institution_id'].isdigit():
+            expression.primary_institution_id = int(post_data['primary_institution_id'])
         else:
-            expression.primary_institution = None  # clear if empty or invalid
+            expression.primary_institution = None
+        
+        # Validate required fields
+        # if not all([
+        #     expression.project_title,
+        #     expression.thematic_axis_id,
+        #     expression.implementation_country_id,
+        #     expression.problem,
+        #     expression.general_objective,
+        #     expression.methodology,
+        #     expression.primary_institution_id
+        # ]):
+        #     messages.error(request, "Please fill in all required fields marked with *.")
+        # else:
+        #     expression.save()
+        required_fields = {
+            "Project title": expression.project_title,
+            "Thematic axis": expression.thematic_axis_id,
+            "Implementation country": expression.implementation_country_id,
+            "Problem": expression.problem,
+            "General objective": expression.general_objective,
+            "Methodology": expression.methodology,
+            "Primary institution": expression.primary_institution_id,
+        }
 
-        # Validate core fields
-        if not all([
-            expression.project_title,
-            expression.thematic_axis_id,
-            expression.implementation_country_id,
-            expression.problem,
-            expression.general_objective,
-            expression.methodology,
-            expression.primary_institution_id
-        ]):
-            messages.error(request, "Please fill in all required fields marked with *.")
-        else:
-            # Save the Expression
+        has_errors = False
+
+        missing = [label for label, value in required_fields.items() if value is None or value == ""]
+        if missing:
+            has_errors = True
+            for field in missing:
+                messages.error(request, f"The field '{field}' is required.")
+
+        if not has_errors:
             expression.save()
-
+        
+        print('Post required fields', request.POST)
         # Only proceed if core fields are valid
-        if not messages.get_messages(request):
-            # Process dynamic question responses
+        #if not any(messages.get_messages(request)):
+        storage = messages.get_messages(request)
+        has_errors = any(storage)
+        # re-add them so template still shows them
+        for m in storage:
+            messages.add_message(request, m.level, m.message)
+            print(m.message)
+
+        if not has_errors:
+            # Process dynamic questions
+            print('Dynamic questions', request.POST)
+            question_errors = []
             for fq in form_questions:
                 field_name = f"question_{fq.shared_question.id}"
-                value = request.POST.get(field_name)
-                
-                if fq.shared_question.is_required and not value:
-                    messages.error(request, f'Question "{fq.shared_question.question}" is required.')
-                    break # Break to re-render form with error
-
-                # Handle boolean fields
+                #value = request.POST.get(field_name)
+                raw_value = request.POST.get(field_name)
                 if fq.shared_question.field_type == 'boolean':
-                    value = True if value == 'true' else False if value == 'false' else None
+                    value = raw_value == "on"
+                else:
+                    value = raw_value
 
-                # Save or update the response
-                ProponentResponse.objects.update_or_create(
-                    expression=expression,
-                    shared_question=fq.shared_question,
-                    defaults={'value': value}
-                )
-
-            # Only proceed if no errors from dynamic questions
-            if not messages.get_messages(request):
-                # Handle Products
+                if fq.shared_question.is_required and not value:
+                    question_errors.append(f'Question "{fq.shared_question.question}" is required.')
+                    continue
+                    #messages.error(request, f'Question "{fq.shared_question.question}" is required.')
+                
+                if value is not None:
+                    ProponentResponse.objects.update_or_create(
+                        expression=expression,
+                        shared_question=fq.shared_question,
+                        defaults={'value': value}
+                    )
+            if question_errors:
+                for err in question_errors:
+                    messages.error(request, err)
+                #return redirect(request.path)
+            else:  # Only if no break
+                # Products
+                print('Products', request.POST)
                 Product.objects.filter(expression=expression).delete()
-                product_indices = set()
-                for key in request.POST.keys():
-                    if key.startswith('product_title_'):
-                        index = key.split('_')[-1]
-                        product_indices.add(index)
-
+                product_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('product_title_'))
                 for index in product_indices:
                     title = request.POST.get(f'product_title_{index}', '').strip()
-                    description = request.POST.get(f'product_description_{index}', '').strip()
-                    outcome = request.POST.get(f'product_outcome_{index}', '').strip()
-                    start_date = request.POST.get(f'product_start_date_{index}')
-                    end_date = request.POST.get(f'product_end_date_{index}')
-                    effect_ids = request.POST.getlist(f'product_strategic_effects_{index}')
-
                     if title:
-                        try:
-                            product = Product.objects.create(
-                                expression=expression,
-                                title=title,
-                                description=description,
-                                outcome=outcome,
-                                start_date=start_date,
-                                end_date=end_date,
-                                status=Status.objects.get(name='Abierta'),
-                                created_by=request.user
-                            )
-                            if effect_ids:
-                                effects = StrategicEffect.objects.filter(id__in=effect_ids)
-                                product.strategic_effects.set(effects)
-                        except Exception as e:
-                            messages.error(request, f"Error saving product '{title}': {str(e)}")
+                        product = Product.objects.create(
+                            expression=expression,
+                            title=title,
+                            description=request.POST.get(f'product_description_{index}', ''),
+                            outcome=request.POST.get(f'product_outcome_{index}', ''),
+                            start_date=request.POST.get(f'product_start_date_{index}'),
+                            end_date=request.POST.get(f'product_end_date_{index}'),
+                            status=Status.objects.get(name='Abierta'),
+                            created_by=request.user
+                        )
+                        effect_ids = request.POST.getlist(f'product_strategic_effects_{index}')
+                        if effect_ids:
+                            product.strategic_effects.set(StrategicEffect.objects.filter(id__in=effect_ids))
 
-                # Handle Project Team Members
-                # Delete existing team members to avoid duplicates
+                # Team Members
+                print('Project Members', request.POST)
                 ProjectTeamMember.objects.filter(expression=expression).delete()
+                team_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('team_member_person_'))
+                for index in team_indices:
+                    person_id = request.POST.get(f'team_member_person_{index}')
+                    role = request.POST.get(f'team_member_role_{index}', '').strip()
+                    if person_id and person_id.strip() and role:
+                        member = ProjectTeamMember.objects.create(
+                            expression=expression,
+                            person_id=person_id,
+                            role=role,
+                            status_id=request.POST.get(f'team_member_status_{index}'),
+                            start_date=request.POST.get(f'team_member_start_date_{index}'),
+                            end_date=request.POST.get(f'team_member_end_date_{index}'),
+                            institution_id=request.POST.get(f'team_member_institution_id_{index}')
+                        )
+                        # Antecedents
+                        axis_ids = request.POST.getlist(f'team_member_antecedent_axis_{index}')
+                        descriptions = request.POST.getlist(f'team_member_antecedent_description_{index}')
+                        urls = request.POST.getlist(f'team_member_antecedent_url_{index}')
+                        for i, axis_id in enumerate(axis_ids):
+                            if i < len(descriptions) and descriptions[i].strip():
+                                InvestigatorThematicAxisAntecedent.objects.create(
+                                    team_member=member,
+                                    thematic_axis_id=axis_id,
+                                    description=descriptions[i].strip(),
+                                    evidence_url=urls[i].strip() if i < len(urls) else ''
+                                )
 
-                # --- Handle Budget Items ---
+                # Budget Items
+                print('Budget', request.POST)
                 BudgetItem.objects.filter(expression=expression).delete()
-                budget_item_indices = set()
-                for key in request.POST.keys():
-                    if key.startswith('budget_item_category_'):
-                        index = key.split('_')[-1]
-                        budget_item_indices.add(index)
-
-                for index in budget_item_indices:
+                budget_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('budget_item_category_'))
+                for index in budget_indices:
                     category_id = request.POST.get(f'budget_item_category_{index}')
                     period_id = request.POST.get(f'budget_item_period_{index}')
                     amount_str = request.POST.get(f'budget_item_amount_{index}', '').strip()
                     notes = request.POST.get(f'budget_item_notes_{index}', '').strip()
-
-                    # Skip if no category or period selected
-                    if not category_id or not period_id:
-                        continue
-
-                    # Validate amount is a valid decimal
-                    try:
-                        amount = float(amount_str) if amount_str else 0.0
-                        if amount < 0:
-                            raise ValueError("Amount cannot be negative")
-                    except (ValueError, TypeError):
-                        messages.error(request, f"Invalid amount for Budget Item {int(index)+1}. Please enter a valid number.")
-                        continue
-
-                    try:
-                        category = BudgetCategory.objects.get(id=category_id)
-                        period = BudgetPeriod.objects.get(id=period_id)
-                        BudgetItem.objects.create(
-                            expression=expression,
-                            category=category,
-                            period=period,
-                            amount=amount,
-                            notes=notes
-                        )
-                    except (BudgetCategory.DoesNotExist, BudgetPeriod.DoesNotExist):
-                        messages.error(request, f"Invalid category or period selected for Budget Item {int(index)+1}.")
-
-
-                # Get all team member indices
-                team_member_indices = set()
-                for key in request.POST.keys():
-                    if key.startswith('team_member_person_'):
-                        index = key.split('_')[-1]
-                        team_member_indices.add(index)
-
-                # Create new team members
-                for index in team_member_indices:
-                    person_id = request.POST.get(f'team_member_person_{index}')
-                    role = request.POST.get(f'team_member_role_{index}', '').strip()
-
-                    print(f"=== DEBUG: Processing team member {index} ===")
-                    print(f"Person ID: {person_id}, Role: {role}")
-
-                    status_id = request.POST.get(f'team_member_status_{index}')
-                    start_date = request.POST.get(f'team_member_start_date_{index}')
-                    end_date = request.POST.get(f'team_member_end_date_{index}')
-
-                    institution_id = request.POST.get(f'team_member_institution_id_{index}')
-
-                    # Only create if person and role are provided
-                    #if person_id and role:
-                    if person_id and person_id.strip() != "" and role:
+                    if category_id and period_id:
                         try:
-                            # Create the team member
-                            team_member = ProjectTeamMember.objects.create(
+                            amount = float(amount_str) if amount_str else 0.0
+                            if amount <= 0:
+                                raise ValueError("El valor debe ser mayor que 0.")
+                            category = BudgetCategory.objects.get(id=category_id)
+                            period = BudgetPeriod.objects.get(id=period_id)
+                            BudgetItem.objects.create(
                                 expression=expression,
-                                person_id=person_id,
-                                role=role,
-                                status_id=status_id,
-                                start_date=start_date,
-                                end_date=end_date,
-                                institution_id=institution_id
+                                category=category,
+                                period=period,
+                                amount=amount,
+                                notes=notes
                             )
+                        except ValueError as e:
+                            messages.error(request, f"Invalid amount in budget item {int(index)+1}: {e}")
+                        except BudgetCategory.DoesNotExist:
+                            messages.error(request, f"Invalid category in budget item {int(index)+1}")
+                        except BudgetPeriod.DoesNotExist:
+                            messages.error(request, f"Invalid period in budget item {int(index)+1}")
 
-                            # Handle Conditions for this team member
-                            # condition_texts = request.POST.getlist(f'team_member_condition_text_{index}')
-                            # for condition_text in condition_texts:
-                            #     if condition_text.strip():
-                            #         InvestigatorCondition.objects.create(
-                            #             team_member=team_member,
-                            #             condition_text=condition_text.strip(),
-                            #             is_fulfilled=False # Default to not fulfilled
-                            #         )
-
-                            # Handle Thematic Antecedents for this team member
-                            antecedent_axis_ids = request.POST.getlist(f'team_member_antecedent_axis_{index}')
-                            antecedent_descriptions = request.POST.getlist(f'team_member_antecedent_description_{index}')
-                            antecedent_urls = request.POST.getlist(f'team_member_antecedent_url_{index}')
-
-                            # Pair up axis, description, and URL
-                            for i, axis_id in enumerate(antecedent_axis_ids):
-                                description = antecedent_descriptions[i] if i < len(antecedent_descriptions) else ''
-                                url = antecedent_urls[i] if i < len(antecedent_urls) else ''
-                                if axis_id and description.strip():
-                                    InvestigatorThematicAxisAntecedent.objects.create(
-                                        team_member=team_member,
-                                        thematic_axis_id=axis_id,
-                                        description=description.strip(),
-                                        evidence_url=url.strip() if url else ''
-                                    )
-
-                        except Exception as e:
-                            messages.error(request, f"Error saving team member: {str(e)}")
-                            print(f"Error saving team member: {str(e)}")
-                # print(request.FILES)
-                # print(type(request.FILES))
-                # print("???", 'document_upload' in request.FILES)
-                # print(request.FILES.keys())
+                # Documents
+                print('Documents', request.POST)
                 if 'file' in request.FILES:
-                    print('Trying upload')
-                    document_form = ExpressionDocumentForm(request.POST, request.FILES)
-                    if document_form.is_valid():
-                        doc = document_form.save(commit=False)
+                    doc_form = ExpressionDocumentForm(request.POST, request.FILES)
+                    if doc_form.is_valid():
+                        doc = doc_form.save(commit=False)
                         doc.expression = expression
                         doc.uploaded_by = request.user.customuser
-                        doc.save()
-                        messages.success(request, "File uploaded successfully!")
+                        if not doc.file.name.lower().endswith(('.pdf', '.docx', '.jpg', '.png')):
+                            messages.error(request, "Only PDF, DOCX, JPG, and PNG files are allowed.")
+                        else:
+                            doc.save()
+                            messages.success(request, "File uploaded successfully!")
                     else:
-                        for field, errors in document_form.errors.items():
-                            for error in errors:
-                                messages.error(request, f"Upload error: {error}")
-                elif 'remove_document' in request.POST:
-                    doc_id = request.POST.get('remove_document')
-                    ExpressionDocument.objects.filter(id=doc_id, expression=expression).delete()
-                    messages.info(request, "File removed.")
+                        for error in doc_form.non_field_errors():
+                            messages.error(request, f"Upload error: {error}")
+                
 
-                # If we got here without any `messages.error`, everything was saved successfully.
+                # Submit or save
                 if 'submit_application' in request.POST:
                     submitted_status, _ = Status.objects.get_or_create(name='Enviada')
                     expression.status = submitted_status
                     expression.submission_datetime = timezone.now()
                     expression.save()
-                    #messages.success(request, 'Your application has been submitted successfully!')
-                    #return redirect('calls:researcher_dashboard')
                     messages.success(request, 'Your application has been submitted successfully!')
                 else:
                     messages.success(request, 'Your application has been saved as a draft.')
 
-    # --- CONTEXT SETUP: Re-fetch expression from DB to ensure fresh state ---
+    # Re-fetch expression to ensure fresh state
     expression = Expression.objects.select_related(
         'thematic_axis',
         'implementation_country',
@@ -1015,13 +1007,8 @@ def apply_call(request, call_pk):
         'intersectionality_scopes'
     ).get(pk=expression.pk)
 
-
-    # --- Get all active institutions for dropdown ---
-    institutions = Institution.objects.filter(is_active=True).order_by('name')
-    institutions = list(Institution.objects.filter(is_active=True).order_by('name').values('id', 'name')),
-    # --- For institution modal ---
-    institution_types = InstitutionType.objects.filter(is_active=True).order_by('name')
-
+    # Prepare context
+    institutions_list = list(Institution.objects.filter(is_active=True).order_by('name').values('id', 'name'))
 
     context = {
         'call': call,
@@ -1043,41 +1030,19 @@ def apply_call(request, call_pk):
             for effect in strategic_effects
         ], cls=DjangoJSONEncoder),
         'existing_products': Product.objects.filter(expression=expression).prefetch_related('strategic_effects'),
-        # Add data for Project Team Members
-        'existing_team_members': ProjectTeamMember.objects.filter(expression=expression).prefetch_related(
-            #'conditions', 
-            'thematic_antecedents'
-        ),
-        'statuses': Status.objects.all().order_by('name'), # For team member status dropdown
-        'institutions': institutions, # For team member institution dropdown
-        
-        # --- For institution input ---
-        # Seralizable object for the template filter
-        'institutions': list(Institution.objects.filter(is_active=True).order_by('name').values('id', 'name')),
-        # 'institutions': list(
-        #     Institution.objects.filter(is_active=True)
-        #         .select_related('institution_type')
-        #         .order_by('name')
-        #         .values('id', 'name', 'institution_type__name')
-        # )
+        'existing_team_members': ProjectTeamMember.objects.filter(expression=expression).prefetch_related('thematic_antecedents'),
+        'statuses': Status.objects.all().order_by('name'),
+        'institutions': institutions_list,
         'institution_types': institution_types,
-        'countries': countries,  # Redundant? No — needed in partial
-        'people': Person.objects.filter(created_by__isnull=False).order_by('first_name', 'first_last_name'),
-        # --- BUDGET ---
+        'people': people,
         'budget_categories': budget_categories,
         'budget_periods': budget_periods,
         'existing_budget_items': existing_budget_items,
-
-        # --- Document Context ---
-        'documents': expression.documents.all(),  # All uploaded docs
+        'documents': documents,
         'document_form': ExpressionDocumentForm(),
-
-        # --- Intersectionality Context ---
         'intersectionality_scopes': IntersectionalityScope.objects.filter(is_active=True).order_by('name'),
-
-        # Pass post_data to template for re-populating fields on validation error ---
-        #'post_data': post_data if messages.get_messages(request) else None,
-        
+        # ALWAYS pass post_data — even on GET
+        'post_data': post_data,
     }
 
     return render(request, 'calls/apply_call.html', context)

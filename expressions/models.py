@@ -43,6 +43,12 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
         verbose_name="País de Implementación"
     )
 
+    primary_institution = models.ForeignKey(
+        'institutions.Institution',
+        on_delete=models.PROTECT,
+        related_name='expressions_as_primary'
+    )
+
     problem = models.TextField(
         verbose_name="Descripción del Problema"
     )

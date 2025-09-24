@@ -71,14 +71,6 @@ class Institution(TimestampMixin, AddressMixin, CreatedByMixin):
         null=True
     )
 
-    primary_institution = models.ForeignKey(
-        'institutions.Institution',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='expressions_as_primary'
-    )
-
     name = models.CharField(
         "Nombre de institucion",
         max_length=200

@@ -125,12 +125,14 @@
                             <!--<a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-eye"></i> View
                             </a> -->
-                            <a href="{% url 'calls:download_expression_document' doc.id %}" target="_blank" class="btn btn-sm btn-outline-secondary"></a>
-                            <form method="post" class="d-inline" action="" style="display: inline-block;">
+                            <a href="{% url 'calls:download_expression_document' doc.id %}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                Descargar
+                            </a>
+                            
                                 {% csrf_token %}
                                 <input type="hidden" name="remove_document" value="{{ doc.id }}">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this file?')">✕ Remove</button>
-                            </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger remove-document" data-doc-id="{{ doc.id }}">✕ Remove</button>
+                            
                         </li>
                     {% endfor %}
                 </ul>
@@ -684,6 +686,83 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    function showMessage(type, text) {
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type} alert-dismissible fade show`;
+        alert.role = 'alert';
+        alert.innerHTML = `
+            ${text}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        const container = document.querySelector('.container');
+        if (container) {
+            // Append to container. No dependency on form position
+            container.appendChild(alert);
+        }
+        setTimeout(() => {
+            if (alert.parentNode) {
+                alert.remove();
+            }
+        }, 5000);
+    }
+
+    document.addEventListener('click', function(e) {
+        const removeBtn = e.target.closest('.remove-document');
+        if (!removeBtn) return;
+
+        e.preventDefault();
+
+        const docId = removeBtn.getAttribute('data-doc-id');
+        if (!docId) return;
+
+        if (!confirm('¿Estás seguro de que deseas eliminar este archivo?')) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('remove_document', docId);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        fetch('', {
+            method: 'POST',
+            body: formData,
+        })
+        .then(response => {
+            console.log("Response status:", response.status);
+            return response.text().then(text => {
+                console.log("Raw response:", text);
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error("JSON parse failed:", e);
+                    throw new Error("Server did not return JSON. See console for raw response.");
+                }
+            });
+        })
+        .then(data => {
+            console.log("Parsed data:", data, "Type:", typeof data);
+
+            if (data.success) {
+                showMessage('success', 'Archivo eliminado correctamente.');
+
+                const li = removeBtn.closest('li');
+                console.log("Found li?", li);
+
+                if (li) {
+                    li.remove();
+                } else {
+                    console.warn("No <li> found for button:", removeBtn);
+                }
+            } else {
+                showMessage('danger', 'El servidor no confirmó la eliminación.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al eliminar el archivo. Por favor, inténtalo de nuevo.');
+        });
+    });
+
 
     // ============================
     // 2. PROJECT TEAM MEMBERS
@@ -961,6 +1040,15 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("Team Members initialized.");
     }
     console.log("Form initialization complete.");
+
+    document.querySelector('form').addEventListener('submit', function(e) {
+        console.log("Form submit event triggered!");
+        // If you want to prevent default submission for debugging:
+        // e.preventDefault();
+        // console.log("Form data:", new FormData(this));
+    });
+
+
 });
 </script>
 {% endblock %}
