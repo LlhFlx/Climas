@@ -285,9 +285,11 @@
                         <input type="text" name="team_member_role_{{ forloop.counter0 }}" class="form-control" value="{{ member.role }}" required>
                     </div>
                     <!-- Institution -->
-                    <div class="mb-3">
-                        {% include 'calls/partials/institution_input.html' with index=forloop.counter0 institution_name=member.institution.name institution_id=member.institution.id %}
-                    </div>
+                    <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=institution_id_{{ index }}" 
+                    target="_blank" 
+                    class="btn btn-outline-primary mt-2">
+                        + Crear
+                    </a>
                     <!-- Dates -->
                     <div class="row mb-3">
                         <div class="col-md-6">
@@ -800,9 +802,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         <input type="hidden" name="team_member_institution_${index}" class="institution-id">
                     </div>
                     <small class="form-text text-muted">Escriba el nombre de la institución para buscar.</small>
-                    <button type="button" class="btn btn-sm btn-outline-secondary mt-2 institution-create-btn">
-                        + Crear Institución
-                    </button>
+                    <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=institution_id_{{ index }}" 
+                    target="_blank" 
+                    class="btn btn-outline-primary mt-2">
+                        + Crear
+                    </a>
                 </div>
                 <div class="row mb-3">
                     <div class="col-md-6">

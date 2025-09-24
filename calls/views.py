@@ -778,12 +778,9 @@ def apply_call(request, call_pk):
     if request.method == 'POST':
 
         if request.method == "POST" and 'remove_document' in request.POST:
-            print(request.POST)
-            print('XYZ')
             doc_id = request.POST.get('remove_document')
             ExpressionDocument.objects.filter(id=doc_id, expression=expression).delete()
             messages.info(request, "File removed.")
-            print('Done')
             # Do NOT proceed to form validation, redirect to avoid re-submission
             #return redirect('calls:apply_call', call_pk=call_pk)
             return JsonResponse({'success': True})
