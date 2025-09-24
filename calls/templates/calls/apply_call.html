@@ -166,13 +166,13 @@
                     <input type="number" name="question_{{ fq.shared_question.id }}" class="form-control" value="{{ existing_responses|get_item:fq.shared_question.id }}">
                 {% elif fq.shared_question.field_type == 'boolean' %}
                     <select name="question_{{ fq.shared_question.id }}" class="form-select">
-                        <option value="">-- Select --</option>
+                        <option value="">-- Seleccionar --</option>
                         <option value="true" {% if existing_responses|get_item:fq.shared_question.id == 'true' %}selected{% endif %}>Yes</option>
                         <option value="false" {% if existing_responses|get_item:fq.shared_question.id == 'false' %}selected{% endif %}>No</option>
                     </select>
                 {% elif fq.shared_question.field_type == 'dropdown' %}
                     <select name="question_{{ fq.shared_question.id }}" class="form-select">
-                        <option value="">-- Select --</option>
+                        <option value="">-- Seleccionar --</option>
                         {% for option in fq.shared_question.options %}
                             <option value="{{ option }}" {% if existing_responses|get_item:fq.shared_question.id == option %}selected{% endif %}>
                                 {{ option }}
@@ -181,7 +181,7 @@
                     </select>
                 {% elif fq.shared_question.field_type == 'dynamic_dropdown' %}
                     <select name="question_{{ fq.shared_question.id }}" class="form-select">
-                        <option value="">-- Select --</option>
+                        <option value="">-- Seleccionar --</option>
                         {% for option in fq.shared_question.get_options %}
                             <option value="{{ option }}" {% if existing_responses|get_item:fq.shared_question.id == option %}selected{% endif %}>
                                 {{ option }}
@@ -888,7 +888,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="col-md-4">
                             <label class="form-label">Categoría *</label>
                             <select name="budget_item_category_${index}" class="form-select" required>
-                                <option value="">-- Select Category --</option>
+                                <option value="">-- Seleccionar Categoría --</option>
                                 {% for cat in budget_categories %}
                                     <option value="{{ cat.id }}">{{ cat.name }}</option>
                                 {% endfor %}
@@ -897,7 +897,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="col-md-4">
                             <label class="form-label">Periodo *</label>
                             <select name="budget_item_period_${index}" class="form-select" required>
-                                <option value="">-- Select Period --</option>
+                                <option value="">-- Seleccionar Periodo --</option>
                                 {% for period in budget_periods %}
                                     <option value="{{ period.id }}">{{ period.name }}</option>
                                 {% endfor %}
@@ -1053,7 +1053,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="mb-2">
                         <label class="form-label">Eje Temático</label>
                         <select name="team_member_antecedent_axis_${index}" class="form-select" required>
-                            <option value="">-- Select Axis --</option>
+                            <option value="">-- Seleccionar Eje Temático --</option>
                             {% for axis in thematic_axes %}
                                 <option value="{{ axis.id }}">{{ axis.name }}</option>
                             {% endfor %}
