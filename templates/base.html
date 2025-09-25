@@ -202,6 +202,42 @@
             color: #721c24 !important;
             text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6) !important;
         }
+
+        /* People autocomplete */
+        .suggestions-list {
+            position: absolute !important;
+            z-index: 1050 !important;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 0.3rem;
+            background: white;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+            margin-top: 0.25rem;
+            padding: 0;
+            width: 100%;
+            min-width: 200px; /* Prevents narrow dropdown */
+        }
+
+        /* Force parent .card to allow overflow for suggestions */
+        .team-member-entry {
+            overflow: visible !important;
+        }
+
+        .suggestions-list .list-group-item {
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 0 !important;
+            border-bottom: 1px solid #eee;
+        }
+
+        .suggestions-list .list-group-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestions-list .list-group-item:hover {
+            background-color: #f8f9fa !important;
+        }
     </style>
 </head>
 <body :class="{ 'dark': darkMode }" class="alpinejs">

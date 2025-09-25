@@ -279,14 +279,26 @@
                     <!-- Person -->
                     <div class="mb-3">
                         <label class="form-label">Persona *</label>
-                        <select name="team_member_person_{{ forloop.counter0 }}" class="form-select" required>
-                            <option value="">-- Seleccione una persona--</option>
-                            {% for person in people %}
-                                <option value="{{ person.id }}" {% if member.person_id == person.id %}selected{% endif %}>
-                                    {{ person.first_name }} {{ person.first_last_name }}
-                                </option>
-                            {% endfor %}
-                        </select>
+                        <div class="input-group">
+                            <input type="text"
+                                name="team_member_person"
+                                class="form-control person-search"
+                                placeholder="Buscar persona por nombre..."
+                                aria-label="Persona"
+                                value="{% if member.person %}{{ member.person.first_name }} {{ member.person.first_last_name }}{% endif %}"
+                                required
+                            >
+                            <input type="hidden"
+                                name="team_member_person_id_{{ forloop.counter0 }}"
+                                value="{% if member.person %}{{ member.person.id }}{% endif %}"
+                            >
+                        </div>
+                        <a href="{% url 'calls:create_person_page' %}?return_url={{ request.get_full_path }}&field_name=team_member_person_id_{{ forloop.counter0 }}" 
+                        target="_blank" 
+                        class="btn btn-outline-primary mt-2">
+                            + Crear
+                        </a>
+                        <small class="form-text text-muted">Escriba para buscar, o haga clic en “Crear” para agregar una nueva.</small>
                     </div>
                     <!-- Role -->
                     <div class="mb-3">
@@ -450,10 +462,109 @@
 {% endblock %}
 {% block extra_js %}
 {{ institutions|json_script:"institutions-json" }}
+{{ people_json|json_script:"people-json" }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     //debugger;
     console.log("Initializing form components...");
+
+    // ============================
+    // 6. ATTACH PERSON AUTOCOMPLETE (GLOBAL DECLARATION)
+    // ============================
+    const personSearchInputs = document.querySelectorAll('.person-search');
+    const peopleScript = document.getElementById('people-json');
+    const peopleList = JSON.parse(peopleScript.textContent.trim());
+    // console.log("HELLO", peopleScript)
+    // console.log(peopleList)
+    // console.log(typeof peopleList);
+    console.log("People array correctly serialized:", Array.isArray(peopleList));
+    // console.log(peopleList.constructor.name);
+    // console.log("CUT")
+    // const script = document.getElementById('people-json');
+    // console.log('Raw text:', script.textContent);
+    // console.log('Type of text:', typeof script.textContent);
+    // console.log('Parsed result:', JSON.parse(script.textContent));
+    // console.log('Is it an array?', Array.isArray(JSON.parse(script.textContent)));
+    // console.log("CUT2")
+    // ============================
+    // 5. PERSON AUTOCOMPLETE FUNCTION
+    // ============================
+    function setupPersonAutocomplete(input) {
+        const container = input.closest('.mb-3');
+        const hiddenIdInput = container.querySelector('input[type="hidden"][name^="team_member_person_id_"]');
+        if (!hiddenIdInput) {
+            console.warn("Could not find corresponding hidden input for person search:", input);
+            return;
+        }
+        input.addEventListener('input', function () {
+            const query = this.value.trim().toLowerCase();
+            const results = peopleList.filter(person =>
+                person.first_name.toLowerCase().includes(query) ||
+                person.first_last_name.toLowerCase().includes(query) ||
+                `${person.first_name} ${person.first_last_name}`.toLowerCase().includes(query)
+            );
+            // Clear old suggestions
+            let suggestions = container.querySelector('.suggestions-list');
+            if (suggestions) suggestions.remove();
+            if (!query || results.length === 0) return;
+            // Create suggestion list
+            suggestions = document.createElement('ul');
+            suggestions.className = 'suggestions-list list-group position-absolute w-100 mt-1 shadow-sm';
+            suggestions.style.maxHeight = '200px';
+            suggestions.style.overflowY = 'auto';
+            suggestions.style.zIndex = '1000';
+            results.forEach(person => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item cursor-pointer';
+                li.textContent = `${person.first_name} ${person.first_last_name}`;
+                li.dataset.id = person.id;
+                li.addEventListener('click', () => {
+                    input.value = `${person.first_name} ${person.first_last_name}`; // ✅ Fixed
+                    hiddenIdInput.value = person.id;
+                    suggestions.remove();
+                });
+                suggestions.appendChild(li);
+            });
+            container.appendChild(suggestions);
+        });
+        // Blur: if user typed something but didn't pick a valid item
+        input.addEventListener('blur', function () {
+            if (this.value && !hiddenIdInput.value) {
+                this.value = '';
+                hiddenIdInput.value = '';
+            }
+        });
+    }
+
+    // Attach autocomplete to each person search input
+    personSearchInputs.forEach(input => {
+        setupPersonAutocomplete(input);
+    });
+
+    // Event delegation for dynamically added person search inputs
+    document.getElementById('team-members-container').addEventListener('focusin', function(e) {
+        if (e.target.classList.contains('person-search')) {
+            setupPersonAutocomplete(e.target);
+        }
+    });
+
+    // One global click listener for all person inputs
+    document.addEventListener('click', function (e) {
+        // Skip if clicking a submit button
+        if (e.target.tagName === 'BUTTON' && e.target.type === 'submit') {
+            return;
+        }
+        personSearchInputs.forEach(input => {
+            const container = input.closest('.mb-3');
+            if (!container) return;
+            if (container.contains(e.target)) return;
+            if (e.target.classList.contains('person-create-btn')) return;
+            if (e.target.closest('.person-create-btn')) return;
+            const suggestions = container.querySelector('.suggestions-list');
+            if (suggestions) suggestions.remove();
+        });
+    });
+
     // ============================
     // 1. PRODUCTS & STRATEGIC EFFECTS
     // ============================
@@ -797,19 +908,36 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button type="button" class="btn btn-sm btn-outline-danger remove-team-member">Remove</button>
                 </div>
                 <input type="hidden" name="team_member_index_${index}" value="${index}">
+                <!-- Person -->
                 <div class="mb-3">
-                    <label class="form-label">Colaborador *</label>
-                    <select name="team_member_person_${index}" class="form-select" required>
-                        <option value="">-- Seleccione una persona--</option>
-                        {% for person in people %}
-                            <option value="{{ person.id }}">{{ person.first_name }} {{ person.first_last_name }}</option>
-                        {% endfor %}
-                    </select>
+                    <label class="form-label">Persona *</label>
+                    <div class="input-group">
+                        <input type="text"
+                            name="team_member_person"
+                            class="form-control person-search"
+                            placeholder="Buscar persona por nombre..."
+                            aria-label="Persona"
+                            value=""
+                            required
+                        >
+                        <input type="hidden"
+                            name="team_member_person_id_${index}"
+                            value=""
+                        >
+                    </div>
+                    <a href="{% url 'calls:create_person_page' %}?return_url={{ request.get_full_path }}&field_name=team_member_person_id_${index}" 
+                    target="_blank" 
+                    class="btn btn-outline-primary mt-2">
+                        + Crear
+                    </a>
+                    <small class="form-text text-muted">Escriba para buscar, o haga clic en “Crear” para agregar una nueva.</small>
                 </div>
+                <!-- Role -->
                 <div class="mb-3">
                     <label class="form-label">Rol *</label>
                     <input type="text" name="team_member_role_${index}" class="form-control" required>
                 </div>
+                <!-- Institution -->
                 <div class="mb-3">
                     <label class="form-label">Institución *</label>
                     <div class="input-group">
@@ -823,6 +951,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         + Crear
                     </a>
                 </div>
+                <!-- Dates -->
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <label class="form-label">Fecha de Inicio</label>
@@ -833,11 +962,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         <input type="date" name="team_member_end_date_${index}" class="form-control">
                     </div>
                 </div>
+                <!-- Conditions -->
                 <!--<div class="mb-3">
                     <label class="form-label">Conditions</label>
                     <div class="conditions-container"></div>
                     <button type="button" class="btn btn-sm btn-outline-secondary add-condition mt-2">+ Agregar Condición</button>
                 </div>-->
+                <!-- Thematic Antecedents -->
                 <div class="mb-3">
                     <label class="form-label">Antecedentes Temáticos</label>
                     <div class="antecedents-container"></div>

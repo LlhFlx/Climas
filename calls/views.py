@@ -240,6 +240,30 @@ def create_institution(request):
     return JsonResponse({'success': False, 'error': 'Invalid request method.'})
 
 @login_required
+def create_person_page(request):
+    if request.method == 'POST':
+        first_name = request.POST.get('first_name')
+        first_last_name = request.POST.get('first_last_name')
+        if not all([first_name, first_last_name]):
+            messages.error(request, 'Nombre y apellido son requeridos.')
+        else:
+            try:
+                person = Person.objects.create(
+                    first_name=first_name.strip(),
+                    first_last_name=first_last_name.strip(),
+                    created_by=request.user
+                )
+                messages.success(request, f'Persona "{person.first_name} {person.first_last_name}" creada exitosamente.')
+                # Redirect back to the calling page (passed via URL)
+                return redirect(request.GET.get('return_url', 'calls:researcher_dashboard'))
+            except Exception as e:
+                messages.error(request, str(e))
+    # Always render the form on GET or after error
+    return render(request, 'calls/create_person_page.html', {
+        'return_url': request.GET.get('return_url', 'calls:researcher_dashboard'),
+    })
+
+@login_required
 def create_institution_page(request):
     if request.method == 'POST':
         name = request.POST.get('name')
@@ -1069,6 +1093,14 @@ def apply_call(request, call_pk):
         'institutions': institutions_list,
         'institution_types': institution_types,
         'people': people,
+        'people_json': [
+            {
+                'id': person.id,
+                'first_name': person.first_name,
+                'first_last_name': person.first_last_name
+            }
+            for person in people
+        ],
         'budget_categories': budget_categories,
         'budget_periods': budget_periods,
         'existing_budget_items': existing_budget_items,
@@ -1089,6 +1121,7 @@ def apply_call(request, call_pk):
         'post_data': post_data,
     }
 
+    print(f"People list is: {context['people_json']}")
     return render(request, 'calls/apply_call.html', context)
 
 @login_required

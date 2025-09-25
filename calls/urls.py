@@ -46,4 +46,5 @@ urlpatterns = [
     path('document/<int:doc_id>/download/', views.download_expression_document, name='download_expression_document'),
     path('render/institution-input/', views.render_institution_input, name='render_institution_input'),
     path('create-institution-page/', views.create_institution_page, name='create_institution_page'),
+    path('create-person-page/', views.create_person_page, name='create_person_page'),
 ]
