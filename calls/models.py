@@ -30,7 +30,7 @@ class Call(TimestampMixin, CreatedByMixin, models.Model):
         help_text="Estado actual de la convocatoria (ej. Abierta, Cerrada)"
     )
 
-    title = models.TextField(
+    title = models.CharField(
         unique=True,
         verbose_name="Titulo",
         max_length=255
