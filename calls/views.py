@@ -797,12 +797,19 @@ def apply_call(request, call_pk):
     people = Person.objects.filter(created_by__isnull=False).order_by('first_name', 'first_last_name')
     scale_choices = Scale.objects.filter(is_active=True).order_by('name')
 
-    # Initialize post_data here — always exists, even on GET
+    # Initialize post_data here - always exists, even on GET
     post_data = {}
     doc_form = ExpressionDocumentForm()
+    print("Check documents")
+    if documents.exists():
+        print("Check documents... They exist.")
+        doc_form.fields['file'].required = False
+        print(doc_form.fields['file'].required )
 
     if request.method == 'POST':
-
+        #print(request.POST)
+        print('remove_document' in request.POST)
+        print(request.POST.get('remove_document'))
         if request.method == "POST" and 'remove_document' in request.POST:
             doc_id = request.POST.get('remove_document')
             ExpressionDocument.objects.filter(id=doc_id, expression=expression).delete()
@@ -871,7 +878,7 @@ def apply_call(request, call_pk):
         if not has_errors:
             expression.save()
         
-        print('Post required fields', request.POST)
+        #print('Post required fields', request.POST)
         # Only proceed if core fields are valid
         #if not any(messages.get_messages(request)):
         storage = messages.get_messages(request)
@@ -883,7 +890,7 @@ def apply_call(request, call_pk):
 
         if not has_errors:
             # Process dynamic questions
-            print('Dynamic questions', request.POST)
+            #print('Dynamic questions', request.POST)
             question_errors = []
             for fq in form_questions:
                 field_name = f"question_{fq.shared_question.id}"
@@ -911,7 +918,7 @@ def apply_call(request, call_pk):
                 #return redirect(request.path)
             else:  # Only if no break
                 # Products
-                print('Products', request.POST)
+                #print('Products', request.POST)
                 Product.objects.filter(expression=expression).delete()
                 product_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('product_title_'))
                 for index in product_indices:
@@ -932,7 +939,7 @@ def apply_call(request, call_pk):
                             product.strategic_effects.set(StrategicEffect.objects.filter(id__in=effect_ids))
 
                 # Team Members
-                print('Project Members', request.POST)
+                #print('Project Members', request.POST)
                 ProjectTeamMember.objects.filter(expression=expression).delete()
                 team_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('team_member_person_'))
                 for index in team_indices:
@@ -962,7 +969,7 @@ def apply_call(request, call_pk):
                                 )
 
                 # Budget Items
-                print('Budget', request.POST)
+                #print('Budget', request.POST)
                 BudgetItem.objects.filter(expression=expression).delete()
                 budget_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('budget_item_category_'))
                 total_budget = 0
@@ -1014,9 +1021,13 @@ def apply_call(request, call_pk):
                     expression.scale = Scale.objects.get(name=scale_name)
 
                 # Documents
-                print('Documents', request.POST)
+                #print('Documents', request.POST)
                 if 'file' in request.FILES:
+                    print("Got to doc branch")
+                    print(f"doc existence {documents.exists()}")
                     doc_form = ExpressionDocumentForm(request.POST, request.FILES)
+                    if documents.exists():
+                        doc_form.fields['file'].required = False
                     if doc_form.is_valid():
                         doc = doc_form.save(commit=False)
                         doc.expression = expression
@@ -1027,7 +1038,7 @@ def apply_call(request, call_pk):
                             doc.save()
                             messages.success(request, "File uploaded successfully!")
                             # Security: Empty file input for next render.
-                            document_form = ExpressionDocumentForm()
+                            doc_form = ExpressionDocumentForm()
                     else:
                         for error in doc_form.non_field_errors():
                             messages.error(request, f"Upload error: {error}")
@@ -1037,8 +1048,9 @@ def apply_call(request, call_pk):
                     # But we don't want to show a "required" error if there's already a document.
                     # So, if there are existing documents, we make the form NOT required for this submission.
                     if documents.exists():
+                        print("Documents exist...")
                         # Temporarily make the file field not required for this validation
-                        document_form.fields['file'].required = False
+                        doc_form.fields['file'].required = False
                         # We don't validate it here because we're not uploading, but we need to pass it to the template
                         # If the user *did* try to upload, it would have been caught above.
                     # If there are NO documents, we leave document_form as is (required=True) so it validates
@@ -1050,9 +1062,17 @@ def apply_call(request, call_pk):
                     expression.status = submitted_status
                     expression.submission_datetime = timezone.now()
                     expression.save()
+                    print('Your application has been submitted successfully!')
                     messages.success(request, 'Your application has been submitted successfully!')
-                else:
+                elif 'save_draft' in request.POST:
+                    submitted_status, _ = Status.objects.get_or_create(name='Borrador')
+                    expression.status = submitted_status
+                    expression.submission_datetime = timezone.now()
+                    expression.save()
+                    print('Your application has been saved as a draft.')
                     messages.success(request, 'Your application has been saved as a draft.')
+                else:
+                    print("Something wrong")
 
     # Re-fetch expression to ensure fresh state
     expression = Expression.objects.select_related(
@@ -1115,13 +1135,13 @@ def apply_call(request, call_pk):
              for s in scale_choices
         ], cls=DjangoJSONEncoder),
         'documents': documents,
-        'document_form': ExpressionDocumentForm(),
+        'document_form': doc_form,
         'intersectionality_scopes': IntersectionalityScope.objects.filter(is_active=True).order_by('name'),
         # ALWAYS pass post_data - even on GET
         'post_data': post_data,
     }
 
-    print(f"People list is: {context['people_json']}")
+    #print(f"People list is: {context['people_json']}")
     return render(request, 'calls/apply_call.html', context)
 
 @login_required

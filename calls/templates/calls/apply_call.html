@@ -139,8 +139,11 @@
                             </a>
                             
                                 {% csrf_token %}
-                                <input type="hidden" name="remove_document" value="{{ doc.id }}">
-                                <button type="button" class="btn btn-sm btn-outline-danger remove-document" data-doc-id="{{ doc.id }}">✕ Borrar</button>
+                                <button type="button" 
+                                    class="btn btn-sm btn-outline-danger remove-document" 
+                                    data-doc-id="{{ doc.id }}">
+                                    ✕ Borrar
+                                </button>
                             
                         </li>
                     {% endfor %}
@@ -455,6 +458,9 @@
         <hr>
         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
             <a href="{% url 'calls:researcher_dashboard' %}" class="btn btn-secondary me-md-2">Cancelar</a>
+            <button type="submit" name="save_draft" class="btn btn-secondary">
+                Guardar Borrador
+            </button>
             <button type="submit" name="submit_application" class="btn btn-primary">Enviar Expresión de Interés</button>
         </div>
     </form>
@@ -468,6 +474,28 @@ document.addEventListener('DOMContentLoaded', function() {
     //debugger;
     console.log("Initializing form components...");
 
+
+    document.querySelectorAll(".remove-document").forEach(button => {
+        button.addEventListener("click", function () {
+            const docId = this.dataset.docId;
+
+            fetch("", {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({ remove_document: docId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    this.closest("li").remove();
+                }
+            });
+        });
+    });
+    
     // ============================
     // 6. ATTACH PERSON AUTOCOMPLETE (GLOBAL DECLARATION)
     // ============================
