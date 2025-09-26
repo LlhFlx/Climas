@@ -21,6 +21,7 @@ from geo.models import Country, DocumentType
 from people.models import Person
 from expressions.models import Expression, ExpressionDocument
 from expressions.forms import ExpressionDocumentForm
+from accounts.models import CustomUser
 
 from products.models import Product
 from django.forms import modelformset_factory
@@ -32,6 +33,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from project_team.models import ProjectTeamMember, InvestigatorCondition, InvestigatorThematicAxisAntecedent
 from intersectionality.models import IntersectionalityScope
 from budgets.models import BudgetCategory, BudgetItem, BudgetPeriod
+from evaluations.models import Evaluation, EvaluationResponse, EvaluationTemplate, TemplateCategory, TemplateItem
 
 @login_required
 def coordinator_dashboard(request):
@@ -61,10 +63,24 @@ def coordinator_dashboard(request):
     budget_categories = BudgetCategory.objects.filter(is_active=True).order_by('name')
     budget_periods = BudgetPeriod.objects.all().order_by('order', 'name')
     people = Person.objects.filter(created_by__isnull=False).order_by('first_name', 'first_last_name')
+    # Get all templates
+    templates = EvaluationTemplate.objects.all().order_by('-is_active', 'name')
+    print(f"Templates are {templates}")
+    # Get all submitted expressions (status = 'Enviada')
+    submitted_expressions = Expression.objects.filter(
+        status__name='Enviada'
+    ).select_related('user', 'call', 'scale', 'status').order_by('-submission_datetime')
 
-    return render(request, 'calls/coordinator_dashboard.html', {
+    # Get all Evaluator users
+    evaluators = CustomUser.objects.filter(
+        role__name='Evaluator',
+        role__is_active=True
+    ).select_related('role', 'person', 'user').order_by('person__first_name', 'person__first_last_name')
+    context = {
         'calls': calls,
         'shared_questions': shared_questions,
+        'submitted_expressions': submitted_expressions,
+        'evaluators': evaluators,
         'institutions': institutions,
         'institution_types': institution_types,
         'countries': countries,
@@ -74,7 +90,189 @@ def coordinator_dashboard(request):
         'budget_categories': budget_categories,
         'budget_periods': budget_periods,
         'people': people,
-    })
+        'templates': templates,
+    }
+    return render(request, 'calls/coordinator_dashboard.html', context)
+
+
+@login_required
+def assign_evaluator(request, expression_id):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
+        messages.error(request, "Access denied.")
+        return redirect('home')
+
+    expression = get_object_or_404(Expression, id=expression_id)
+    
+    # Check if the expression has been submitted
+    if expression.status.name != 'Enviada':
+        messages.error(request, "Solo se pueden asignar evaluadores a expresiones enviadas.")
+        return redirect('calls:coordinator_evaluations_dashboard')
+
+    if request.method == 'POST':
+        evaluator_id = request.POST.get('evaluator_id')
+        if not evaluator_id:
+            messages.error(request, "Debe seleccionar un evaluador.")
+            return redirect('calls:coordinator_evaluations_dashboard')
+
+        try:
+            evaluator = CustomUser.objects.get(id=evaluator_id, role__name='Evaluator', role__is_active=True)
+        except CustomUser.DoesNotExist:
+            messages.error(request, "Evaluador no válido o inactivo.")
+            return redirect('calls:coordinator_evaluations_dashboard')
+
+        # Get or create required related objects safely
+        pending_status, _ = Status.objects.get_or_create(
+            name='Pendiente',
+            defaults={'description': 'Evaluación pendiente de revisión'}
+        )
+        
+        default_template = EvaluationTemplate.objects.filter(is_active=True).first()
+        if not default_template:
+            messages.error(request, "No hay plantillas de evaluación activas disponibles.")
+            return redirect('calls:coordinator_evaluations_dashboard')
+
+        # Create or update Evaluation record
+        evaluation, created = Evaluation.objects.get_or_create(
+            expression=expression,
+            evaluator=evaluator,
+            defaults={
+                'status': pending_status,
+                'template': default_template,
+                'total_score': None,
+                'max_possible_score': 100.00,
+            }
+        )
+
+        if created:
+            messages.success(
+                request,
+                f"Evaluador '{evaluator.person}' asignado correctamente a '{expression.project_title}'."
+            )
+        else:
+            messages.info(
+                request,
+                f"Evaluador '{evaluator.person}' ya estaba asignado a esta expresión."
+            )
+
+    return redirect('calls:coordinator_evaluations_dashboard')
+
+@login_required
+def evaluator_dashboard(request):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Evaluator':
+        messages.error(request, "Access denied.")
+        return redirect('home')
+
+    # Get all evaluations assigned to this evaluator (status: Pendiente, En Progreso, etc.)
+    evaluations = Evaluation.objects.filter(
+        evaluator=request.user.customuser,
+        status__name__in=['Pendiente', 'En Progreso']
+    ).select_related(
+        'expression', 'expression__call', 'expression__user', 'template'
+    ).order_by('-submission_datetime')
+
+    context = {
+        'evaluations': evaluations,
+    }
+    return render(request, 'calls/evaluator_dashboard.html', context)
+
+@login_required
+def evaluate_expression(request, evaluation_id):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Evaluator':
+        messages.error(request, "Access denied.")
+        return redirect('home')
+
+    evaluation = get_object_or_404(Evaluation, id=evaluation_id, evaluator=request.user.customuser)
+
+    if evaluation.status.name not in ['Pendiente', 'En Progreso']:
+        messages.error(request, "Esta evaluación ya fue completada o no está disponible.")
+        return redirect('calls:evaluator_dashboard')
+
+    # Load template and items
+    template = evaluation.template
+    if not template:
+        messages.error(request, "No se encontró una plantilla de evaluación activa.")
+        return redirect('calls:evaluator_dashboard')
+
+    items = TemplateItem.objects.filter(category__template=template).select_related('category').order_by('category__order', 'order')
+
+    if request.method == 'POST':
+        total_score = 0
+        for item in items:
+            field_name = f"item_{item.id}"
+            score_str = request.POST.get(field_name)
+            comment = request.POST.get(f"comment_{item.id}", "")
+
+            if not score_str:
+                messages.error(request, f"Debe asignar una puntuación para: {item.question}")
+                return render(request, 'calls/evaluate_expression.html', {
+                    'evaluation': evaluation,
+                    'template': template,
+                    'items': items,
+                })
+
+            try:
+                score = float(score_str)
+                if score < 0 or score > item.max_score:
+                    messages.error(request, f"Puntuación inválida para: {item.question}. Debe estar entre 0 y {item.max_score}.")
+                    return render(request, 'calls/evaluate_expression.html', {
+                        'evaluation': evaluation,
+                        'template': template,
+                        'items': items,
+                    })
+            except ValueError:
+                messages.error(request, f"Puntuación inválida para: {item.question}.")
+                return render(request, 'calls/evaluate_expression.html', {
+                    'evaluation': evaluation,
+                    'template': template,
+                    'items': items,
+                })
+
+            # Save or update response
+            response, created = EvaluationResponse.objects.update_or_create(
+                evaluation=evaluation,
+                item=item,
+                defaults={
+                    'score': score,
+                    'comment': comment,
+                }
+            )
+            total_score += score
+
+        # Update total score
+        evaluation.total_score = total_score
+        evaluation.status = Status.objects.get(name='Completada')
+        evaluation.submission_datetime = timezone.now()
+        evaluation.save()
+
+        messages.success(request, "Evaluación enviada con éxito.")
+        return redirect('calls:evaluator_dashboard')
+
+    context = {
+        'evaluation': evaluation,
+        'template': template,
+        'items': items,
+    }
+    return render(request, 'calls/evaluate_expression.html', context)
+
+@login_required
+def coordinator_view_evaluations(request):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
+        messages.error(request, "Access denied.")
+        return redirect('home')
+
+    evaluations = Evaluation.objects.select_related(
+        'expression__user__person',
+        'expression__call',
+        'evaluator__person',
+        'template'
+    ).order_by('-submission_datetime')
+
+    context = {
+        'evaluations': evaluations,
+    }
+    return render(request, 'calls/coordinator_view_evaluations.html', context)
+
+
 
 @login_required
 def create_shared_question(request):
@@ -1194,4 +1392,4 @@ def render_institution_input(request):
         'institution_name': '',   # empty for new entries
         'institution_id': '',     # empty for new entries
     }
-    return render(request, 'calls/partials/institution_input.html', context)
+    return render(request, 'calls/institution_input.html', context)

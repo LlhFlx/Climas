@@ -7,7 +7,7 @@ from accounts.models import User
 from common.models import Status
 
 
-class EvaluationTemplate(TimestampMixin, models.Model):
+class EvaluationTemplate(TimestampMixin, CreatedByMixin, models.Model):
     name = models.CharField(
         max_length=100,
         verbose_name="Nombre"
@@ -55,6 +55,11 @@ class TemplateCategory(TimestampMixin, models.Model):
     # )
 
     order = models.PositiveIntegerField(default=0, verbose_name="Orden")
+
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name='Activa'
+    )
 
     class Meta:
         ordering = ['order']

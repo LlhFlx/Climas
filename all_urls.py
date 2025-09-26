@@ -103,6 +103,11 @@ urlpatterns = [
     path('budget-period/create/', views.create_budget_period, name='create_budget_period'),
     path('budget-period/<int:period_id>/edit/', views.edit_budget_period, name='edit_budget_period'),
     path('budget-period/<int:period_id>/delete/', views.delete_budget_period, name='delete_budget_period'),
+
+    path('document/<int:doc_id>/download/', views.download_expression_document, name='download_expression_document'),
+    path('render/institution-input/', views.render_institution_input, name='render_institution_input'),
+    path('create-institution-page/', views.create_institution_page, name='create_institution_page'),
+    path('create-person-page/', views.create_person_page, name='create_person_page'),
 ]
 
 # ===== From: project_team/urls.py =====

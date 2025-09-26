@@ -312,6 +312,28 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     
-    {% block extra_js %}{% endblock %}
+    {% block extra_js %}
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tab = urlParams.get('tab');
+
+        if (tab) {
+            // Find the button with data-bs-target="#{tab}"
+            const triggerEl = document.querySelector(`button[data-bs-target="#${tab}"]`);
+            
+            if (triggerEl) {
+                // Use Bootstrap's JS API to show the tab
+                const tabInstance = bootstrap.Tab.getInstance(triggerEl);
+                if (tabInstance) {
+                    tabInstance.show();
+                } else {
+                    new bootstrap.Tab(triggerEl).show();
+                }
+            }
+        }
+    });
+    </script>
+{% endblock %}
 </body>
 </html>

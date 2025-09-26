@@ -24,6 +24,14 @@
                     <button class="nav-link active" id="calls-tab" data-bs-toggle="tab" data-bs-target="#calls" type="button" role="tab">Calls & Questions</button>
                 </li>
                 <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="evaluations-tab" data-bs-toggle="tab" data-bs-target="#evaluations" type="button" role="tab">
+                        Gestión de Evaluaciones
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="evaluation-templates-tab" data-bs-toggle="tab" data-bs-target="#evaluation-templates" type="button" role="tab">Plantillas de Evaluación</button>
+                </li>
+                <li class="nav-item" role="presentation">
                     <button class="nav-link" id="institutions-tab" data-bs-toggle="tab" data-bs-target="#institutions" type="button" role="tab">Institutions & Geo</button>
                 </li>
                 <li class="nav-item" role="presentation">
@@ -41,6 +49,15 @@
         <!-- Calls & Questions Tab -->
         <div class="tab-pane fade show active" id="calls" role="tabpanel">
             {% include 'calls/partials/calls_section.html' %}
+        </div>
+
+        <!-- Evaluations Tab -->
+        <div class="tab-pane fade" id="evaluations" role="tabpanel">
+            {% include 'calls/partials/evaluations_management.html' %}
+        </div>
+
+        <div class="tab-pane fade" id="evaluation-templates" role="tabpanel">
+            {% include 'calls/partials/evaluation_templates.html' %}
         </div>
 
         <!-- Institutions & Geo Tab -->

@@ -30,8 +30,8 @@ class ProjectLeaderExperience(TimestampMixin, models.Model):
     """
     Experiencia del líder del proyecto en una categoría específica.
     """
-    expression = models.ForeignKey(
-        'expressions.Expression',
+    expression = models.ForeignKey( ## Esto es para la proposal no expresion
+        'expressions.Expression', # PROPOSAL
         on_delete=models.CASCADE,
         verbose_name="Expresión de Interés"
     )
@@ -264,7 +264,7 @@ User = get_user_model()
 
 class Person(TimestampMixin, CreatedByMixin, models.Model):
     
-    person_id = models.AutoField(
+    id = models.AutoField(
         primary_key=True,
         verbose_name="ID Persona"
     )
@@ -411,6 +411,7 @@ from django.db import models
 from django.db import models
 from core.models import TimestampMixin, CreatedByMixin
 from django.core.validators import RegexValidator
+from django.core.files.storage import default_storage
 
 class Expression(TimestampMixin, CreatedByMixin, models.Model):
     id = models.AutoField(
@@ -448,6 +449,12 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
         verbose_name="País de Implementación"
     )
 
+    primary_institution = models.ForeignKey(
+        'institutions.Institution',
+        on_delete=models.PROTECT,
+        related_name='expressions_as_primary'
+    )
+
     problem = models.TextField(
         verbose_name="Descripción del Problema"
     )
@@ -469,6 +476,21 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
         null=True,
         blank=True,
         verbose_name="Fecha de Envío"
+    )
+
+    scale = models.ForeignKey(
+        'common.Scale',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Escala del Presupuesto"
+    )
+
+    intersectionality_scopes = models.ManyToManyField(
+        'intersectionality.IntersectionalityScope',
+        blank=True,
+        related_name='expressions',
+        verbose_name="Ámbitos de Interseccionalidad"
     )
 
     # evaluations = models.ManyToManyField(
@@ -494,6 +516,48 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
         # Auto-set submission_datetime on first save (when status changes to submitted)
         if not self.submission_datetime and self.status.name.lower() == 'submitted':
             self.submission_datetime = self.updated_at
+        super().save(*args, **kwargs)
+
+class ExpressionDocument(TimestampMixin, models.Model):
+    """
+    Document uploaded by the researcher as part of their Expression.
+    Stored temporarily until submission. Deleted on submission or timeout.
+    """
+    expression = models.ForeignKey(
+        'Expression',
+        on_delete=models.CASCADE,
+        related_name='documents',
+        verbose_name="Expresión de Interés"
+    )
+    file = models.FileField(
+        upload_to='expression_documents/%Y/%m/%d/',
+        verbose_name="Archivo",
+        help_text="Sube archivos como CV, cartas de apoyo, certificados. Máximo 10MB."
+    )
+    name = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Nombre del archivo"
+    )
+    uploaded_by = models.ForeignKey(
+        'accounts.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name="Cargado por"
+    )
+
+    class Meta:
+        db_table = 'expression_document'
+        verbose_name = "Documento de Expresión"
+        verbose_name_plural = "Documentos de Expresión"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name or self.file.name} ({self.expression.project_title})"
+    
+    def save(self, *args, **kwargs):
+        if not self.name:
+            self.name = self.file.name
         super().save(*args, **kwargs)
 
 # ===== From: intersectionality/models.py =====
@@ -702,7 +766,7 @@ class StrategicEffect(TimestampMixin, CreatedByMixin, models.Model):
     Efecto estrategico predefinido en la documentacion.
     """
     name = models.CharField(
-        max_length=250,
+        max_length=500,
         unique=True,
         verbose_name="Nombre"
     )
@@ -845,7 +909,8 @@ class Call(TimestampMixin, CreatedByMixin, models.Model):
 
     title = models.TextField(
         unique=True,
-        verbose_name="Titulo"
+        verbose_name="Titulo",
+        max_length=255
     )
     description = models.TextField(
         verbose_name="Descripcion"
@@ -912,7 +977,16 @@ class ProjectTeamMember(TimestampMixin, models.Model):
     status = models.ForeignKey(
         'common.Status',
         on_delete=models.PROTECT,
-        verbose_name="Estado de Participación"
+        verbose_name="Estado de Participación",
+        null=True,  # Allow null until selected/created
+        blank=True,
+    )
+    institution = models.ForeignKey(
+        'institutions.Institution',
+        on_delete=models.PROTECT,
+        verbose_name="Institución",
+        null=True,  # Allow null until selected/created
+        blank=True,
     )
     start_date = models.DateField(verbose_name="Fecha de Inicio")
     end_date = models.DateField(verbose_name="Fecha de Finalización")
@@ -925,7 +999,7 @@ class ProjectTeamMember(TimestampMixin, models.Model):
         ordering = ['expression', 'role']
 
     def __str__(self):
-        return f"{self.person} - {self.role} ({self.expression.project_title})"
+        return f"{self.person} - {self.role} ({self.institution.name if self.institution else 'Sin Institución'})"
 
 
 class InvestigatorThematicAxisAntecedent(TimestampMixin, models.Model):
@@ -1667,6 +1741,51 @@ class Status(TimestampMixin, models.Model):
 
     def __str__(self):
         return self.name
+    
+class Scale(TimestampMixin, models.Model):
+    """
+    Budget scale categories for Expression.
+    Used to classify project size based on total budget.
+    """
+    name = models.CharField(
+        max_length=1,
+        unique=True,
+        choices=[('S', 'Pequeña'), ('M', 'Mediana'), ('B', 'Grande')],
+        verbose_name="Escala"
+    )
+    description = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Descripción"
+    )
+    min_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        default=0,
+        verbose_name="Monto Mínimo (COP)"
+    )
+    max_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Monto Máximo (COP)"
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Activa")
+
+    class Meta:
+        db_table = 'scale'
+        verbose_name = "Escala de Presupuesto"
+        verbose_name_plural = "Escala de Presupuesto"
+        ordering = ['min_amount']
+
+    def __str__(self):
+        return f"{self.name} - {self.description}"
+
+    def save(self, *args, **kwargs):
+        if not self.description:
+            self.description = self.get_name_display()
+        super().save(*args, **kwargs)
 
 # ===== From: accounts/models.py =====
 

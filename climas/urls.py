@@ -22,6 +22,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
     path('calls/', include('calls.urls')),
+    path('evaluations/', include('evaluations.urls', namespace='evaluations')),
     path('', RedirectView.as_view(url='/accounts/login/', permanent=False), name='home'),
     path('captcha/', include('captcha.urls')),
 
