@@ -17,8 +17,10 @@
             {% for category in categories %}
                 <div class="card mb-4" id="category-{{ category.id }}">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <strong>{{ category.name }}</strong>
-                        <span class="text-muted">Orden: {{ category.order }}</span>
+                        <div>
+                            <strong>{{ category.name }}</strong>
+                            <span class="text-muted ms-3">Orden: {{ category.order }}</span>
+                        </div>
                         <div>
                             <a href="#" class="btn btn-sm btn-outline-warning me-1"
                             data-action="edit-category"
