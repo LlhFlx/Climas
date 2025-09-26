@@ -36,9 +36,16 @@
                                         <a href="{% url 'evaluations:template_detail' template.id %}" class="btn btn-outline-info btn-sm">
                                             Administrar Categorías e Ítems
                                         </a>
-                                        <a href="{% url 'evaluations:edit_template' template.id %}" class="btn btn-outline-primary btn-sm">
+                                        <button type="button"
+                                                class="btn btn-outline-primary btn-sm"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editTemplateModal"
+                                                data-template-id="{{ template.id }}"
+                                                data-template-name="{{ template.name|escapejs }}"
+                                                data-template-description="{{ template.description|escapejs }}"
+                                                data-template-is-active="{{ template.is_active }}">
                                             Editar
-                                        </a>
+                                        </button>
                                         <button type="button"
                                                 class="btn btn-outline-danger btn-sm"
                                                 onclick="confirmDelete({{ template.id }}, '{{ template.name }}')">
@@ -59,7 +66,7 @@
     </div>
 </div>
 
-<!-- Modal: Create/Edit Template -->
+<!-- Modal: Create Template -->
 <div class="modal fade" id="createTemplateModal" tabindex="-1" aria-labelledby="createTemplateModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <form method="post" id="templateForm" action="{% url 'evaluations:create_template' %}">
@@ -92,7 +99,60 @@
     </div>
 </div>
 
+<!-- Modal: Edit Template -->
+<div class="modal fade" id="editTemplateModal" tabindex="-1" aria-labelledby="editTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form method="post" id="editTemplateForm" action="">
+            {% csrf_token %}
+            <input type="hidden" name="id" id="edit-template-id">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editTemplateModalLabel">Editar Plantilla de Evaluación</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre *</label>
+                        <input type="text" name="name" class="form-control" id="edit-template-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descripción</label>
+                        <textarea name="description" class="form-control" rows="3" id="edit-template-description"></textarea>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="is_active" value="on" class="form-check-input" id="edit-template-is-active">
+                        <label class="form-check-label">Activa</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+
 <script>
+// Reusable function to show user feedback
+function showMessage(type, text) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.role = 'alert';
+    alert.innerHTML = `
+        ${text}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    const container = document.querySelector('.container');
+    if (container) {
+        container.insertBefore(alert, container.firstChild);
+    }
+    setTimeout(() => {
+        if (alert.parentNode) alert.remove();
+    }, 5000);
+}
+
 document.getElementById('templateForm').addEventListener('submit', function(e) {
     e.preventDefault(); // Stop full page submit
     const form = e.target;
@@ -132,4 +192,81 @@ function confirmDelete(templateId, name) {
         form.submit();
     }
 }
+
+// ============================
+// HANDLE EDIT TEMPLATE BUTTON
+// ============================
+document.addEventListener('click', function(e) {
+    const editBtn = e.target.closest('button[data-template-id]');
+    if (!editBtn) return;
+
+    e.preventDefault();
+
+    const templateId = editBtn.getAttribute('data-template-id');
+    const templateName = editBtn.getAttribute('data-template-name');
+    const templateDescription = editBtn.getAttribute('data-template-description');
+    const templateIsActive = editBtn.getAttribute('data-template-is-active') === 'True';
+
+    const form = document.getElementById('editTemplateForm');
+    const modalTitle = document.getElementById('editTemplateModalLabel');
+
+    // Set form action
+    form.action = `{% url "evaluations:edit_template" 0 %}`.replace('0', templateId);
+
+    // Populate fields
+    document.getElementById('edit-template-id').value = templateId;
+    document.getElementById('edit-template-name').value = templateName;
+    document.getElementById('edit-template-description').value = templateDescription;
+    document.getElementById('edit-template-is-active').checked = templateIsActive;
+
+    // Show modal
+    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('editTemplateModal'));
+    if (modalInstance) {
+        modalInstance.show();
+    } else {
+        new bootstrap.Modal(document.getElementById('editTemplateModal')).show();
+    }
+});
+
+// ============================
+// HANDLE EDIT TEMPLATE FORM SUBMISSION
+// ============================
+document.getElementById('editTemplateForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const form = this;
+    const formData = new FormData(form);
+
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update the table row dynamically (optional)
+            const row = document.querySelector(`tr[data-template-id="${data.id}"]`);
+            if (row) {
+                row.querySelector('td strong').textContent = data.name;
+                row.querySelector('td:nth-child(2)').textContent = data.description;
+                const badge = row.querySelector('.badge');
+                badge.textContent = data.is_active ? 'Activa' : 'Inactiva';
+                badge.className = `badge bg-${data.is_active ? 'success' : 'secondary'}`;
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('editTemplateModal')).hide();
+            showMessage('success', `Plantilla "${data.name}" actualizada exitosamente.`);
+        } else {
+            alert('Error: ' + (data.error || 'Desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error al editar plantilla:', error);
+        alert('Hubo un problema al conectar con el servidor.');
+    });
+});
+
 </script>

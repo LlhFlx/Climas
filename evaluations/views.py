@@ -78,14 +78,12 @@ def create_evaluation_template(request):
 def edit_evaluation_template(request, template_id):
     if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
         return JsonResponse({'success': False, 'error': 'Access denied.'})
-
     template = get_object_or_404(EvaluationTemplate, id=template_id)
 
     if request.method == 'POST':
         name = request.POST.get('name')
         description = request.POST.get('description', '')
         is_active = request.POST.get('is_active') == 'on'
-
         if not name:
             return JsonResponse({'success': False, 'error': 'Name is required.'})
 
