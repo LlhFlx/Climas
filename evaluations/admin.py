@@ -148,7 +148,7 @@ class TemplateItemAdmin(admin.ModelAdmin):
 @admin.register(Evaluation)
 class EvaluationAdmin(CreatedByAdminMixin, admin.ModelAdmin):
     list_display = (
-        'expression',
+        'target_display',
         'evaluator',
         'status',
         'total_score',
@@ -161,23 +161,21 @@ class EvaluationAdmin(CreatedByAdminMixin, admin.ModelAdmin):
         'submission_datetime',
         'created_at',
         'template',
-        'expression__call'
+        'target_content_type',
     )
     search_fields = (
-        'expression__project_title',
         'evaluator__username',
         'evaluator__person__first_name',
         'evaluator__person__first_last_name',
-        'expression__user__person__first_name',
-        'expression__user__person__first_last_name',
+        'target_object_id',
     )
     readonly_fields = ('created_at', 'updated_at', 'total_score', 'max_possible_score')
-    autocomplete_fields = ('expression', 'evaluator', 'status', 'template')
+    autocomplete_fields = ('evaluator', 'status', 'template')
     date_hierarchy = 'submission_datetime'
 
     fieldsets = (
         (None, {
-            'fields': ('expression', 'evaluator', 'status', 'template')
+            'fields': ('target_content_type', 'target_object_id', 'evaluator', 'status', 'template')
         }),
         ('Resultados', {
             'fields': ('total_score', 'max_possible_score')
@@ -192,6 +190,15 @@ class EvaluationAdmin(CreatedByAdminMixin, admin.ModelAdmin):
     )
 
     ordering = ['-submission_datetime']
+
+    def target_display(self, obj):
+        """Custom column showing Expression or Proposal title."""
+        if obj.target_content_type.model == "expression":
+            return getattr(obj.target, "project_title", f"Expresión {obj.target_object_id}")
+        elif obj.target_content_type.model == "proposal":
+            return getattr(obj.target, "title", f"Propuesta {obj.target_object_id}")
+        return f"Objetivo {obj.target_object_id}"
+    target_display.short_description = "Objetivo"
 
 
 @admin.register(EvaluationResponse)

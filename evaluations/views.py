@@ -11,6 +11,7 @@ from evaluations.models import Evaluation, EvaluationResponse, EvaluationTemplat
 from expressions.models import Expression
 from people.models import Person
 from accounts.models import CustomUser
+from common.models import Status
 
 @login_required
 def coordinator_evaluations_dashboard(request):
@@ -398,9 +399,39 @@ def delete_template_item(request, item_id):
             return JsonResponse({'success': False, 'error': f'Failed to delete: {str(e)}'}, status=500)
 
     return JsonResponse({'success': False, 'error': 'Invalid request method.'}, status=405) 
-@login_required
-def assign_evaluator():
-    return None
+
+login_required
+def assign_evaluator(request, expression_id):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
+        messages.error(request, "Access denied.")
+        return redirect('calls:coordinator_dashboard')
+
+    expression = get_object_or_404(Expression, id=expression_id)
+    evaluator_id = request.POST.get('evaluator_id')
+
+    if not evaluator_id:
+        messages.error(request, "Debe seleccionar un evaluador.")
+        return redirect('calls:coordinator_dashboard')
+
+    evaluator = get_object_or_404(CustomUser, id=evaluator_id)
+
+    # Check if evaluation already exists
+    if Evaluation.objects.filter(expression=expression, evaluator=evaluator).exists():
+        messages.warning(request, f"Ya existe una evaluación asignada a {evaluator.person or evaluator.user.username}.")
+        return redirect('calls:coordinator_dashboard')
+
+    # Create the evaluation - but we DON’T assign a template yet!
+    # We’ll assign it later, when the evaluator opens the evaluation.    
+    evaluation = Evaluation.objects.create(
+        expression=expression,
+        evaluator=evaluator,        
+        status=Status.objects.get(name='Pendiente'),  # or whatever initial status
+        template=None,  # We'll set this later
+        created_by=request.user
+    )
+
+    messages.success(request, f"Evaluador '{evaluator.person or evaluator.user.username}' asignado exitosamente.")
+    return redirect('calls:coordinator_dashboard')
 
 @login_required
 def evaluator_dashboard():

@@ -3,9 +3,11 @@ from django.apps import apps
 from core.models import TimestampMixin, CreatedByMixin
 from core.choices import FIELD_TYPE_CHOICES, SOURCE_MODEL_CHOICES
 from expressions.models import Expression
-from accounts.models import User
+from accounts.models import CustomUser
 from common.models import Status
-
+from calls.models import Call
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType  
 
 class EvaluationTemplate(TimestampMixin, CreatedByMixin, models.Model):
     name = models.CharField(
@@ -21,6 +23,24 @@ class EvaluationTemplate(TimestampMixin, CreatedByMixin, models.Model):
     is_active = models.BooleanField(
         default=True,
         verbose_name='Activa'
+    )
+
+    # Template can be used for Expression, Proposal, or both
+    applies_to_expression = models.BooleanField(
+        default=True,
+        verbose_name="Aplica a Expresiones"
+    )
+    applies_to_proposal = models.BooleanField(
+        default=True,
+        verbose_name="Aplica a Propuestas"
+    )
+
+    # Template is tied to one or more calls
+    calls = models.ManyToManyField(
+        'calls.Call',
+        blank=True,
+        related_name='evaluation_templates',
+        verbose_name="Convocatorias Aplicables"
     )
 
     class Meta:
@@ -189,14 +209,21 @@ class TemplateItem(TimestampMixin, models.Model):
 
 class Evaluation(TimestampMixin, CreatedByMixin, models.Model):
     """
-    Representa la evaluacion hecha por un revisor a 
-    una Expresion de Interes.
+    Evaluación realizada por un evaluador.
+    Puede ser sobre una Expresión o una Propuesta.
     """
-    expression = models.ForeignKey(
-        'expressions.Expression',
+    # Generic foreign key to either Expression or Proposal
+    target_content_type = models.ForeignKey(
+        'contenttypes.ContentType',
         on_delete=models.CASCADE,
-        verbose_name="Expresión de Interés"
+        limit_choices_to={
+            'model__in': ['expression', 'proposal']
+        },
+        verbose_name="Objetivo"
     )
+    target_object_id = models.PositiveIntegerField(verbose_name="ID del Objetivo")
+    target = GenericForeignKey('target_content_type', 'target_object_id')
+
     evaluator = models.ForeignKey(
         'accounts.CustomUser',
         on_delete=models.PROTECT,
@@ -232,14 +259,38 @@ class Evaluation(TimestampMixin, CreatedByMixin, models.Model):
     )
 
     class Meta:
-        unique_together = ('expression', 'evaluator')
+        unique_together = ('target_content_type', 'target_object_id', 'evaluator')
         db_table = 'evaluation'
         verbose_name = "Evaluación"
         verbose_name_plural = "Evaluaciones"
         ordering = ['-submission_datetime']
 
     def __str__(self):
-        return f"Evaluación de {self.expression.project_title} por {self.evaluator}"
+        if self.target_content_type.model == "expression":
+            return f"Evaluación de la expresión '{self.target.project_title}' por {self.evaluator}"
+        elif self.target_content_type.model == "proposal":
+            return f"Evaluación de la propuesta '{self.target.title}' por {self.evaluator}"
+        return f"Evaluación (sin objetivo) por {self.evaluator}"
+    
+    @property
+    def target_object(self):
+        """Helper to get the actual Expression or Proposal object."""
+        return self.target
+
+    @property
+    def project_title(self):
+        """Shortcut to access project_title regardless of target type."""
+        return getattr(self.target, 'project_title', None)
+
+    @property
+    def call(self):
+        """Shortcut to access call via target."""
+        return getattr(self.target, 'call', None)
+
+    @property
+    def user(self):
+        """Shortcut to access user via target."""
+        return getattr(self.target, 'user', None)
 
 class EvaluationResponse(models.Model):
     """
