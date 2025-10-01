@@ -9,9 +9,13 @@ from django.http import HttpResponseForbidden, JsonResponse, FileResponse, Http4
 from django.core.serializers import serialize
 from evaluations.models import Evaluation, EvaluationResponse, EvaluationTemplate, TemplateCategory, TemplateItem
 from expressions.models import Expression
+from proposals.models import Proposal
 from people.models import Person
 from accounts.models import CustomUser
 from common.models import Status
+from django.contrib.contenttypes.models import ContentType
+from calls.models import Call
+#from proposals.models import Proposal
 
 @login_required
 def coordinator_evaluations_dashboard(request):
@@ -123,9 +127,13 @@ def evaluation_template_detail(request, template_id):
     template = get_object_or_404(EvaluationTemplate, id=template_id)
     categories = TemplateCategory.objects.filter(template=template).prefetch_related('items').order_by('order')
 
+    # Get all calls for linking
+    all_calls = Call.objects.all().order_by('title')
+
     context = {
         'template': template,
         'categories': categories,
+        'all_calls': all_calls,  # Pass to template
     }
     return render(request, 'evaluations/template_detail.html', context)
 
@@ -400,47 +408,306 @@ def delete_template_item(request, item_id):
 
     return JsonResponse({'success': False, 'error': 'Invalid request method.'}, status=405) 
 
-login_required
-def assign_evaluator(request, expression_id):
+@login_required
+def assign_evaluator(request, target_type, target_id):
     if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
         messages.error(request, "Access denied.")
         return redirect('calls:coordinator_dashboard')
+    
+    # Map target_type to model
+    model_map = {
+        "expression": Expression,
+        "proposal": Proposal,  # Make sure this import exists!
+    }
+
+    Model = model_map.get(target_type.lower())
+    if not Model:
+        messages.error(request, "Tipo de objetivo inválido.")
+        return redirect('calls:coordinator_dashboard')
+
+    # Get the actual object
+    target = get_object_or_404(Model, id=target_id)
+    
+    # Validate status based on type
+    if target_type == "expression" and target.status.name != 'Enviada':
+        messages.error(request, "Solo se pueden asignar evaluadores a expresiones enviadas.")
+        return redirect('calls:coordinator_dashboard')
+    elif target_type == "proposal" and target.status.name != 'Aprobada':
+        messages.error(request, "Solo se pueden asignar evaluadores a propuestas aprobadas.")
+        return redirect('calls:coordinator_dashboard')
+
+    if request.method == 'POST':
+        evaluator_id = request.POST.get('evaluator_id')
+        template_id = request.POST.get('template_id')
+
+        if not evaluator_id:
+            messages.error(request, "Debe seleccionar un evaluador.")
+            return redirect('calls:coordinator_dashboard')
+
+        evaluator = get_object_or_404(
+            CustomUser,
+            id=evaluator_id,
+            role__name='Evaluator',
+            role__is_active=True
+        )
+        
+        # Validate template if selected
+        template = None
+        if template_id:
+            try:
+                if target_type == "expression":
+                    template = EvaluationTemplate.objects.get(
+                        id=template_id,
+                        calls=target.call,
+                        applies_to_expression=True
+                    )
+                elif target_type == "proposal":
+                    template = EvaluationTemplate.objects.get(
+                        id=template_id,
+                        calls=target.call,
+                        applies_to_proposal=True
+                    )
+            except EvaluationTemplate.DoesNotExist:
+                messages.error(request, "La plantilla seleccionada no es válida para esta convocatoria o tipo de objetivo.")
+                return redirect('calls:coordinator_dashboard')
+
+        # Get or create status
+        pending_status, _ = Status.objects.get_or_create(
+            name='Pendiente',
+            defaults={'description': 'Evaluación pendiente de revisión'}
+        )
+
+        # Save evaluation dynamically
+        content_type = ContentType.objects.get_for_model(target)
+
+        print("Pre save")
+        print(content_type)
+        print(target.id)
+        
+        evaluation, created = Evaluation.objects.get_or_create(
+            target_content_type=content_type,
+            target_object_id=target.id,
+            evaluator=evaluator,
+            defaults={
+                'status': pending_status,
+                'template': template,
+                'max_possible_score': 100.00,
+                'created_by': request.user,
+            }
+        )
+
+        if created:
+            msg = f"Evaluador '{evaluator.person or evaluator.user.username}' asignado"
+            if template:
+                msg += f" con plantilla '{template.name}'"
+            msg += f" a '{target.project_title}'."
+            messages.success(request, msg)
+        else:
+            messages.info(
+                request,
+                f"Evaluador '{evaluator.person or evaluator.user.username}' ya estaba asignado a esta {target_type}."
+            )
+
+    return redirect('calls:coordinator_dashboard')
+
+@login_required
+def approve_expression(request, expression_id):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
+        messages.error(request, "Acceso denegado.")
+        return redirect('calls:coordinator_dashboard')
 
     expression = get_object_or_404(Expression, id=expression_id)
-    evaluator_id = request.POST.get('evaluator_id')
 
-    if not evaluator_id:
-        messages.error(request, "Debe seleccionar un evaluador.")
+    if expression.status.name != 'Enviada':
+        messages.error(request, "Solo se puede aprobar expresiones con estado 'Enviada'.")
         return redirect('calls:coordinator_dashboard')
 
-    evaluator = get_object_or_404(CustomUser, id=evaluator_id)
-
-    # Check if evaluation already exists
-    if Evaluation.objects.filter(expression=expression, evaluator=evaluator).exists():
-        messages.warning(request, f"Ya existe una evaluación asignada a {evaluator.person or evaluator.user.username}.")
-        return redirect('calls:coordinator_dashboard')
-
-    # Create the evaluation - but we DON’T assign a template yet!
-    # We’ll assign it later, when the evaluator opens the evaluation.    
-    evaluation = Evaluation.objects.create(
-        expression=expression,
-        evaluator=evaluator,        
-        status=Status.objects.get(name='Pendiente'),  # or whatever initial status
-        template=None,  # We'll set this later
-        created_by=request.user
+    
+    # Create Proposal (inherits Expression fields)
+    proposal = Proposal.objects.create(
+        expression_ptr=expression,
+        budget_breakdown="",
+        implementation_plan="",
+        risk_analysis="",
+        sustainability_plan="",
+        status=Status.objects.get(name='Aprobada'),
     )
 
-    messages.success(request, f"Evaluador '{evaluator.person or evaluator.user.username}' asignado exitosamente.")
+    expression.status = Status.objects.get(name='Aprobada')
+    expression.save()
+
+    # Let coordinator choose template for Proposal
+    template_id = request.POST.get('proposal_template_id')
+    if template_id:
+        try:
+            template = EvaluationTemplate.objects.get(
+                id=template_id,
+                calls=expression.call,
+                applies_to_proposal=True
+            )
+            Evaluation.objects.filter(
+                target_content_type=ContentType.objects.get_for_model(Expression),
+                target_object_id=expression.id
+            ).update(
+                target=proposal,  # Point to Proposal now
+                template=template
+            )
+            messages.success(
+                request,
+                f"Propuesta aprobada y evaluación actualizada con plantilla '{template.name}'."
+            )
+        except EvaluationTemplate.DoesNotExist:
+            messages.error(request, "La plantilla seleccionada no aplica a propuestas.")
+    else:
+        # If no template selected, leave Evaluation.template as-is (or None)
+        messages.info(
+            request,
+            "Propuesta aprobada. Evaluación existente se mantiene. Asigne plantilla si es necesario."
+        )
+
     return redirect('calls:coordinator_dashboard')
+
 
 @login_required
 def evaluator_dashboard():
     return None
 
 @login_required
-def evaluate_expression():
-    return None
+def evaluate_expression(request, evaluation_id):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Evaluator':
+        messages.error(request, "Access denied.")
+        return redirect('home')
+
+    evaluation = get_object_or_404(Evaluation, id=evaluation_id, evaluator=request.user.customuser)
+    if evaluation.status.name not in ['Pendiente', 'En Progreso']:
+        messages.error(request, "Esta evaluación ya fue completada o no está disponible.")
+        return redirect('calls:evaluator_dashboard')
+
+    # Load template and items
+    template = evaluation.template
+    if not template:
+        messages.error(request, "No se encontró una plantilla de evaluación activa.")
+        return redirect('calls:evaluator_dashboard')
+
+    items = TemplateItem.objects.filter(category__template=template).select_related('category').order_by('category__order', 'order')
+
+    if request.method == 'POST':
+        total_score = 0
+        for item in items:
+            field_name = f"item_{item.id}"
+            score_str = request.POST.get(field_name)
+            comment = request.POST.get(f"comment_{item.id}", "")
+
+            if not score_str:
+                messages.error(request, f"Debe asignar una puntuación para: {item.question}")
+                return render(request, 'calls/evaluate_expression.html', {
+                    'evaluation': evaluation,
+                    'template': template,
+                    'items': items,
+                })
+
+            try:
+                score = float(score_str)
+                if score < 0 or score > item.max_score:
+                    messages.error(request, f"Puntuación inválida para: {item.question}. Debe estar entre 0 y {item.max_score}.")
+                    return render(request, 'calls/evaluate_expression.html', {
+                        'evaluation': evaluation,
+                        'template': template,
+                        'items': items,
+                    })
+            except ValueError:
+                messages.error(request, f"Puntuación inválida para: {item.question}.")
+                return render(request, 'calls/evaluate_expression.html', {
+                    'evaluation': evaluation,
+                    'template': template,
+                    'items': items,
+                })
+
+            # Save or update response
+            response, created = EvaluationResponse.objects.update_or_create(
+                evaluation=evaluation,
+                item=item,
+                defaults={
+                    'score': score,
+                    'comment': comment,
+                }
+            )
+            total_score += score
+
+        # THRESHOLD LOGIC HERE
+        evaluation.total_score = total_score
+        evaluation.is_positive = (total_score / evaluation.max_possible_score) >= 0.7  # 70% threshold
+        evaluation.status = Status.objects.get_or_create(name='Completada')
+        evaluation.submission_datetime = timezone.now()
+        evaluation.save()
+
+        from evaluations.utils import approve_if_auto_approved
+        target = evaluation.target
+        target_type = 'expression' if isinstance(target, Expression) else 'proposal'
+        if approve_if_auto_approved(target.id, target_type):
+            messages.info(
+                request,
+                "¡Autoaprobado! Dos evaluaciones positivas recibidas. La propuesta ha sido aprobada automáticamente."
+            )
+
+        messages.success(request, "Evaluación enviada con éxito.")
+        return redirect('calls:evaluator_dashboard')
+
+    context = {
+        'evaluation': evaluation,
+        'template': template,
+        'items': items,
+    }
+    return render(request, 'calls/evaluate_expression.html', context)
 
 @login_required
-def coordinator_view_evaluations():
-    return None
+def coordinator_view_evaluations(request):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
+        messages.error(request, "Access denied.")
+        return redirect('home')
+
+    evaluations = Evaluation.objects.select_related(
+        'target__user__person',     # Use target
+        'target__call',
+        'evaluator__person',
+        'template'
+    ).order_by('-submission_datetime')
+
+    context = {
+        'evaluations': evaluations,
+    }
+    return render(request, 'calls/coordinator_view_evaluations.html', context)
+
+@login_required
+def link_template_to_call(request, template_id):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
+        messages.error(request, "Access denied.")
+        return redirect('calls:coordinator_dashboard')
+
+    template = get_object_or_404(EvaluationTemplate, id=template_id)
+
+    if request.method == 'POST':
+        call_id = request.POST.get('call_id')
+        if not call_id:
+            messages.error(request, "Debe seleccionar una convocatoria.")
+            return redirect('evaluations:template_detail', template_id=template.id)
+
+        call = get_object_or_404(Call, id=call_id)
+        template.calls.add(call)
+        messages.success(request, f"Plantilla '{template.name}' asociada a la convocatoria '{call.title}'.")
+
+    return redirect('evaluations:template_detail', template_id=template.id)
+
+
+@login_required
+def unlink_template_from_call(request, template_id, call_id):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
+        messages.error(request, "Access denied.")
+        return redirect('calls:coordinator_dashboard')
+
+    template = get_object_or_404(EvaluationTemplate, id=template_id)
+    call = get_object_or_404(Call, id=call_id)
+    template.calls.remove(call)
+    messages.success(request, f"Plantilla '{template.name}' desasociada de la convocatoria '{call.title}'.")
+
+    return redirect('evaluations:template_detail', template_id=template.id)

@@ -12,6 +12,53 @@
         </button>
     </div>
 
+    <!-- Link Template to Calls -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Asociar Plantilla a Convocatorias</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{% url 'evaluations:link_template_to_call' template.id %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="call_id" class="form-label">Seleccionar Convocatoria</label>
+                    <select name="call_id" id="call_id" class="form-select" required>
+                        <option value="">-- Seleccionar --</option>
+                        {% for call in all_calls %}
+                            <option value="{{ call.id }}" {% if call in template.calls.all %}selected{% endif %}>
+                                {{ call.title }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Asociar Plantilla</button>
+            </form>
+
+            <!-- Show currently linked calls -->
+            {% if template.calls.exists %}
+                <div class="mt-3">
+                    <h6>Convocatorias Asociadas:</h6>
+                    <ul class="list-group list-group-flush">
+                        {% for call in template.calls.all %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ call.title }}
+                                <form method="post" action="{% url 'evaluations:unlink_template_from_call' template.id call.id %}" class="d-inline" onsubmit="return confirm('¿Desasociar esta convocatoria?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Quitar</button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% else %}
+                <div class="mt-3 text-muted">
+                    <small>No hay convocatorias asociadas aún.</small>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Categories and Items -->
     {% if categories %}
         <div id="categories-list">
             {% for category in categories %}
@@ -23,10 +70,10 @@
                         </div>
                         <div>
                             <a href="#" class="btn btn-sm btn-outline-warning me-1"
-                            data-action="edit-category"
-                            data-category-id="{{ category.id }}"
-                            data-category-name="{{ category.name|escapejs }}"
-                            data-category-order="{{ category.order }}">
+                               data-action="edit-category"
+                               data-category-id="{{ category.id }}"
+                               data-category-name="{{ category.name|escapejs }}"
+                               data-category-order="{{ category.order }}">
                                 Editar
                             </a>
                             <button type="button"
@@ -48,9 +95,9 @@
                                             <span><strong>{{ item.question }}</strong> ({{ item.get_field_type_display }}) - Max: {{ item.max_score }}</span>
                                             <div>
                                                 <a href="#" class="btn btn-sm btn-outline-warning me-1"
-                                                    data-action="edit-item"
-                                                    data-item-id="{{ item.id }}"
-                                                    data-question="{{ item.question|escapejs }}">
+                                                   data-action="edit-item"
+                                                   data-item-id="{{ item.id }}"
+                                                   data-question="{{ item.question|escapejs }}">
                                                     Editar
                                                 </a>
                                                 <button type="button"

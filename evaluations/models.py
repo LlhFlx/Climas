@@ -7,7 +7,6 @@ from accounts.models import CustomUser
 from common.models import Status
 from calls.models import Call
 from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType  
 
 class EvaluationTemplate(TimestampMixin, CreatedByMixin, models.Model):
     name = models.CharField(
@@ -256,6 +255,24 @@ class Evaluation(TimestampMixin, CreatedByMixin, models.Model):
         null=True,
         blank=True,
         verbose_name="Fecha de Envío"
+    )
+
+    # Track if this evaluation is considered "positive"
+    is_positive = models.BooleanField(
+        default=False,
+        verbose_name="Evaluación positiva"
+    )
+
+    # Coordinator can mark evaluation as "validated" after review
+    is_validated = models.BooleanField(
+        default=False,
+        verbose_name="Validada por coordinador"
+    )
+
+    # Optional: Coordinator notes
+    coordinator_notes = models.TextField(
+        blank=True,
+        verbose_name="Notas del coordinador"
     )
 
     class Meta:

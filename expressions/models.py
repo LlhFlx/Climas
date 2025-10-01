@@ -6,6 +6,8 @@ from django.db import models
 from core.models import TimestampMixin, CreatedByMixin
 from django.core.validators import RegexValidator
 from django.core.files.storage import default_storage
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericRelation
 
 class Expression(TimestampMixin, CreatedByMixin, models.Model):
     id = models.AutoField(
@@ -86,6 +88,14 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
         related_name='expressions',
         verbose_name="Ámbitos de Interseccionalidad"
     )
+    
+    evaluations = GenericRelation(
+        'evaluations.Evaluation',
+        content_type_field='target_content_type',
+        object_id_field='target_object_id',
+        related_query_name='expression'
+    )
+
 
     # evaluations = models.ManyToManyField(
     #     'accounts.CustomUser',
@@ -111,6 +121,21 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
         if not self.submission_datetime and self.status.name.lower() == 'submitted':
             self.submission_datetime = self.updated_at
         super().save(*args, **kwargs)
+    
+    @property
+    def evaluations(self):
+        """Get all evaluations for this expression via GenericForeignKey."""
+        from evaluations.models import Evaluation
+        content_type = ContentType.objects.get_for_model(self)
+        return Evaluation.objects.filter(
+            target_content_type=content_type,
+            target_object_id=self.id
+        )
+
+    # Get first evaluation
+    @property
+    def first_evaluation(self):
+        return self.evaluations.first()
 
 class ExpressionDocument(TimestampMixin, models.Model):
     """

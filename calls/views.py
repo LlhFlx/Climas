@@ -21,11 +21,13 @@ from geo.models import Country, DocumentType
 from people.models import Person
 from expressions.models import Expression, ExpressionDocument
 from expressions.forms import ExpressionDocumentForm
+from proposals.models import Proposal
 from accounts.models import CustomUser
 
 from products.models import Product
 from django.forms import modelformset_factory
 from django import forms
+from django.contrib.contenttypes.models import ContentType
 
 import json
 from django.core.serializers.json import DjangoJSONEncoder
@@ -71,6 +73,16 @@ def coordinator_dashboard(request):
         status__name='Enviada'
     ).select_related('user', 'call', 'scale', 'status').order_by('-submission_datetime')
 
+    
+    proposals = Proposal.objects.filter(
+        status__name='Aprobada'
+    ).select_related(
+        'expression_ptr__user',
+        'expression_ptr__call',
+        'expression_ptr__scale',
+        'expression_ptr__status'
+    ).order_by('-submission_datetime')
+
     # Get all Evaluator users
     evaluators = CustomUser.objects.filter(
         role__name='Evaluator',
@@ -80,6 +92,7 @@ def coordinator_dashboard(request):
         'calls': calls,
         'shared_questions': shared_questions,
         'submitted_expressions': submitted_expressions,
+        'proposals': proposals,
         'evaluators': evaluators,
         'institutions': institutions,
         'institution_types': institution_types,
@@ -96,65 +109,102 @@ def coordinator_dashboard(request):
 
 
 @login_required
-def assign_evaluator(request, expression_id):
+def assign_evaluator(request, target_type, target_id):
     if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
         messages.error(request, "Access denied.")
-        return redirect('home')
+        return redirect('calls:coordinator_dashboard')
 
-    expression = get_object_or_404(Expression, id=expression_id)
-    
-    # Check if the expression has been submitted
-    if expression.status.name != 'Enviada':
+    # Map target_type to model
+    model_map = {
+        "expression": Expression,
+        "proposal": Proposal,  # Make sure this import exists!
+    }
+
+    Model = model_map.get(target_type.lower())
+    if not Model:
+        messages.error(request, "Tipo de objetivo inválido.")
+        return redirect('calls:coordinator_dashboard')
+
+    # Get the actual object
+    target = get_object_or_404(Model, id=target_id)
+
+    # Validate status based on type
+    if target_type == "expression" and target.status.name != 'Enviada':
         messages.error(request, "Solo se pueden asignar evaluadores a expresiones enviadas.")
-        return redirect('calls:coordinator_evaluations_dashboard')
+        return redirect('calls:coordinator_dashboard')
+    elif target_type == "proposal" and target.status.name != 'Aprobada':
+        messages.error(request, "Solo se pueden asignar evaluadores a propuestas aprobadas.")
+        return redirect('calls:coordinator_dashboard')
 
     if request.method == 'POST':
         evaluator_id = request.POST.get('evaluator_id')
+        template_id = request.POST.get('template_id')
+
         if not evaluator_id:
             messages.error(request, "Debe seleccionar un evaluador.")
-            return redirect('calls:coordinator_evaluations_dashboard')
+            return redirect('calls:coordinator_dashboard')
 
-        try:
-            evaluator = CustomUser.objects.get(id=evaluator_id, role__name='Evaluator', role__is_active=True)
-        except CustomUser.DoesNotExist:
-            messages.error(request, "Evaluador no válido o inactivo.")
-            return redirect('calls:coordinator_evaluations_dashboard')
+        evaluator = get_object_or_404(
+            CustomUser,
+            id=evaluator_id,
+            role__name='Evaluator',
+            role__is_active=True
+        )
 
-        # Get or create required related objects safely
+        # Validate template if selected
+        template = None
+        if template_id:
+            try:
+                if target_type == "expression":
+                    template = EvaluationTemplate.objects.get(
+                        id=template_id,
+                        calls=target.call,
+                        applies_to_expression=True
+                    )
+                elif target_type == "proposal":
+                    template = EvaluationTemplate.objects.get(
+                        id=template_id,
+                        calls=target.call,
+                        applies_to_proposal=True
+                    )
+            except EvaluationTemplate.DoesNotExist:
+                messages.error(request, "La plantilla seleccionada no es válida para esta convocatoria o tipo de objetivo.")
+                return redirect('calls:coordinator_dashboard')
+
+        # Get or create status
         pending_status, _ = Status.objects.get_or_create(
             name='Pendiente',
             defaults={'description': 'Evaluación pendiente de revisión'}
         )
-        
-        default_template = EvaluationTemplate.objects.filter(is_active=True).first()
-        if not default_template:
-            messages.error(request, "No hay plantillas de evaluación activas disponibles.")
-            return redirect('calls:coordinator_evaluations_dashboard')
 
-        # Create or update Evaluation record
+        # Save evaluation dynamically
+        content_type = ContentType.objects.get_for_model(target)
+
         evaluation, created = Evaluation.objects.get_or_create(
-            expression=expression,
+            target_content_type=content_type,
+            target_object_id=target.id,
             evaluator=evaluator,
             defaults={
                 'status': pending_status,
-                'template': default_template,
-                'total_score': None,
+                'template': template,
                 'max_possible_score': 100.00,
+                'created_by': request.user,
             }
         )
 
         if created:
-            messages.success(
-                request,
-                f"Evaluador '{evaluator.person}' asignado correctamente a '{expression.project_title}'."
-            )
+            msg = f"Evaluador '{evaluator.person or evaluator.user.username}' asignado"
+            if template:
+                msg += f" con plantilla '{template.name}'"
+            msg += f" a '{target.project_title}'."
+            messages.success(request, msg)
         else:
             messages.info(
                 request,
-                f"Evaluador '{evaluator.person}' ya estaba asignado a esta expresión."
+                f"Evaluador '{evaluator.person or evaluator.user.username}' ya estaba asignado a esta {target_type}."
             )
 
-    return redirect('calls:coordinator_evaluations_dashboard')
+    return redirect('calls:coordinator_dashboard')
 
 @login_required
 def evaluator_dashboard(request):

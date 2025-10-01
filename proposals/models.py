@@ -1,5 +1,6 @@
 from django.db import models
 
+from django.contrib.contenttypes.fields import GenericRelation
 from expressions.models import Expression 
 
 class Proposal(Expression):
@@ -25,14 +26,11 @@ class Proposal(Expression):
         help_text="Cómo se mantendrá el proyecto después del financiamiento"
     )
 
-    # Override field from Expression if needed
-    scale = models.ForeignKey(
-        'common.Scale',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        verbose_name="Escala del Presupuesto",
-        help_text="Escalado revisado para propuesta"
+    evaluations = GenericRelation(
+        'evaluations.Evaluation',
+        content_type_field='target_content_type',
+        object_id_field='target_object_id',
+        related_query_name='proposal'
     )
 
     class Meta:

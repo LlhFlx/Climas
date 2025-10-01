@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'calls.apps.CallsConfig',
     'thematic_axes.apps.ThematicAxesConfig',
     'expressions.apps.ExpressionsConfig',
+    'proposals.apps.ProposalsConfig',
     'evaluations.apps.EvaluationsConfig',
     'strategic_effects.apps.StrategicEffectsConfig',
     'products.apps.ProductsConfig',
