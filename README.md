@@ -96,5 +96,7 @@ docker build -t climas-app .
 ```
 
 y luego volver a ejecutar el contenedor o el script `run-django.sh`.
+- Hay emoticones en el archivo
+`/myenv/lib64/python3.10/site-packages/pip/_vendor/rich/_emoji_codes.py`
 
 ---
