@@ -48,7 +48,9 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
     primary_institution = models.ForeignKey(
         'institutions.Institution',
         on_delete=models.PROTECT,
-        related_name='expressions_as_primary'
+        related_name='expressions_as_primary',
+        blank=True,
+        null=True
     )
 
     problem = models.TextField(
