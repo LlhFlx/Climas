@@ -1327,11 +1327,14 @@ def apply_call(request, call_pk):
                     if not expression.primary_institution_id:
                         messages.error(request, "La institución principal es obligatoria para enviar la expresión.")
                         has_errors = True
-                    submitted_status, _ = Status.objects.get_or_create(name='Enviada')
-                    expression.status = submitted_status
-                    expression.submission_datetime = timezone.now()
-                    expression.save()
-                    print('Your application has been submitted successfully!')
+                    if expression.status.name == 'Aprobada':
+                        messages.warning(request, "Esta expresión ya fue aprobada. No se puede volver a enviar.")
+                    else:
+                        submitted_status, _ = Status.objects.get_or_create(name='Enviada')
+                        expression.status = submitted_status
+                        expression.submission_datetime = timezone.now()
+                        expression.save()
+                        messages.success(request, 'Your application has been submitted successfully!')
                     messages.success(request, 'Your application has been submitted successfully!')
                 elif 'save_draft' in request.POST:
                     submitted_status, _ = Status.objects.get_or_create(name='Borrador')
