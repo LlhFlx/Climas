@@ -7,6 +7,7 @@ from accounts.models import CustomUser
 from common.models import Status
 from calls.models import Call
 from django.contrib.contenttypes.fields import GenericForeignKey
+from decimal import Decimal
 
 class EvaluationTemplate(TimestampMixin, CreatedByMixin, models.Model):
     name = models.CharField(
@@ -63,11 +64,51 @@ class EvaluationTemplate(TimestampMixin, CreatedByMixin, models.Model):
         self.update_evaluations()
 
     def update_evaluations(self):
-        """Update all Evaluation objects using this template with new max_possible_score."""
-        total = self.get_total_max_score()
-        if total > 0:
-            Evaluation.objects.filter(template=self).update(max_possible_score=total)
+        """Recalculate max_possible_score and re-evaluate is_positive for all related evaluations."""
+        new_total = self.get_total_max_score()
 
+        # If there are no items, set to 0
+        if new_total is None:
+            new_total = 0
+
+        # Grab all evaluations tied to this template
+        evaluations = Evaluation.objects.filter(template=self).select_related("status")
+
+        for evaluation in evaluations:
+            evaluation.max_possible_score = new_total
+
+            # Only recalc is_positive if evaluation is completed and has a score
+            if evaluation.status.name == "Completada" and evaluation.total_score is not None:
+                ratio = Decimal(str(evaluation.total_score)) / Decimal(str(new_total)) if new_total > 0 else Decimal("0")
+                evaluation.is_positive = ratio >= Decimal("0.7")
+
+            evaluation.save(update_fields=["max_possible_score", "is_positive"])
+            
+    # def update_evaluations(self):
+    #     """Update all Evaluation objects using this template with new max_possible_score."""
+    #     total = self.get_total_max_score()
+    #     if total > 0:
+    #         Evaluation.objects.filter(template=self).update(max_possible_score=total)
+
+    # def update_evaluations(self):
+    #     """Recalculate max_possible_score and re-evaluate is_positive for all related evaluations."""
+    #     new_total = self.get_total_max_score()
+    #     if new_total == 0:
+    #         return
+
+    #     # Get all evaluations using this template
+    #     evaluations = Evaluation.objects.filter(template=self).select_related('target', 'status')
+
+    #     for eval in evaluations:
+    #         # Update max possible score
+    #         eval.max_possible_score = new_total
+
+    #         # Recalculate is_positive only if it was Completada
+    #         if eval.status.name == 'Completada' and eval.total_score is not None:
+    #             ratio = Decimal(str(eval.total_score)) / Decimal(str(new_total))
+    #             eval.is_positive = ratio >= Decimal('0.7')  # 70%
+
+    #         eval.save(update_fields=['max_possible_score', 'is_positive'])
 
 class TemplateCategory(TimestampMixin, models.Model):
     template = models.ForeignKey(

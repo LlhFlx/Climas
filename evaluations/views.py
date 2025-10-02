@@ -662,27 +662,34 @@ def evaluate_expression(request, evaluation_id):
                     name='Completada',
                     defaults={'description': 'Evaluación completada por el evaluador'}
                 )
-
                 # THRESHOLD LOGIC - SAFE DECIMAL ARITHMETIC
                 # Convert to Decimal
                 total_score_decimal = Decimal(str(total_score))
 
                 # Calculate ratio safely
-                if evaluation.max_possible_score == 0:
-                    ratio = Decimal('0')
+                # if evaluation.max_possible_score == 0:
+                #     ratio = Decimal('0')
+                # else:
+                #     ratio = total_score_decimal / evaluation.max_possible_score
+                # Recalculate max_possible_score first!
+                evaluation.total_score = total_score_decimal
+                evaluation.max_possible_score = evaluation.template.get_total_max_score()
+
+                # Then calculate is_positive
+                if evaluation.max_possible_score > 0:
+                    ratio = total_score / float(evaluation.max_possible_score)
+                    evaluation.is_positive = ratio >= 0.7
                 else:
-                    ratio = total_score_decimal / evaluation.max_possible_score
+                    evaluation.is_positive = False
 
                 # Save final evaluation
-                evaluation.total_score = total_score_decimal
-                evaluation.is_positive = ratio >= Decimal('0.7')
                 evaluation.status = status_completada
                 evaluation.submission_datetime = timezone.now()
                 evaluation.save()
-
                 # Auto-approve check (if applicable)
                 target = evaluation.target
                 target_type = 'expression' if isinstance(target, Expression) else 'proposal'
+                print(approve_if_auto_approved(target.id, target_type))
                 if approve_if_auto_approved(target.id, target_type):
                     messages.info(
                         request,

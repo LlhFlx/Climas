@@ -69,6 +69,47 @@ class ProjectLeaderExperience(TimestampMixin, models.Model):
 
 from django.db import models
 
+from django.contrib.contenttypes.fields import GenericRelation
+from expressions.models import Expression 
+
+class Proposal(Expression):
+    """
+    Propuesta formal — expresión aprobada con campos adicionales.
+    Hereda todos los campos de Expression, más los nuevos.
+    """
+    # NEW FIELDS specific to Proposal
+    budget_breakdown = models.TextField(
+        verbose_name="Desglose Presupuestario",
+        help_text="Detalles de asignación de fondos por actividad"
+    )
+    implementation_plan = models.TextField(
+        verbose_name="Plan de Implementación",
+        help_text="Fases, cronograma, hitos"
+    )
+    risk_analysis = models.TextField(
+        verbose_name="Análisis de Riesgos",
+        help_text="Riesgos identificados y planes de mitigación"
+    )
+    sustainability_plan = models.TextField(
+        verbose_name="Plan de Sostenibilidad",
+        help_text="Cómo se mantendrá el proyecto después del financiamiento"
+    )
+
+    evaluations = GenericRelation(
+        'evaluations.Evaluation',
+        content_type_field='target_content_type',
+        object_id_field='target_object_id',
+        related_query_name='proposal'
+    )
+
+    class Meta:
+        verbose_name = "Propuesta"
+        verbose_name_plural = "Propuestas"
+        db_table = 'proposal'
+
+    def __str__(self):
+        return f"PROPUESTA: {self.project_title}"
+
 # ===== From: proponent_forms/models.py =====
 
 from django.apps import apps
@@ -328,6 +369,21 @@ class Person(TimestampMixin, CreatedByMixin, models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.first_last_name}"
+    
+    def get_full_name(self):
+        """Return full name (first + second name + both last names)."""
+        parts = [
+            self.first_name,
+            getattr(self, "second_name", None),  # in case it's optional
+            self.first_last_name,
+            getattr(self, "second_last_name", None),
+        ]
+        # filter out None or empty strings
+        return " ".join(filter(None, parts)).strip()
+
+    def get_short_name(self):
+        """Return first name only"""
+        return self.first_name
 
 
 # ===== From: thematic_axes/models.py =====
@@ -412,6 +468,8 @@ from django.db import models
 from core.models import TimestampMixin, CreatedByMixin
 from django.core.validators import RegexValidator
 from django.core.files.storage import default_storage
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.contenttypes.fields import GenericRelation
 
 class Expression(TimestampMixin, CreatedByMixin, models.Model):
     id = models.AutoField(
@@ -452,7 +510,9 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
     primary_institution = models.ForeignKey(
         'institutions.Institution',
         on_delete=models.PROTECT,
-        related_name='expressions_as_primary'
+        related_name='expressions_as_primary',
+        blank=True,
+        null=True
     )
 
     problem = models.TextField(
@@ -492,6 +552,14 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
         related_name='expressions',
         verbose_name="Ámbitos de Interseccionalidad"
     )
+    
+    evaluations = GenericRelation(
+        'evaluations.Evaluation',
+        content_type_field='target_content_type',
+        object_id_field='target_object_id',
+        related_query_name='expression'
+    )
+
 
     # evaluations = models.ManyToManyField(
     #     'accounts.CustomUser',
@@ -517,6 +585,21 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
         if not self.submission_datetime and self.status.name.lower() == 'submitted':
             self.submission_datetime = self.updated_at
         super().save(*args, **kwargs)
+    
+    @property
+    def evaluations(self):
+        """Get all evaluations for this expression via GenericForeignKey."""
+        from evaluations.models import Evaluation
+        content_type = ContentType.objects.get_for_model(self)
+        return Evaluation.objects.filter(
+            target_content_type=content_type,
+            target_object_id=self.id
+        )
+
+    # Get first evaluation
+    @property
+    def first_evaluation(self):
+        return self.evaluations.first()
 
 class ExpressionDocument(TimestampMixin, models.Model):
     """
@@ -907,7 +990,7 @@ class Call(TimestampMixin, CreatedByMixin, models.Model):
         help_text="Estado actual de la convocatoria (ej. Abierta, Cerrada)"
     )
 
-    title = models.TextField(
+    title = models.CharField(
         unique=True,
         verbose_name="Titulo",
         max_length=255
@@ -1340,11 +1423,13 @@ from django.apps import apps
 from core.models import TimestampMixin, CreatedByMixin
 from core.choices import FIELD_TYPE_CHOICES, SOURCE_MODEL_CHOICES
 from expressions.models import Expression
-from accounts.models import User
+from accounts.models import CustomUser
 from common.models import Status
+from calls.models import Call
+from django.contrib.contenttypes.fields import GenericForeignKey
+from decimal import Decimal
 
-
-class EvaluationTemplate(TimestampMixin, models.Model):
+class EvaluationTemplate(TimestampMixin, CreatedByMixin, models.Model):
     name = models.CharField(
         max_length=100,
         verbose_name="Nombre"
@@ -1360,6 +1445,24 @@ class EvaluationTemplate(TimestampMixin, models.Model):
         verbose_name='Activa'
     )
 
+    # Template can be used for Expression, Proposal, or both
+    applies_to_expression = models.BooleanField(
+        default=True,
+        verbose_name="Aplica a Expresiones"
+    )
+    applies_to_proposal = models.BooleanField(
+        default=True,
+        verbose_name="Aplica a Propuestas"
+    )
+
+    # Template is tied to one or more calls
+    calls = models.ManyToManyField(
+        'calls.Call',
+        blank=True,
+        related_name='evaluation_templates',
+        verbose_name="Convocatorias Aplicables"
+    )
+
     class Meta:
         db_table = 'evaluation_template'
         verbose_name = "Plantilla de Evaluacion"
@@ -1368,7 +1471,64 @@ class EvaluationTemplate(TimestampMixin, models.Model):
 
     def __str__(self):
         return self.name
+    
+    def get_total_max_score(self):
+        """Calculate the sum of max_score from all items."""
+        return self.categories.aggregate(
+            total=models.Sum('items__max_score')
+        )['total'] or 0
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Recalculate max_possible_score for all evaluations using this template
+        self.update_evaluations()
+
+    def update_evaluations(self):
+        """Recalculate max_possible_score and re-evaluate is_positive for all related evaluations."""
+        new_total = self.get_total_max_score()
+
+        # If there are no items, set to 0
+        if new_total is None:
+            new_total = 0
+
+        # Grab all evaluations tied to this template
+        evaluations = Evaluation.objects.filter(template=self).select_related("status")
+
+        for evaluation in evaluations:
+            evaluation.max_possible_score = new_total
+
+            # Only recalc is_positive if evaluation is completed and has a score
+            if evaluation.status.name == "Completada" and evaluation.total_score is not None:
+                ratio = Decimal(str(evaluation.total_score)) / Decimal(str(new_total)) if new_total > 0 else Decimal("0")
+                evaluation.is_positive = ratio >= Decimal("0.7")
+
+            evaluation.save(update_fields=["max_possible_score", "is_positive"])
+            
+    # def update_evaluations(self):
+    #     """Update all Evaluation objects using this template with new max_possible_score."""
+    #     total = self.get_total_max_score()
+    #     if total > 0:
+    #         Evaluation.objects.filter(template=self).update(max_possible_score=total)
+
+    # def update_evaluations(self):
+    #     """Recalculate max_possible_score and re-evaluate is_positive for all related evaluations."""
+    #     new_total = self.get_total_max_score()
+    #     if new_total == 0:
+    #         return
+
+    #     # Get all evaluations using this template
+    #     evaluations = Evaluation.objects.filter(template=self).select_related('target', 'status')
+
+    #     for eval in evaluations:
+    #         # Update max possible score
+    #         eval.max_possible_score = new_total
+
+    #         # Recalculate is_positive only if it was Completada
+    #         if eval.status.name == 'Completada' and eval.total_score is not None:
+    #             ratio = Decimal(str(eval.total_score)) / Decimal(str(new_total))
+    #             eval.is_positive = ratio >= Decimal('0.7')  # 70%
+
+    #         eval.save(update_fields=['max_possible_score', 'is_positive'])
 
 class TemplateCategory(TimestampMixin, models.Model):
     template = models.ForeignKey(
@@ -1392,6 +1552,11 @@ class TemplateCategory(TimestampMixin, models.Model):
     # )
 
     order = models.PositiveIntegerField(default=0, verbose_name="Orden")
+
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name='Activa'
+    )
 
     class Meta:
         ordering = ['order']
@@ -1521,14 +1686,21 @@ class TemplateItem(TimestampMixin, models.Model):
 
 class Evaluation(TimestampMixin, CreatedByMixin, models.Model):
     """
-    Representa la evaluacion hecha por un revisor a 
-    una Expresion de Interes.
+    Evaluación realizada por un evaluador.
+    Puede ser sobre una Expresión o una Propuesta.
     """
-    expression = models.ForeignKey(
-        'expressions.Expression',
+    # Generic foreign key to either Expression or Proposal
+    target_content_type = models.ForeignKey(
+        'contenttypes.ContentType',
         on_delete=models.CASCADE,
-        verbose_name="Expresión de Interés"
+        limit_choices_to={
+            'model__in': ['expression', 'proposal']
+        },
+        verbose_name="Objetivo"
     )
+    target_object_id = models.PositiveIntegerField(verbose_name="ID del Objetivo")
+    target = GenericForeignKey('target_content_type', 'target_object_id')
+
     evaluator = models.ForeignKey(
         'accounts.CustomUser',
         on_delete=models.PROTECT,
@@ -1563,15 +1735,64 @@ class Evaluation(TimestampMixin, CreatedByMixin, models.Model):
         verbose_name="Fecha de Envío"
     )
 
+    # Track if this evaluation is considered "positive"
+    is_positive = models.BooleanField(
+        default=False,
+        verbose_name="Evaluación positiva"
+    )
+
+    # Coordinator can mark evaluation as "validated" after review
+    is_validated = models.BooleanField(
+        default=False,
+        verbose_name="Validada por coordinador"
+    )
+
+    # Optional: Coordinator notes
+    coordinator_notes = models.TextField(
+        blank=True,
+        verbose_name="Notas del coordinador"
+    )
+
     class Meta:
-        unique_together = ('expression', 'evaluator')
+        unique_together = ('target_content_type', 'target_object_id', 'evaluator')
         db_table = 'evaluation'
         verbose_name = "Evaluación"
         verbose_name_plural = "Evaluaciones"
         ordering = ['-submission_datetime']
 
     def __str__(self):
-        return f"Evaluación de {self.expression.project_title} por {self.evaluator}"
+        if self.target_content_type.model == "expression":
+            return f"Evaluación de la expresión '{self.target.project_title}' por {self.evaluator}"
+        elif self.target_content_type.model == "proposal":
+            return f"Evaluación de la propuesta '{self.target.title}' por {self.evaluator}"
+        return f"Evaluación (sin objetivo) por {self.evaluator}"
+    
+    @property
+    def target_object(self):
+        """Helper to get the actual Expression or Proposal object."""
+        return self.target
+    
+    # @property
+    # def target(self):
+    #     """Resolves GenericForeignKey safely."""
+    #     content_type = self.target_content_type
+    #     model_class = content_type.model_class()
+    #     return model_class._default_manager.get(pk=self.target_object_id)
+
+    @property
+    def project_title(self):
+        """Shortcut to access project_title regardless of target type."""
+        return getattr(self.target, 'project_title', None)
+
+    @property
+    def call(self):
+        """Shortcut to access call via target."""
+        return getattr(self.target, 'call', None)
+
+    @property
+    def user(self):
+        """Shortcut to access user via target."""
+        return getattr(self.target, 'user', None)
 
 class EvaluationResponse(models.Model):
     """
