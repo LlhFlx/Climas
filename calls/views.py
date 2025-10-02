@@ -67,7 +67,8 @@ def coordinator_dashboard(request):
     people = Person.objects.filter(created_by__isnull=False).order_by('first_name', 'first_last_name')
     # Get all templates
     templates = EvaluationTemplate.objects.all().order_by('-is_active', 'name')
-    print(f"Templates are {templates}")
+    # print(f"Templates are {templates}")
+    
     # Get all submitted expressions (status = 'Enviada')
     submitted_expressions = Expression.objects.filter(
         status__name='Enviada'
@@ -83,6 +84,15 @@ def coordinator_dashboard(request):
         'expression_ptr__status'
     ).order_by('-submission_datetime')
 
+    completed_evaluations = Evaluation.objects.filter(
+        status__name='Completada'
+    ).select_related(
+        'target_content_type',
+        'evaluator__person',
+        'template',
+        'status'
+    ).order_by('-submission_datetime')
+
     # Get all Evaluator users
     evaluators = CustomUser.objects.filter(
         role__name='Evaluator',
@@ -93,6 +103,7 @@ def coordinator_dashboard(request):
         'shared_questions': shared_questions,
         'submitted_expressions': submitted_expressions,
         'proposals': proposals,
+        'evaluations': completed_evaluations,
         'evaluators': evaluators,
         'institutions': institutions,
         'institution_types': institution_types,
@@ -1087,8 +1098,15 @@ def apply_call(request, call_pk):
         expression.methodology = post_data['methodology']
         expression.funding_eligibility_acceptance = post_data['funding_eligibility_acceptance']
         
-        if post_data['primary_institution_id'] and post_data['primary_institution_id'].isdigit():
-            expression.primary_institution_id = int(post_data['primary_institution_id'])
+        # Graceful handling for missing primary institution
+        inst_id = post_data['primary_institution_id']
+        if inst_id and inst_id.isdigit():
+            try:
+                institution = Institution.objects.get(id=int(inst_id))
+                expression.primary_institution = institution
+            except Institution.DoesNotExist:
+                messages.error(request, "Institución seleccionada no válida.")
+                expression.primary_institution = None
         else:
             expression.primary_institution = None
         
@@ -1306,6 +1324,9 @@ def apply_call(request, call_pk):
 
                 # Submit or save
                 if 'submit_application' in request.POST:
+                    if not expression.primary_institution_id:
+                        messages.error(request, "La institución principal es obligatoria para enviar la expresión.")
+                        has_errors = True
                     submitted_status, _ = Status.objects.get_or_create(name='Enviada')
                     expression.status = submitted_status
                     expression.submission_datetime = timezone.now()

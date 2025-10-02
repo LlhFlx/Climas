@@ -4,6 +4,7 @@ from django.contrib.contenttypes.models import ContentType
 from geo.models import Country
 from accounts.models import Role
 from budgets.models import BudgetCategory, BudgetPeriod
+from common.models import Scale
 
 
 class Command(BaseCommand):
@@ -159,6 +160,46 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(f"Created {created_periods} budget periods.")
+        )
+
+        # -------------------------
+        # 5. Load Scales
+        # -------------------------
+        scale_data = [
+            {
+                'name': 'S',
+                'description': 'Hasta $250.000.000 COP',
+                'min_amount': 0,
+                'max_amount': 250000000,
+                'is_active': True
+            },
+            {
+                'name': 'M',
+                'description': 'De $250.000.001 a $500.000.000 COP',
+                'min_amount': 250000001,
+                'max_amount': 500000000,
+                'is_active': True
+            },
+            {
+                'name': 'B',
+                'description': 'Más de $500.000.000 COP',
+                'min_amount': 500000001,
+                'max_amount': 900000000,
+                'is_active': True
+            }
+        ]
+        
+        created_scales = 0
+        for data in scale_data:
+            obj, created = Scale.objects.get_or_create(
+                name=data['name'],
+                defaults=data
+            )
+            if created:
+                created_scales += 1
+
+        self.stdout.write(
+            self.style.SUCCESS(f"Created {created_scales} project scales.")
         )
 
         self.stdout.write(

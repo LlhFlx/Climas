@@ -15,6 +15,9 @@ from accounts.models import CustomUser
 from common.models import Status
 from django.contrib.contenttypes.models import ContentType
 from calls.models import Call
+from evaluations.utils import approve_if_auto_approved
+from django.db import transaction
+from decimal import Decimal
 #from proposals.models import Proposal
 
 @login_required
@@ -569,8 +572,25 @@ def approve_expression(request, expression_id):
 
 
 @login_required
-def evaluator_dashboard():
-    return None
+def evaluator_dashboard(request):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Evaluator':
+        messages.error(request, "Access denied.")
+        return redirect('home')
+
+    # Get all evaluations assigned to this evaluator
+    evaluations = Evaluation.objects.filter(
+        evaluator=request.user.customuser,
+        status__name__in=['Pendiente', 'En Progreso', 'Completada']
+    ).select_related(
+        'target_content_type',
+        'template',
+        'status'
+    ).order_by('-updated_at')
+
+    context = {
+        'evaluations': evaluations
+    }
+    return render(request, 'evaluations/evaluator_dashboard.html', context)
 
 @login_required
 def evaluate_expression(request, evaluation_id):
@@ -578,7 +598,13 @@ def evaluate_expression(request, evaluation_id):
         messages.error(request, "Access denied.")
         return redirect('home')
 
-    evaluation = get_object_or_404(Evaluation, id=evaluation_id, evaluator=request.user.customuser)
+    evaluation = get_object_or_404(
+        Evaluation, 
+        id=evaluation_id, 
+        evaluator=request.user.customuser
+    )
+
+    # Validate state
     if evaluation.status.name not in ['Pendiente', 'En Progreso']:
         messages.error(request, "Esta evaluación ya fue completada o no está disponible.")
         return redirect('calls:evaluator_dashboard')
@@ -589,76 +615,98 @@ def evaluate_expression(request, evaluation_id):
         messages.error(request, "No se encontró una plantilla de evaluación activa.")
         return redirect('calls:evaluator_dashboard')
 
-    items = TemplateItem.objects.filter(category__template=template).select_related('category').order_by('category__order', 'order')
+    items = TemplateItem.objects.filter(
+        category__template=template
+    ).select_related('category').order_by('category__order', 'order')
 
     if request.method == 'POST':
         total_score = 0
-        for item in items:
-            field_name = f"item_{item.id}"
-            score_str = request.POST.get(field_name)
-            comment = request.POST.get(f"comment_{item.id}", "")
+        try:
+            with transaction.atomic():
+                for item in items:
+                    field_name = f"item_{item.id}"
+                    score_str = request.POST.get(field_name)
+                    comment = request.POST.get(f"comment_{item.id}", "")
 
-            if not score_str:
-                messages.error(request, f"Debe asignar una puntuación para: {item.question}")
-                return render(request, 'calls/evaluate_expression.html', {
-                    'evaluation': evaluation,
-                    'template': template,
-                    'items': items,
-                })
+                    if not score_str:
+                        raise ValueError(f"Debe asignar una puntuación para: {item.question}")
 
-            try:
-                score = float(score_str)
-                if score < 0 or score > item.max_score:
-                    messages.error(request, f"Puntuación inválida para: {item.question}. Debe estar entre 0 y {item.max_score}.")
-                    return render(request, 'calls/evaluate_expression.html', {
-                        'evaluation': evaluation,
-                        'template': template,
-                        'items': items,
-                    })
-            except ValueError:
-                messages.error(request, f"Puntuación inválida para: {item.question}.")
-                return render(request, 'calls/evaluate_expression.html', {
-                    'evaluation': evaluation,
-                    'template': template,
-                    'items': items,
-                })
+                    try:
+                        score = float(score_str)
+                        if score < 0 or score > item.max_score:
+                            raise ValueError(f"Puntuación inválida para '{item.question}'. Debe estar entre 0 y {item.max_score}.")
+                    except ValueError as e:
+                        raise ValueError(str(e))
 
-            # Save or update response
-            response, created = EvaluationResponse.objects.update_or_create(
-                evaluation=evaluation,
-                item=item,
-                defaults={
-                    'score': score,
-                    'comment': comment,
-                }
-            )
-            total_score += score
+                    # Update or create response
+                    EvaluationResponse.objects.update_or_create(
+                        evaluation=evaluation,
+                        item=item,
+                        defaults={
+                            'score': score,
+                            'comment': comment,
+                        }
+                    )
+                    total_score += score
 
-        # THRESHOLD LOGIC HERE
-        evaluation.total_score = total_score
-        evaluation.is_positive = (total_score / evaluation.max_possible_score) >= 0.7  # 70% threshold
-        evaluation.status = Status.objects.get_or_create(name='Completada')
-        evaluation.submission_datetime = timezone.now()
-        evaluation.save()
+                # Set completion status
+                status_completada, _ = Status.objects.get_or_create(
+                    name='Completada',
+                    defaults={'description': 'Evaluación completada por el evaluador'}
+                )
 
-        from evaluations.utils import approve_if_auto_approved
-        target = evaluation.target
-        target_type = 'expression' if isinstance(target, Expression) else 'proposal'
-        if approve_if_auto_approved(target.id, target_type):
-            messages.info(
-                request,
-                "¡Autoaprobado! Dos evaluaciones positivas recibidas. La propuesta ha sido aprobada automáticamente."
-            )
+                # THRESHOLD LOGIC - SAFE DECIMAL ARITHMETIC
+                # Convert to Decimal
+                total_score_decimal = Decimal(str(total_score))
 
-        messages.success(request, "Evaluación enviada con éxito.")
-        return redirect('calls:evaluator_dashboard')
+                # Calculate ratio safely
+                if evaluation.max_possible_score == 0:
+                    ratio = Decimal('0')
+                else:
+                    ratio = total_score_decimal / evaluation.max_possible_score
+
+                # Save final evaluation
+                evaluation.total_score = total_score_decimal
+                evaluation.is_positive = ratio >= Decimal('0.7')
+                evaluation.status = status_completada
+                evaluation.submission_datetime = timezone.now()
+                evaluation.save()
+
+                # Auto-approve check (if applicable)
+                target = evaluation.target
+                target_type = 'expression' if isinstance(target, Expression) else 'proposal'
+                if approve_if_auto_approved(target.id, target_type):
+                    messages.info(
+                        request,
+                        "¡Autoaprobado! Dos evaluaciones positivas recibidas. La propuesta ha sido aprobada automáticamente."
+                    )
+
+                messages.success(request, "Evaluación enviada con éxito.")
+
+        except ValueError as ve:
+            messages.error(request, str(ve))
+            return render(request, 'evaluations/evaluate_expression.html', {
+                'evaluation': evaluation,
+                'template': template,
+                'items': items,
+            })
+        except Exception as e:
+            messages.error(request, "Ocurrió un error al guardar la evaluación.")
+            print("Error saving evaluation:", e)
+            return render(request, 'evaluations/evaluate_expression.html', {
+                'evaluation': evaluation,
+                'template': template,
+                'items': items,
+            })
+
+        return redirect('evaluations:evaluator_dashboard')
 
     context = {
         'evaluation': evaluation,
         'template': template,
         'items': items,
     }
-    return render(request, 'calls/evaluate_expression.html', context)
+    return render(request, 'evaluations/evaluate_expression.html', context)
 
 @login_required
 def coordinator_view_evaluations(request):
@@ -666,17 +714,19 @@ def coordinator_view_evaluations(request):
         messages.error(request, "Access denied.")
         return redirect('home')
 
-    evaluations = Evaluation.objects.select_related(
-        'target__user__person',     # Use target
-        'target__call',
+    evaluations = Evaluation.objects.filter(
+        status__name='Completada'
+    ).select_related(
+        'target_content_type',
         'evaluator__person',
-        'template'
+        'template',
+        'status'
     ).order_by('-submission_datetime')
 
     context = {
         'evaluations': evaluations,
     }
-    return render(request, 'calls/coordinator_view_evaluations.html', context)
+    return render(request, 'evaluations/coordinator_view_evaluations.html', context)
 
 @login_required
 def link_template_to_call(request, template_id):
@@ -711,3 +761,68 @@ def unlink_template_from_call(request, template_id, call_id):
     messages.success(request, f"Plantilla '{template.name}' desasociada de la convocatoria '{call.title}'.")
 
     return redirect('evaluations:template_detail', template_id=template.id)
+
+@login_required
+def evaluation_detail_json(request, evaluation_id):
+    # Get evaluation with all related data
+    try:
+        evaluation = Evaluation.objects.select_related(
+            'target_content_type',
+            'evaluator__person',
+            'template',
+            'status'
+        ).get(id=evaluation_id)
+    except Evaluation.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Evaluación no encontrada.'}, status=404)
+
+    # Permission Check: Only evaluator or coordinator
+    user = request.user
+    if not hasattr(user, 'customuser'):
+        return JsonResponse({'success': False, 'error': 'Acceso denegado.'}, status=403)
+
+    customuser = user.customuser
+    is_evaluator = (customuser == evaluation.evaluator)
+    is_coordinator = (customuser.role.name == 'Coordinator')
+
+    if not (is_evaluator or is_coordinator):
+        return JsonResponse({'success': False, 'error': 'Acceso denegado.'}, status=403)
+
+    # Resolve target (Expression or Proposal)
+    target = evaluation.target  # Uses GenericForeignKey — safe
+
+    # Safety fallbacks for missing related objects
+    def safe_str(obj, field):
+        return str(getattr(obj, field, '')) or ''
+
+    return JsonResponse({
+        'success': True,
+        'id': evaluation.id,
+        'project_title': target.project_title,
+
+        'investigator_name': (
+            target.user.person.get_full_name()
+            if target.user.person else target.user.user.username
+        ),
+
+        'evaluator_name': (
+            evaluation.evaluator.person.get_full_name()
+            if evaluation.evaluator.person else evaluation.evaluator.user.username
+        ),
+
+        'call_title': target.call.title,
+        'template_name': evaluation.template.name,
+
+        'total_score': float(evaluation.total_score) if evaluation.total_score else None,
+        'max_possible_score': float(evaluation.max_possible_score),
+        'is_positive': evaluation.is_positive,
+
+        'submission_datetime': (
+            evaluation.submission_datetime.strftime('%d/%m/%Y %H:%M')
+            if evaluation.submission_datetime else '—'
+        ),
+
+        'target_type': evaluation.target_content_type.model,
+        'status': evaluation.status.name,
+
+        'is_own_evaluation': is_evaluator,
+    })

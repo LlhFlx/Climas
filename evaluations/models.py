@@ -293,6 +293,13 @@ class Evaluation(TimestampMixin, CreatedByMixin, models.Model):
     def target_object(self):
         """Helper to get the actual Expression or Proposal object."""
         return self.target
+    
+    # @property
+    # def target(self):
+    #     """Resolves GenericForeignKey safely."""
+    #     content_type = self.target_content_type
+    #     model_class = content_type.model_class()
+    #     return model_class._default_manager.get(pk=self.target_object_id)
 
     @property
     def project_title(self):

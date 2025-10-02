@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Evaluar: {{ evaluation.target.project_title }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px;">
+    <h3>Evaluando: "{{ evaluation.target.project_title }}"</h3>
+    <p><strong>Convocatoria:</strong> {{ evaluation.call.title }}</p>
+    <p><strong>Plantilla:</strong> {{ evaluation.template.name }}</p>
+
+    <hr>
+
+    <!-- Read-only Project Info -->
+    <div class="mb-4">
+        <h5>Datos del Proyecto</h5>
+        <ul class="list-group">
+            <li class="list-group-item"><strong>Título:</strong> {{ evaluation.target.project_title }}</li>
+            <li class="list-group-item"><strong>Investigador Principal:</strong> {{ evaluation.target.user.person|default:evaluation.target.user.user.username }}</li>
+            <li class="list-group-item"><strong>País:</strong> {{ evaluation.target.implementation_country.name }}</li>
+            <li class="list-group-item"><strong>Problema:</strong> {{ evaluation.target.problem|truncatewords:50 }}</li>
+            <li class="list-group-item"><strong>Objetivo General:</strong> {{ evaluation.target.general_objective|truncatewords:50 }}</li>
+            <li class="list-group-item"><strong>Metodología:</strong> {{ evaluation.target.methodology|truncatewords:50 }}</li>
+        </ul>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <h5>Preguntas de Evaluación</h5>
+        {% for item in items %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <p><strong>{{ item.question }}</strong> (Max: {{ item.max_score }})</p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="item_{{ item.id }}">Puntaje (0 - {{ item.max_score }})</label>
+                            <input type="number"
+                                   step="0.1"
+                                   min="0"
+                                   max="{{ item.max_score }}"
+                                   name="item_{{ item.id }}"
+                                   id="item_{{ item.id }}"
+                                   class="form-control"
+                                   required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="comment_{{ item.id }}">Comentario</label>
+                            <textarea name="comment_{{ item.id }}" id="comment_{{ item.id }}" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <p>No hay ítems en esta plantilla.</p>
+        {% endfor %}
+
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+            <a href="{% url 'evaluations:evaluator_dashboard' %}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Enviar Evaluación</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

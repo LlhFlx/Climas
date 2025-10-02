@@ -29,6 +29,11 @@
                     </button>
                 </li>
                 <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="view-evaluations-tab" data-bs-toggle="tab" data-bs-target="#view-evaluations" type="button" role="tab">
+                        Ver Evaluaciones
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
                     <button class="nav-link" id="evaluation-templates-tab" data-bs-toggle="tab" data-bs-target="#evaluation-templates" type="button" role="tab">Plantillas de Evaluación</button>
                 </li>
                 <li class="nav-item" role="presentation">
@@ -51,13 +56,19 @@
             {% include 'calls/partials/calls_section.html' %}
         </div>
 
-        <!-- Evaluations Tab -->
+        <!-- Evaluations Management Tab -->
         <div class="tab-pane fade" id="evaluations" role="tabpanel">
             {% include 'calls/partials/evaluations_management.html' %}
         </div>
 
+        <!-- Evaluations Templates Tab -->
         <div class="tab-pane fade" id="evaluation-templates" role="tabpanel">
             {% include 'calls/partials/evaluation_templates.html' %}
+        </div>
+
+        <!-- View All Evaluations -->
+        <div class="tab-pane fade" id="view-evaluations" role="tabpanel">
+            {% include 'evaluations/coordinator_view_evaluations.html' %}
         </div>
 
         <!-- Institutions & Geo Tab -->

@@ -73,3 +73,18 @@ class Person(TimestampMixin, CreatedByMixin, models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.first_last_name}"
+    
+    def get_full_name(self):
+        """Return full name (first + second name + both last names)."""
+        parts = [
+            self.first_name,
+            getattr(self, "second_name", None),  # in case it's optional
+            self.first_last_name,
+            getattr(self, "second_last_name", None),
+        ]
+        # filter out None or empty strings
+        return " ".join(filter(None, parts)).strip()
+
+    def get_short_name(self):
+        """Return first name only"""
+        return self.first_name

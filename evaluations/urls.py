@@ -79,5 +79,9 @@ urlpatterns = [
     path('coordinator/evaluations/all/', 
         views.coordinator_view_evaluations, 
         name='coordinator_view_evaluations'),
+
+    path('evaluation/<int:evaluation_id>/detail-json/',
+        views.evaluation_detail_json,
+        name='evaluation_detail_json'),
 ]
 

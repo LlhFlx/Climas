@@ -1,6 +1,11 @@
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5>Asignar Evaluadores</h5>
+        <!-- "View All Evaluations" Button -->
+        <a href="{% url 'evaluations:coordinator_view_evaluations' %}" 
+           class="btn btn-outline-info btn-sm">
+            👁️ Ver Evaluaciones Completadas
+        </a>
     </div>
     <div class="card-body">
         <!-- ========== EXPRESSIONS ========== -->
