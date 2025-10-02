@@ -50,6 +50,23 @@ class EvaluationTemplate(TimestampMixin, CreatedByMixin, models.Model):
 
     def __str__(self):
         return self.name
+    
+    def get_total_max_score(self):
+        """Calculate the sum of max_score from all items."""
+        return self.categories.aggregate(
+            total=models.Sum('items__max_score')
+        )['total'] or 0
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Recalculate max_possible_score for all evaluations using this template
+        self.update_evaluations()
+
+    def update_evaluations(self):
+        """Update all Evaluation objects using this template with new max_possible_score."""
+        total = self.get_total_max_score()
+        if total > 0:
+            Evaluation.objects.filter(template=self).update(max_possible_score=total)
 
 
 class TemplateCategory(TimestampMixin, models.Model):

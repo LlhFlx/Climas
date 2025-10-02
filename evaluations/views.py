@@ -483,10 +483,10 @@ def assign_evaluator(request, target_type, target_id):
         # Save evaluation dynamically
         content_type = ContentType.objects.get_for_model(target)
 
-        print("Pre save")
-        print(content_type)
-        print(target.id)
-        
+        # print("Pre save")
+        # print(content_type)
+        # print(target.id)
+
         evaluation, created = Evaluation.objects.get_or_create(
             target_content_type=content_type,
             target_object_id=target.id,
@@ -494,10 +494,18 @@ def assign_evaluator(request, target_type, target_id):
             defaults={
                 'status': pending_status,
                 'template': template,
-                'max_possible_score': 100.00,
                 'created_by': request.user,
             }
         )
+
+        # If template changed, update it
+        if template and evaluation.template != template:
+            evaluation.template = template
+            evaluation.save()
+
+        # Force recalculation via signal
+        if evaluation.template:
+            evaluation.template.update_evaluations()
 
         if created:
             msg = f"Evaluador '{evaluator.person or evaluator.user.username}' asignado"
