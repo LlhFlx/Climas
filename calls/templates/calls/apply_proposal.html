@@ -1,0 +1,523 @@
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+{% block title %}Enviar Propuesta Formal - {{ call.title }} - Climas{% endblock %}
+{% block content %}
+<div class="container" style="max-width: 800px; margin: 3rem auto;">
+    <h3 class="mb-4">Enviar Propuesta Formal</h3>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <!-- HIDDEN PROPOSAL ID FOR AJAX UPLOADS -->
+        <input type="hidden" name="proposal_id" value="{{ proposal.id }}">
+
+        <!-- Expression Fields (READ-ONLY) -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Información de la Expresión de Interés</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Título del Proyecto</label>
+                    <p class="form-control-plaintext">{{ expression.project_title }}</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Eje Temático</label>
+                    <p class="form-control-plaintext">{{ expression.thematic_axis.name }}</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">País de Implementación</label>
+                    <p class="form-control-plaintext">{{ expression.implementation_country.name }}</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Institución Principal</label>
+                    <p class="form-control-plaintext">{{ expression.primary_institution.name }}</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Descripción del Problema</label>
+                    <p class="form-control-plaintext">{{ expression.problem|linebreaks }}</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Objetivo General</label>
+                    <p class="form-control-plaintext">{{ expression.general_objective|linebreaks }}</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Metodología</label>
+                    <p class="form-control-plaintext">{{ expression.methodology|linebreaks }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Proposal Fields -->
+        <h4 class="mb-4">Información de la Propuesta Formal</h4>
+
+        <!-- 1. Principal Research Experience -->
+        <div class="mb-3">
+            <label class="form-label">Experiencia en investigación del Investigador/a Principal *</label>
+            <textarea name="principal_research_experience" class="form-control" rows="4" maxlength="1000" required>{{ proposal.principal_research_experience }}</textarea>
+            <small class="form-text text-muted">Máximo 250 palabras (≈1000 caracteres)</small>
+        </div>
+
+        <!-- 2. Partner Institutions & Commitment Letters (GROUPED) -->
+        <div class="mb-4">
+            <h5>Instituciones Aliadas y Cartas de Compromiso</h5>
+            <p class="text-muted">Seleccione instituciones y cargue una carta de compromiso por cada una.</p>
+
+            <!-- Institution Search -->
+            <div class="input-group mb-3">
+                <input type="text"
+                    name="partner_institution_search"
+                    class="form-control institution-search"
+                    placeholder="Buscar institución..."
+                    aria-label="Buscar institución"
+                    value=""
+                >
+                <button type="button" class="btn btn-outline-primary add-institution" disabled>Agregar</button>
+            </div>
+
+            <!-- Selected Institutions List -->
+            <div id="partner-institutions-list" class="mb-3">
+                {% for inst in proposal.partner_institutions.all %}
+                    <div class="d-flex align-items-center mb-2 p-2 bg-light rounded" data-institution-id="{{ inst.id }}">
+                        <span class="me-2">{{ inst.name }}</span>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-institution" data-institution-id="{{ inst.id }}">Eliminar</button>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Commitment Letters Section — dynamically populated per institution -->
+            <div id="commitment-documents-container">
+                {% for inst in proposal.partner_institutions.all %}
+                    <div class="card mb-3 p-3 commitment-doc-section" data-institution-id="{{ inst.id }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Carta de Compromiso: {{ inst.name }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-section" data-institution-id="{{ inst.id }}">Eliminar</button>
+                        </div>
+
+                        <!-- ✅ Show ALL commitment documents linked to THIS proposal AND associated with THIS institution -->
+                        {% for doc in proposal.partner_institution_commitments.all %}
+                            {% if doc.document_type == 'commitment' %}
+                                <!-- Only show if this doc's proposal has this institution -->
+                                {% if inst in doc.proposal.partner_institutions.all %}
+                                    <div class="d-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded">
+                                        <span class="flex-grow-1">{{ doc.name }}</span>
+                                        <a href="{% url 'proposals:download_proposal_document' doc.id %}" target="_blank" class="btn btn-sm btn-outline-secondary me-2">Ver</a>
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-doc" data-doc-id="{{ doc.id }}">Borrar</button>
+                                    </div>
+                                {% endif %}
+                            {% endif %}
+                        {% endfor %}
+
+                        <!-- Upload form for this institution -->
+                        <div class="input-group mb-2">
+                            <input type="file" name="commitment_documents_{{ inst.id }}" class="form-control" accept=".pdf,.docx">
+                            <button type="button" class="btn btn-outline-primary upload-commitment" data-institution-id="{{ inst.id }}">Cargar</button>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Hidden field to store selected institution IDs -->
+            <input type="hidden" name="partner_institution_ids" value="{% for inst in proposal.partner_institutions.all %}{{ inst.id }},{% endfor %}">
+        </div>
+
+        <!-- 3. Community Country + Description -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">País de la Comunidad</label>
+                <select name="community_country" class="form-select">
+                    <option value="">-- Seleccionar País --</option>
+                    {% for country in countries %}
+                        <option value="{{ country.id }}" {% if proposal.community_country_id == country.id %}selected{% endif %}>
+                            {{ country.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Descripción de la Comunidad</label>
+                <input type="text" name="community_description" class="form-control" value="{{ proposal.community_description }}">
+            </div>
+        </div>
+
+        <!-- 4. Project Location -->
+        <div class="mb-3">
+            <label class="form-label">País donde se desarrollará el proyecto *</label>
+            <select name="project_location" class="form-select" required>
+                <option value="">-- Seleccionar País --</option>
+                {% for country in countries %}
+                    <option value="{{ country.id }}" {% if proposal.project_location_id == country.id %}selected{% endif %}>
+                        {{ country.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- 5. Duration -->
+        <div class="mb-3">
+            <label class="form-label">Duración del proyecto (meses) *</label>
+            <input type="number" name="duration_months" class="form-control" min="1" value="{{ proposal.duration_months|default:12 }}" required>
+        </div>
+
+        <!-- 6. Summary -->
+        <div class="mb-3">
+            <label class="form-label">Resumen *</label>
+            <textarea name="summary" class="form-control" rows="4" maxlength="1000" required>{{ proposal.summary }}</textarea>
+            <small class="form-text text-muted">Máximo 250 palabras</small>
+        </div>
+
+        <!-- 7. Context, Problem & Justification -->
+        <div class="mb-3">
+            <label class="form-label">Contexto, problema y justificación *</label>
+            <textarea name="context_problem_justification" class="form-control" rows="5" maxlength="1600" required>{{ proposal.context_problem_justification }}</textarea>
+            <small class="form-text text-muted">Máximo 400 palabras</small>
+        </div>
+
+        <!-- 8. Specific Objectives -->
+        <div class="mb-3">
+            <label class="form-label">Objetivos específicos *</label>
+            <textarea name="specific_objectives" class="form-control" rows="3" maxlength="800" required>{{ proposal.specific_objectives }}</textarea>
+            <small class="form-text text-muted">Máximo 200 palabras</small>
+        </div>
+
+        <!-- 9. Methodology, Analytical Plan & Ethics -->
+        <div class="mb-3">
+            <label class="form-label">Metodología, planeamiento analítico y aspectos éticos *</label>
+            <textarea name="methodology_analytical_plan_ethics" class="form-control" rows="8" maxlength="6000" required>{{ proposal.methodology_analytical_plan_ethics }}</textarea>
+            <small class="form-text text-muted">Máximo 1500 palabras</small>
+        </div>
+
+        <!-- 10. Equity, Gender, Intersectionality -->
+        <div class="mb-3">
+            <label class="form-label">Equidad, género, interseccionalidad e inclusión *</label>
+            <textarea name="equity_inclusion" class="form-control" rows="4" maxlength="1000" required>{{ proposal.equity_inclusion }}</textarea>
+            <small class="form-text text-muted">Máximo 250 palabras</small>
+        </div>
+
+        <!-- 11. Timeline -->
+        <div class="mb-3">
+            <label class="form-label">Cronograma *</label>
+            <div class="input-group">
+                <input type="file" name="timeline_document" class="form-control" accept=".pdf,.docx">
+                {% if proposal.timeline_document %}
+                    <a href="{% url 'proposals:download_proposal_document' proposal.timeline_document.id %}" 
+                       target="_blank" 
+                       class="btn btn-outline-secondary">
+                        Ver documento actual
+                    </a>
+                    <button type="submit" name="remove_timeline_doc" value="{{ proposal.timeline_document.id }}" class="btn btn-outline-danger">Borrar</button>
+                {% endif %}
+            </div>
+            <small class="form-text text-muted">Suba un archivo (PDF, DOCX)</small>
+        </div>
+
+        <!-- 12. Communication Strategy -->
+        <div class="mb-3">
+            <label class="form-label">Estrategia de comunicación *</label>
+            <textarea name="communication_strategy" class="form-control" rows="2" maxlength="400" required>{{ proposal.communication_strategy }}</textarea>
+            <small class="form-text text-muted">Máximo 100 palabras</small>
+        </div>
+
+        <!-- 13. Risk Analysis -->
+        <div class="mb-3">
+            <label class="form-label">Riesgos y plan de mitigación *</label>
+            <textarea name="risk_analysis_mitigation" class="form-control" rows="4" maxlength="800" required>{{ proposal.risk_analysis_mitigation }}</textarea>
+            <small class="form-text text-muted">Máximo 200 palabras</small>
+        </div>
+
+        <!-- 14. Research Team -->
+        <div class="mb-3">
+            <label class="form-label">Equipo de investigación *</label>
+            <textarea name="research_team" class="form-control" rows="8" maxlength="3600" required>{{ proposal.research_team }}</textarea>
+            <small class="form-text text-muted">Máximo 900 palabras</small>
+        </div>
+
+        <!-- 15. Budget -->
+        <div class="mb-3">
+            <label class="form-label">Presupuesto *</label>
+            <div class="input-group">
+                <input type="file" name="budget_document" class="form-control" accept=".pdf,.docx">
+                {% if proposal.budget_document %}
+                    <a href="{% url 'proposals:download_proposal_document' proposal.budget_document.id %}" 
+                       target="_blank" 
+                       class="btn btn-outline-secondary">
+                        Ver documento actual
+                    </a>
+                    <button type="submit" name="remove_budget_doc" value="{{ proposal.budget_document.id }}" class="btn btn-outline-danger">Borrar</button>
+                {% endif %}
+            </div>
+            <small class="form-text text-muted">Suba un archivo (PDF, DOCX)</small>
+        </div>
+
+        <!-- Submit Buttons -->
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <a href="{% url 'calls:researcher_dashboard' %}" class="btn btn-secondary me-md-2">Cancelar</a>
+            <button type="submit" name="save_draft" class="btn btn-secondary">Guardar Borrador</button>
+            <button type="submit" name="submit_proposal" class="btn btn-primary">Enviar Propuesta Formal</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ institutions|json_script:"institutions-json" }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const institutionSearchInput = document.querySelector('.institution-search');
+    const addInstitutionButton = document.querySelector('.add-institution');
+    const hiddenIdsInput = document.querySelector('input[name="partner_institution_ids"]');
+    const listContainer = document.getElementById('partner-institutions-list');
+    const commitmentContainer = document.getElementById('commitment-documents-container');
+    const institutionsScript = document.getElementById('institutions-json');
+    const institutionsList = JSON.parse(institutionsScript.textContent);
+
+    // -------------------------------
+    // INSTITUTION SEARCH & SELECTION
+    // -------------------------------
+    function setupInstitutionAutocomplete() {
+        institutionSearchInput.addEventListener('input', function () {
+            const query = this.value.trim().toLowerCase();
+            const results = institutionsList.filter(inst =>
+                inst.name.toLowerCase().includes(query)
+            );
+
+            // Enable/disable "Agregar" button
+            addInstitutionButton.disabled = !query || results.length === 0;
+
+            // Clear old suggestions
+            let suggestions = document.querySelector('.suggestions-list');
+            if (suggestions) suggestions.remove();
+
+            if (!query || results.length === 0) return;
+
+            // Create suggestion list
+            suggestions = document.createElement('ul');
+            suggestions.className = 'suggestions-list list-group position-absolute w-100 mt-1 shadow-sm';
+            suggestions.style.maxHeight = '200px';
+            suggestions.style.overflowY = 'auto';
+            suggestions.style.zIndex = '1000';
+
+            results.forEach(inst => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item cursor-pointer';
+                li.textContent = inst.name;
+                li.dataset.id = inst.id;
+                li.addEventListener('click', () => {
+                    addInstitution(inst.id, inst.name);
+                    institutionSearchInput.value = '';
+                    institutionSearchInput.focus();
+                    suggestions.remove();
+                });
+                suggestions.appendChild(li);
+            });
+
+            institutionSearchInput.parentElement.appendChild(suggestions);
+        });
+    }
+
+    function addInstitution(id, name) {
+        if (listContainer.querySelector(`[data-institution-id="${id}"]`)) {
+            return;
+        }
+
+        const div = document.createElement('div');
+        div.className = 'd-flex align-items-center mb-2 p-2 bg-light rounded';
+        div.dataset.institutionId = id;
+        div.innerHTML = `
+            <span class="me-2">${name}</span>
+            <button type="button" class="btn btn-sm btn-outline-danger remove-institution" data-institution-id="${id}">Eliminar</button>
+        `;
+        listContainer.appendChild(div);
+
+        // Update hidden field
+        const currentIds = hiddenIdsInput.value.split(',').filter(x => x);
+        currentIds.push(id);
+        hiddenIdsInput.value = currentIds.join(',');
+
+        createCommitmentSection(id, name);
+    }
+
+    // -------------------------------
+    // COMMITMENT DOCUMENTS
+    // -------------------------------
+    function createCommitmentSection(institutionId, institutionName) {
+        if (commitmentContainer.querySelector(`.commitment-doc-section[data-institution-id="${institutionId}"]`)) {
+            return;
+        }
+
+        const div = document.createElement('div');
+        div.className = 'card mb-3 p-3 commitment-doc-section';
+        div.dataset.institutionId = institutionId;
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">Carta de Compromiso: ${institutionName}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-section" data-institution-id="${institutionId}">Eliminar</button>
+            </div>
+            <div class="input-group mb-2">
+                <input type="file" name="commitment_documents_${institutionId}" class="form-control" accept=".pdf,.docx">
+                <button type="button" class="btn btn-outline-primary upload-commitment" data-institution-id="${institutionId}">Cargar</button>
+            </div>
+        `;
+        commitmentContainer.appendChild(div);
+    }
+
+    // -------------------------------
+    // EVENT LISTENERS
+    // -------------------------------
+
+    setupInstitutionAutocomplete();
+
+    // Click "Agregar" button
+    addInstitutionButton.addEventListener('click', function() {
+        const query = institutionSearchInput.value.trim();
+        const inst = institutionsList.find(i => i.name.toLowerCase() === query.toLowerCase());
+        if (inst) {
+            addInstitution(inst.id, inst.name);
+            institutionSearchInput.value = '';
+            institutionSearchInput.focus();
+            addInstitutionButton.disabled = true;
+        }
+    });
+
+    // Remove institution
+    listContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-institution')) {
+            const id = e.target.dataset.institutionId;
+            e.target.closest('.d-flex').remove();
+
+            let ids = hiddenIdsInput.value.split(',').filter(x => x !== id);
+            hiddenIdsInput.value = ids.join(',');
+
+            const commitSection = commitmentContainer.querySelector(`.commitment-doc-section[data-institution-id="${id}"]`);
+            if (commitSection) commitSection.remove();
+        }
+    });
+
+    // Remove commitment section
+    commitmentContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-commitment-section')) {
+            const id = e.target.dataset.institutionId;
+            e.target.closest('.card').remove();
+
+            const instDiv = listContainer.querySelector(`[data-institution-id="${id}"]`);
+            if (instDiv) instDiv.remove();
+
+            let ids = hiddenIdsInput.value.split(',').filter(x => x !== id);
+            hiddenIdsInput.value = ids.join(',');
+        }
+    });
+
+    // Upload commitment document
+    commitmentContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('upload-commitment')) {
+            const id = e.target.dataset.institutionId;
+            const fileInput = e.target.previousElementSibling;
+            const file = fileInput.files[0];
+            const proposalId = document.querySelector('[name="proposal_id"]').value;
+
+            if (!file) {
+                alert('Por favor, seleccione un archivo.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('commitment_document', file);
+            formData.append('institution_id', id);
+            formData.append('proposal_id', proposalId);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const docDiv = document.createElement('div');
+                    docDiv.className = 'd-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded';
+                    docDiv.innerHTML = `
+                        <span class="flex-grow-1">${data.name}</span>
+                        <a href="${data.url}" target="_blank" class="btn btn-sm btn-outline-secondary me-2">Ver</a>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-doc" data-doc-id="${data.id}">Borrar</button>
+                    `;
+                    e.target.closest('.card').querySelector('.input-group').after(docDiv);
+                    fileInput.value = '';
+                } else {
+                    alert('Error al cargar: ' + data.error);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Error de red. Por favor, inténtelo de nuevo.');
+            });
+        }
+    });
+
+    // Remove individual commitment document
+    commitmentContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-commitment-doc')) {
+            const docId = e.target.dataset.docId;
+            if (!confirm('¿Está seguro de eliminar este documento?')) return;
+
+            const formData = new FormData();
+            formData.append('remove_document', docId);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    e.target.closest('.d-flex').remove();
+                } else {
+                    alert('Error al eliminar.');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Error de red.');
+            });
+        }
+    });
+
+    // Initialize existing removal buttons
+    document.querySelectorAll('.remove-commitment-doc').forEach(button => {
+        button.addEventListener('click', function() {
+            const docId = this.dataset.docId;
+            if (!confirm('¿Está seguro de eliminar este documento?')) return;
+
+            const formData = new FormData();
+            formData.append('remove_document', docId);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    this.closest('.d-flex').remove();
+                } else {
+                    alert('Error al eliminar.');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Error de red.');
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

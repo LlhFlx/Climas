@@ -21,7 +21,7 @@ from geo.models import Country, DocumentType
 from people.models import Person
 from expressions.models import Expression, ExpressionDocument
 from expressions.forms import ExpressionDocumentForm
-from proposals.models import Proposal
+from proposals.models import Proposal, ProposalDocument
 from accounts.models import CustomUser
 
 from products.models import Product
@@ -119,103 +119,106 @@ def coordinator_dashboard(request):
     return render(request, 'calls/coordinator_dashboard.html', context)
 
 
-@login_required
-def assign_evaluator(request, target_type, target_id):
-    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
-        messages.error(request, "Access denied.")
-        return redirect('calls:coordinator_dashboard')
+# @login_required
+# def assign_evaluator(request, target_type, target_id):
+#     if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
+#         messages.error(request, "Access denied.")
+#         return redirect('calls:coordinator_dashboard')
 
-    # Map target_type to model
-    model_map = {
-        "expression": Expression,
-        "proposal": Proposal,  # Make sure this import exists!
-    }
+#     # Map target_type to model
+#     model_map = {
+#         "expression": Expression,
+#         "proposal": Proposal,  # Make sure this import exists!
+#     }
 
-    Model = model_map.get(target_type.lower())
-    if not Model:
-        messages.error(request, "Tipo de objetivo inválido.")
-        return redirect('calls:coordinator_dashboard')
+#     Model = model_map.get(target_type.lower())
+#     if not Model:
+#         messages.error(request, "Tipo de objetivo inválido.")
+#         return redirect('calls:coordinator_dashboard')
 
-    # Get the actual object
-    target = get_object_or_404(Model, id=target_id)
+#     # Get the actual object
+#     target = get_object_or_404(Model, id=target_id)
 
-    # Validate status based on type
-    if target_type == "expression" and target.status.name != 'Enviada':
-        messages.error(request, "Solo se pueden asignar evaluadores a expresiones enviadas.")
-        return redirect('calls:coordinator_dashboard')
-    elif target_type == "proposal" and target.status.name != 'Aprobada':
-        messages.error(request, "Solo se pueden asignar evaluadores a propuestas aprobadas.")
-        return redirect('calls:coordinator_dashboard')
+#     # Validate status based on type
+#     print("x"*50)
+#     print(target.proposal_status.name)
+#     if target_type == "expression" and target.status.name != 'Enviada':
+#         messages.error(request, "Solo se pueden asignar evaluadores a expresiones enviadas.")
+#         return redirect('calls:coordinator_dashboard')
+#     #elif target_type == "proposal" and target.proposal_status.name != 'Aprobada':
+#     elif target_type == "proposal" and target.proposal_status.name != 'Enviada':
+#         messages.error(request, "Solo se pueden asignar evaluadores a propuestas aprobadas.")
+#         return redirect('calls:coordinator_dashboard')
 
-    if request.method == 'POST':
-        evaluator_id = request.POST.get('evaluator_id')
-        template_id = request.POST.get('template_id')
+#     if request.method == 'POST':
+#         evaluator_id = request.POST.get('evaluator_id')
+#         template_id = request.POST.get('template_id')
 
-        if not evaluator_id:
-            messages.error(request, "Debe seleccionar un evaluador.")
-            return redirect('calls:coordinator_dashboard')
+#         if not evaluator_id:
+#             messages.error(request, "Debe seleccionar un evaluador.")
+#             return redirect('calls:coordinator_dashboard')
 
-        evaluator = get_object_or_404(
-            CustomUser,
-            id=evaluator_id,
-            role__name='Evaluator',
-            role__is_active=True
-        )
+#         evaluator = get_object_or_404(
+#             CustomUser,
+#             id=evaluator_id,
+#             role__name='Evaluator',
+#             role__is_active=True
+#         )
 
-        # Validate template if selected
-        template = None
-        if template_id:
-            try:
-                if target_type == "expression":
-                    template = EvaluationTemplate.objects.get(
-                        id=template_id,
-                        calls=target.call,
-                        applies_to_expression=True
-                    )
-                elif target_type == "proposal":
-                    template = EvaluationTemplate.objects.get(
-                        id=template_id,
-                        calls=target.call,
-                        applies_to_proposal=True
-                    )
-            except EvaluationTemplate.DoesNotExist:
-                messages.error(request, "La plantilla seleccionada no es válida para esta convocatoria o tipo de objetivo.")
-                return redirect('calls:coordinator_dashboard')
+#         # Validate template if selected
+#         template = None
+#         if template_id:
+#             try:
+#                 if target_type == "expression":
+#                     template = EvaluationTemplate.objects.get(
+#                         id=template_id,
+#                         calls=target.call,
+#                         applies_to_expression=True
+#                     )
+#                 elif target_type == "proposal":
+#                     template = EvaluationTemplate.objects.get(
+#                         id=template_id,
+#                         calls=target.call,
+#                         applies_to_proposal=True
+#                     )
+#             except EvaluationTemplate.DoesNotExist:
+#                 messages.error(request, "La plantilla seleccionada no es válida para esta convocatoria o tipo de objetivo.")
+#                 return redirect('calls:coordinator_dashboard')
 
-        # Get or create status
-        pending_status, _ = Status.objects.get_or_create(
-            name='Pendiente',
-            defaults={'description': 'Evaluación pendiente de revisión'}
-        )
+#         # Get or create status
+#         pending_status, _ = Status.objects.get_or_create(
+#             name='Pendiente',
+#             defaults={'description': 'Evaluación pendiente de revisión'}
+#         )
 
-        # Save evaluation dynamically
-        content_type = ContentType.objects.get_for_model(target)
+#         # Save evaluation dynamically
+#         content_type = ContentType.objects.get_for_model(target)
 
-        evaluation, created = Evaluation.objects.get_or_create(
-            target_content_type=content_type,
-            target_object_id=target.id,
-            evaluator=evaluator,
-            defaults={
-                'status': pending_status,
-                'template': template,
-                'max_possible_score': 100.00,
-                'created_by': request.user,
-            }
-        )
+#         evaluation, created = Evaluation.objects.get_or_create(
+#             target_content_type=content_type,
+#             target_object_id=target.id,
+#             evaluator=evaluator,
+#             defaults={
+#                 'status': pending_status,
+#                 'template': template,
+#                 'max_possible_score': 100.00,
+#                 'created_by': request.user,
+#             }
+#         )
 
-        if created:
-            msg = f"Evaluador '{evaluator.person or evaluator.user.username}' asignado"
-            if template:
-                msg += f" con plantilla '{template.name}'"
-            msg += f" a '{target.project_title}'."
-            messages.success(request, msg)
-        else:
-            messages.info(
-                request,
-                f"Evaluador '{evaluator.person or evaluator.user.username}' ya estaba asignado a esta {target_type}."
-            )
+#         if created:
+#             msg = f"Evaluador '{evaluator.person or evaluator.user.username}' asignado"
+#             if template:
+#                 msg += f" con plantilla '{template.name}'"
+#             msg += f" a '{target.project_title}'."
+#             messages.success(request, msg)
+#         else:
+#             messages.info(
+#                 request,
+#                 f"Evaluador '{evaluator.person or evaluator.user.username}' ya estaba asignado a esta {target_type}."
+#             )
 
-    return redirect('calls:coordinator_dashboard')
+#     return redirect('calls:coordinator_dashboard')
 
 @login_required
 def evaluator_dashboard(request):
@@ -981,10 +984,29 @@ def researcher_dashboard(request):
     thematic_axes = ThematicAxis.objects.filter(is_active=True)
     countries = Country.objects.all()
 
+    # Get the latest approved Expression (if any)
+    latest_approved_expression = None
+    proposal_status = None
+
+    expressions = Expression.objects.filter(
+        user=request.user.customuser,
+        status__name='Aprobada'
+    ).order_by('-created_at')
+
+    if expressions.exists():
+        latest_approved_expression = expressions.first()
+        # Check if a Proposal exists for this Expression
+        if hasattr(latest_approved_expression, 'proposal_set'):
+            proposal = latest_approved_expression.proposal_set.first()
+            if proposal:
+                proposal_status = proposal.status.name
+
     return render(request, 'calls/researcher_dashboard.html', {
         'open_calls': open_calls,
         'thematic_axes': thematic_axes,  # Optional
         'countries': countries,          # Optional
+        'latest_approved_expression': latest_approved_expression,
+        'proposal_status': proposal_status,
     })
 
     # return render(request, 'calls/researcher_dashboard.html', {
@@ -1467,3 +1489,487 @@ def render_institution_input(request):
         'institution_id': '',     # empty for new entries
     }
     return render(request, 'calls/institution_input.html', context)
+
+
+@login_required
+def apply_proposal(request, expression_id):
+    """
+    Allows researcher to submit a full Proposal after Expression is approved.
+    """
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Researcher':
+        messages.error(request, "Solo los investigadores pueden enviar propuestas.")
+        return redirect('home')
+
+    expression = get_object_or_404(Expression, id=expression_id, user=request.user.customuser)
+
+    # Only allow if Expression is approved
+    if expression.status.name != 'Aprobada':
+        messages.error(request, "Esta expresión aún no ha sido aprobada. No puede enviar una propuesta.")
+        return redirect('calls:researcher_dashboard')
+    
+    # Get or create Proposal linked to this Expression
+    # proposal, created = Proposal.objects.get_or_create(
+    #     pk=expression.pk, 
+    #     defaults={
+    #         'principal_research_experience': '',
+    #         'community_description': '',
+    #         'duration_months': 12,
+    #         'summary': '',
+    #         'context_problem_justification': '',
+    #         'specific_objectives': '',
+    #         'methodology_analytical_plan_ethics': '',
+    #         'equity_inclusion': '',
+    #         'communication_strategy': '',
+    #         'risk_analysis_mitigation': '',
+    #         'research_team': '',
+    #         'created_by': request.user,
+    #         'status': Status.objects.get_or_create(
+    #             name='Borrador',
+    #             defaults={
+    #                 'description': 'Propuesta creada automáticamente tras aprobación de expresión',
+    #                 'is_active': True
+    #             }
+    #         )[0]
+    #     }
+    # )
+
+    draft_status, _ = Status.objects.get_or_create(
+        name='Borrador',
+        defaults={
+            'description': 'Propuesta creada automáticamente tras aprobación de expresión',
+            'is_active': True
+        }
+    )
+    # Check if proposal already exists
+    try:
+        proposal = Proposal.objects.get(pk=expression.pk)
+        created = False
+    except Proposal.DoesNotExist:
+        # Promote expression into proposal
+        print("Proposal does not exist")
+        data = expression.__dict__.copy()
+        data.pop("id", None)
+        data.pop("_state", None)    
+        proposal = Proposal(
+            expression_ptr=expression,
+            **data,
+            #created_by=expression.created_by,
+            principal_research_experience='',
+            community_description='',
+            duration_months=12,
+            summary='',
+            context_problem_justification='',
+            specific_objectives='',
+            methodology_analytical_plan_ethics='',
+            equity_inclusion='',
+            communication_strategy='',
+            risk_analysis_mitigation='',
+            research_team='',
+            proposal_status=draft_status,
+            #user_id=expression.user_id,
+            #call_id=expression.call_id,
+        )
+        proposal.save()
+        created = True
+    
+    # Load context data
+    countries = Country.objects.all().order_by('name')
+    institutions = list(
+        Institution.objects.filter(is_active=True)
+        .order_by('name')
+        .values('id', 'name')
+    )
+    commitment_docs = proposal.proposal_documents.filter(document_type='commitment')
+    timeline_doc = proposal.timeline_document
+    budget_doc = proposal.budget_document
+
+    # Initialize post_data
+    post_data = {}
+    
+    if request.method == 'POST':
+        # Capture all POST data
+        post_data = {
+            'principal_research_experience': request.POST.get('principal_research_experience', '').strip(),
+            'community_description': request.POST.get('community_description', '').strip(),
+            'duration_months': request.POST.get('duration_months', 12),
+            'summary': request.POST.get('summary', '').strip(),
+            'context_problem_justification': request.POST.get('context_problem_justification', '').strip(),
+            'specific_objectives': request.POST.get('specific_objectives', '').strip(),
+            'methodology_analytical_plan_ethics': request.POST.get('methodology_analytical_plan_ethics', '').strip(),
+            'equity_inclusion': request.POST.get('equity_inclusion', '').strip(),
+            'communication_strategy': request.POST.get('communication_strategy', '').strip(),
+            'risk_analysis_mitigation': request.POST.get('risk_analysis_mitigation', '').strip(),
+            'research_team': request.POST.get('research_team', '').strip(),
+            'community_country': request.POST.get('community_country'),
+            'project_location': request.POST.get('project_location'),
+        }
+
+        # Update Proposal fields
+        proposal.principal_research_experience = post_data['principal_research_experience']
+        proposal.community_description = post_data['community_description']
+        proposal.duration_months = int(post_data['duration_months']) if post_data['duration_months'] else None
+        proposal.summary = post_data['summary']
+        proposal.context_problem_justification = post_data['context_problem_justification']
+        proposal.specific_objectives = post_data['specific_objectives']
+        proposal.methodology_analytical_plan_ethics = post_data['methodology_analytical_plan_ethics']
+        proposal.equity_inclusion = post_data['equity_inclusion']
+        proposal.communication_strategy = post_data['communication_strategy']
+        proposal.risk_analysis_mitigation = post_data['risk_analysis_mitigation']
+        proposal.research_team = post_data['research_team']
+
+        # Country fields
+        if post_data['community_country']:
+            proposal.community_country = Country.objects.get(id=post_data['community_country'])
+        if post_data['project_location']:
+            proposal.project_location = Country.objects.get(id=post_data['project_location'])
+
+        # Partner institutions
+        institution_ids = request.POST.getlist('partner_institution_ids')
+        proposal.partner_institutions.clear()
+        for inst_id in institution_ids:
+            if inst_id.isdigit():
+                try:
+                    inst = Institution.objects.get(id=int(inst_id))
+                    proposal.partner_institutions.add(inst)
+                except Institution.DoesNotExist:
+                    continue
+
+        # Timeline document
+        if 'timeline_document' in request.FILES:
+            doc = ProposalDocument.objects.create(
+                proposal=proposal,
+                file=request.FILES['timeline_document'],
+                document_type='timeline',
+                uploaded_by=request.user.customuser
+            )
+            proposal.timeline_document = doc
+        elif request.POST.get('remove_timeline_doc'):
+            if proposal.timeline_document:
+                proposal.timeline_document.delete()
+                proposal.timeline_document = None
+
+        # Budget document
+        if 'budget_document' in request.FILES:
+            doc = ProposalDocument.objects.create(
+                proposal=proposal,
+                file=request.FILES['budget_document'],
+                document_type='budget',
+                uploaded_by=request.user.customuser
+            )
+            proposal.budget_document = doc
+        elif request.POST.get('remove_budget_doc'):
+            if proposal.budget_document:
+                proposal.budget_document.delete()
+                proposal.budget_document = None
+
+        # Commitment letters (multiple files)
+        if 'commitment_documents' in request.FILES:
+            for file in request.FILES.getlist('commitment_documents'):
+                ProposalDocument.objects.create(
+                    proposal=proposal,
+                    file=file,
+                    document_type='commitment',
+                    uploaded_by=request.user.customuser
+                )
+
+        # Handle document removal
+        if request.POST.get('remove_document'):
+            doc_id = request.POST.get('remove_document')
+            try:
+                doc = ProposalDocument.objects.get(id=doc_id, proposal=proposal)
+                doc.delete()
+            except ProposalDocument.DoesNotExist:
+                pass
+
+        # Save
+        proposal.save()
+
+        if 'submit_proposal' in request.POST:
+            status, _ = Status.objects.get_or_create(
+                name='Enviada',
+                defaults={'description': 'Propuesta enviada por investigador', 'is_active': True}
+            )
+            proposal.proposal_status = status
+            proposal.submission_datetime = timezone.now()
+            proposal.save()
+            print(proposal.proposal_status)
+            messages.success(request, "¡Propuesta formal enviada con éxito! Su propuesta será revisada por el coordinador.")
+            return redirect('calls:researcher_dashboard')
+        elif 'save_draft' in request.POST:
+            status, _ = Status.objects.get_or_create(
+                name='Borrador',
+                defaults={'description': 'Propuesta guardada como borrador', 'is_active': True}
+            )
+            proposal.proposal_status = status
+            proposal.save()
+            messages.success(request, "Propuesta guardada como borrador.")
+            return redirect('calls:researcher_dashboard')
+
+    # Re-fetch fresh proposal
+    proposal = Proposal.objects.select_related(
+        'expression_ptr__call',
+        'expression_ptr__user',
+        'expression_ptr__thematic_axis',
+        'expression_ptr__implementation_country',
+        'expression_ptr__primary_institution',
+        'community_country',
+        'project_location',
+        'timeline_document',
+        'budget_document',
+    ).prefetch_related(
+        'partner_institutions',
+        'proposal_documents'
+    ).get(pk=proposal.pk)
+
+    context = {
+        'call': expression.call,
+        'expression': expression,
+        'proposal': proposal,
+        'countries': countries,
+        'institutions': institutions,
+        'commitment_docs': commitment_docs,
+        'timeline_doc': timeline_doc,
+        'budget_doc': budget_doc,
+        'post_data': post_data,
+        'proposal_id': proposal.id, 
+    }
+
+    return render(request, 'calls/apply_proposal.html', context)
+
+
+@login_required
+def upload_commitment_document(request):
+    """
+    Uploads a commitment letter. It is linked to the Proposal.
+    The institution is identified by ID from the frontend.
+    The association between document and institution is maintained
+    by the frontend and the M2M field `proposal.partner_institution_commitments`.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido.'})
+
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Researcher':
+        return JsonResponse({'success': False, 'error': 'Acceso denegado.'})
+
+    file = request.FILES.get('commitment_document')
+    institution_id = request.POST.get('institution_id')
+    proposal_id = request.POST.get('proposal_id')
+
+    if not all([file, institution_id, proposal_id]):
+        return JsonResponse({
+            'success': False,
+            'error': 'Archivo, institución o propuesta no especificados.'
+        })
+
+    allowed_mime_types = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ]
+    if file.content_type not in allowed_mime_types:
+        return JsonResponse({
+            'success': False,
+            'error': 'Solo se permiten archivos PDF o DOCX.'
+        })
+
+    if file.size > 10 * 1024 * 1024:
+        return JsonResponse({
+            'success': False,
+            'error': 'El archivo no puede exceder 10 MB.'
+        })
+
+    try:
+        institution = Institution.objects.get(id=institution_id)
+        proposal = Proposal.objects.get(pk=proposal_id)
+
+        # Validate institution is a partner of this proposal
+        if not proposal.partner_institutions.filter(id=institution_id).exists():
+            return JsonResponse({
+                'success': False,
+                'error': 'Institución no asignada a esta propuesta.'
+            })
+
+        # Create the document — linked ONLY to the proposal
+        doc = ProposalDocument.objects.create(
+            proposal=proposal,
+            file=file,
+            document_type='commitment',
+            uploaded_by=request.user.customuser
+        )
+
+        # Link this document to the proposal's commitment list
+        # This is the ONLY way we associate it with the proposal's institutions
+        proposal.partner_institution_commitments.add(doc)
+
+        return JsonResponse({
+            'success': True,
+            'id': doc.id,
+            'name': doc.name,
+            'url': doc.file.url,
+            'uploaded_at': doc.created_at.isoformat(),
+        })
+
+    except Institution.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Institución no encontrada.'
+        })
+    except Proposal.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'error': 'Propuesta no encontrada.'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': 'Error interno del servidor. Por favor, inténtelo de nuevo.'
+        })
+
+
+# @login_required
+# def upload_commitment_document(request):
+#     if request.method != 'POST':
+#         return JsonResponse({'success': False, 'error': 'Método no permitido.'})
+
+#     # Permission check
+#     if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Researcher':
+#         return JsonResponse({'success': False, 'error': 'Acceso denegado.'})
+
+#     # Extract data
+#     file = request.FILES.get('commitment_document')
+#     institution_id = request.POST.get('institution_id')
+#     proposal_id = request.POST.get('proposal_id')
+
+#     if not file or not institution_id or not proposal_id:
+#         return JsonResponse({
+#             'success': False,
+#             'error': 'Archivo, institución o propuesta no especificados.'
+#         })
+
+#     # Validate file type
+#     allowed_mime_types = [
+#         'application/pdf',
+#         'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+#     ]
+#     if file.content_type not in allowed_mime_types:
+#         return JsonResponse({
+#             'success': False,
+#             'error': 'Solo se permiten archivos PDF o DOCX.'
+#         })
+
+#     # Validate file size (10 MB)
+#     if file.size > 10 * 1024 * 1024:
+#         return JsonResponse({
+#             'success': False,
+#             'error': 'El archivo no puede exceder 10 MB.'
+#         })
+
+#     try:
+#         institution = Institution.objects.get(id=institution_id)
+#         proposal = Proposal.objects.get(pk=proposal_id)
+
+#         # Validate institution is linked to proposal
+#         if not proposal.partner_institutions.filter(id=institution_id).exists():
+#             return JsonResponse({
+#                 'success': False,
+#                 'error': 'Institución no asignada a esta propuesta.'
+#             })
+
+#         # Create document
+#         doc = ProposalDocument.objects.create(
+#             proposal=proposal,
+#             file=file,
+#             document_type='commitment',
+#             uploaded_by=request.user.customuser
+#         )
+
+#         proposal.partner_institution_commitments.add(doc)
+
+#         # Return success with clean data
+#         return JsonResponse({
+#             'success': True,
+#             'id': doc.id,
+#             'name': doc.name,
+#             'url': doc.file.url,
+#             'uploaded_at': doc.created_at.isoformat(),  # Optional: for UI feedback
+#         })
+
+#     except Institution.DoesNotExist:
+#         return JsonResponse({
+#             'success': False,
+#             'error': 'Institución no encontrada.'
+#         })
+#     except Proposal.DoesNotExist:
+#         return JsonResponse({
+#             'success': False,
+#             'error': 'Propuesta no encontrada.'
+#         })
+#     except Exception as e:
+#         # Log the error in production (use logging)
+#         return JsonResponse({
+#             'success': False,
+#             'error': 'Error interno del servidor. Por favor, inténtelo de nuevo.'
+#         })
+    
+    # try:
+    #     file = request.FILES.get('commitment_document')
+    #     institution_id = request.POST.get('institution_id')
+    #     if not file or not institution_id:
+    #         return JsonResponse({'success': False, 'error': 'Archivo o institución no especificados.'})
+
+    #     institution = Institution.objects.get(id=institution_id)
+    #     proposal = Proposal.objects.get(pk=request.POST.get('proposal_id'))  # ← Pass this from form!
+
+    #     # Validate institution is in proposal
+    #     if not proposal.partner_institutions.filter(id=institution_id).exists():
+    #         return JsonResponse({'success': False, 'error': 'Institución no asignada a esta propuesta.'})
+
+    #     doc = ProposalDocument.objects.create(
+    #         proposal=proposal,
+    #         file=file,
+    #         document_type='commitment',
+    #         uploaded_by=request.user.customuser
+    #     )
+
+    #     return JsonResponse({
+    #         'success': True,
+    #         'id': doc.id,
+    #         'name': doc.name,
+    #         'url': doc.file.url,
+    #     })
+    # except Institution.DoesNotExist:
+    #     return JsonResponse({'success': False, 'error': 'Institución no encontrada.'})
+    # except Proposal.DoesNotExist:
+    #     return JsonResponse({'success': False, 'error': 'Propuesta no encontrada.'})
+    # except Exception as e:
+    #     return JsonResponse({'success': False, 'error': str(e)})
+    
+@login_required
+def download_proposal_document(request, doc_id):
+    """
+    Securely serve proposal documents only to authorized users.
+    """
+    try:
+        doc = ProposalDocument.objects.select_related('proposal', 'uploaded_by').get(
+            id=doc_id,
+            proposal__user=request.user.customuser  # Only allow own user
+        )
+    except ProposalDocument.DoesNotExist:
+        raise Http404("Documento no encontrado o acceso denegado.")
+
+    response = FileResponse(
+        doc.file.open(),
+        content_type='application/octet-stream'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{doc.name}"'
+    return response
+
+# @login_required
+# def download_proposal_document(request, doc_id):
+#     doc = get_object_or_404(ProposalDocument, id=doc_id)
+#     # Optional: Check if user owns proposal or has permission
+#     if not request.user.customuser == doc.uploaded_by and not request.user.is_staff:
+#         raise PermissionDenied
+
+#     response = FileResponse(doc.file.open('rb'), content_type='application/octet-stream')
+#     response['Content-Disposition'] = f'attachment; filename="{doc.name}"'
+#     return response

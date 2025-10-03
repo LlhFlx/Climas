@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 
 app_name = 'calls'
@@ -12,7 +12,9 @@ urlpatterns = [
     path('<int:call_pk>/setup/', views.setup_call, name='setup_call'),
     path('<int:call_pk>/', views.call_detail, name='call_detail'),
     path('<int:call_pk>/apply/', views.apply_call, name='apply_call'),
-    path('<int:call_pk>/view/', views.view_call, name='view_call'), 
+    path('<int:call_pk>/view/', views.view_call, name='view_call'),
+    path('expression/<int:expression_id>/apply-proposal/', views.apply_proposal, name='apply_proposal'),
+    path('upload-commitment/', views.upload_commitment_document, name='upload_commitment_document'),
 
     # Shared Questions
     path('shared-question/create/', views.create_shared_question, name='create_shared_question'),
@@ -47,4 +49,6 @@ urlpatterns = [
     path('render/institution-input/', views.render_institution_input, name='render_institution_input'),
     path('create-institution-page/', views.create_institution_page, name='create_institution_page'),
     path('create-person-page/', views.create_person_page, name='create_person_page'),
+    
+    path('proposals/', include('proposals.urls', namespace='proposals')),
 ]

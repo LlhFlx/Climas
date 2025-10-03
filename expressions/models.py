@@ -120,8 +120,23 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
 
     def save(self, *args, **kwargs):
         # Auto-set submission_datetime on first save (when status changes to submitted)
-        if not self.submission_datetime and self.status.name.lower() == 'submitted':
-            self.submission_datetime = self.updated_at
+        # Only apply logic if status is set
+        if self.pk:  # Updating existing Expression/Proposal
+            try:
+                # Always look in Expression table
+                old = Expression.objects.get(pk=self.pk)
+                print("Old is:",old)
+                print("Old.created_at is:", old.created_at)
+                print("Old.user_id is:", old.user_id)
+                if old.created_at:
+                    self.created_at = old.created_at
+            except Expression.DoesNotExist:
+                pass
+
+        if self.status_id and not self.submission_datetime:
+            if self.status.name.lower() == 'submitted':
+                self.submission_datetime = self.updated_at
+
         super().save(*args, **kwargs)
     
     @property

@@ -39,5 +39,29 @@
             No open calls at this time.
         </div>
     {% endif %}
+
+    <!-- === PROPOSAL STATUS PANEL === -->
+    {% if latest_approved_expression %}
+        {% if proposal_status == 'Borrador' %}
+            <div class="alert alert-info mt-4">
+                <strong>¡Excelente!</strong> Su expresión fue aprobada. 
+                <a href="{% url 'calls:apply_proposal' latest_approved_expression.id %}" class="btn btn-primary btn-sm">Enviar Propuesta Formal</a>
+            </div>
+        {% elif proposal_status == 'Enviada' %}
+            <div class="alert alert-warning mt-4">
+                <strong>Su propuesta está en evaluación.</strong> Espere la respuesta del coordinador.
+            </div>
+        {% elif proposal_status == 'Aprobada para Financiamiento' %}
+            <div class="alert alert-success mt-4">
+                <strong>¡Felicidades!</strong> Su propuesta ha sido aprobada para financiamiento. 🎉
+            </div>
+        {% else %}
+            <!-- Expression approved but no Proposal created yet -->
+            <div class="alert alert-info mt-4">
+                <strong>¡Excelente!</strong> Su expresión fue aprobada. 
+                <a href="{% url 'calls:apply_proposal' latest_approved_expression.id %}" class="btn btn-primary btn-sm">Enviar Propuesta Formal</a>
+            </div>
+        {% endif %}
+    {% endif %}
 </div>
 {% endblock %}

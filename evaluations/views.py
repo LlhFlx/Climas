@@ -435,8 +435,8 @@ def assign_evaluator(request, target_type, target_id):
     if target_type == "expression" and target.status.name != 'Enviada':
         messages.error(request, "Solo se pueden asignar evaluadores a expresiones enviadas.")
         return redirect('calls:coordinator_dashboard')
-    elif target_type == "proposal" and target.status.name != 'Aprobada':
-        messages.error(request, "Solo se pueden asignar evaluadores a propuestas aprobadas.")
+    elif target_type == "proposal" and target.proposal_status.name != 'Enviada':
+        messages.error(request, "Solo se pueden asignar evaluadores a propuestas en estado 'Enviada'.")
         return redirect('calls:coordinator_dashboard')
 
     if request.method == 'POST':
