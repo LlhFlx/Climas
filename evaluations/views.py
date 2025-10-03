@@ -52,9 +52,12 @@ def create_evaluation_template(request):
         return JsonResponse({'success': False, 'error': 'Access denied.'})
 
     if request.method == 'POST':
+        print("Trying...")
         name = request.POST.get('name')
         description = request.POST.get('description', '')
         is_active = request.POST.get('is_active') == 'on'
+        applies_to_expression = request.POST.get('applies_to_expression') == 'on'
+        applies_to_proposal = request.POST.get('applies_to_proposal') == 'on'
 
         if not name:
             return JsonResponse({'success': False, 'error': 'El nombre es obligatorio.'})
@@ -68,6 +71,8 @@ def create_evaluation_template(request):
                 name=name,
                 description=description,
                 is_active=is_active,
+                applies_to_expression=applies_to_expression,
+                applies_to_proposal=applies_to_proposal,
                 created_by=request.user
             )
             return JsonResponse({
@@ -89,15 +94,23 @@ def edit_evaluation_template(request, template_id):
     template = get_object_or_404(EvaluationTemplate, id=template_id)
 
     if request.method == 'POST':
+        
         name = request.POST.get('name')
         description = request.POST.get('description', '')
         is_active = request.POST.get('is_active') == 'on'
+        applies_to_expression = request.POST.get('applies_to_expression') == 'on'
+        applies_to_proposal = request.POST.get('applies_to_proposal') == 'on'
+        print("Expression", applies_to_expression, request.POST.get('applies_to_expression'))
+        print("Proposal", applies_to_proposal, request.POST.get('applies_to_proposal') )
+
         if not name:
             return JsonResponse({'success': False, 'error': 'Name is required.'})
 
         template.name = name
         template.description = description
         template.is_active = is_active
+        template.applies_to_expression=applies_to_expression
+        template.applies_to_proposal=applies_to_proposal
         template.save()
 
         return JsonResponse({

@@ -15,6 +15,7 @@
                             <th>Descripción</th>
                             <th>Estado</th>
                             <th>Categorías</th>
+                            <th>Aplica a</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
@@ -32,6 +33,17 @@
                                 </td>
                                 <td>{{ template.categories.count }}</td>
                                 <td>
+                                    {% if template.applies_to_expression and template.applies_to_proposal %}
+                                        <span class="badge bg-primary">Expresiones & Propuestas</span>
+                                    {% elif template.applies_to_expression %}
+                                        <span class="badge bg-info">Expresiones</span>
+                                    {% elif template.applies_to_proposal %}
+                                        <span class="badge bg-success">Propuestas</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Ninguno</span>
+                                    {% endif %}
+                                </td>
+                                <td>
                                     <div class="d-flex gap-1">
                                         <a href="{% url 'evaluations:template_detail' template.id %}" class="btn btn-outline-info btn-sm">
                                             Administrar Categorías e Ítems
@@ -43,7 +55,9 @@
                                                 data-template-id="{{ template.id }}"
                                                 data-template-name="{{ template.name|escapejs }}"
                                                 data-template-description="{{ template.description|escapejs }}"
-                                                data-template-is-active="{{ template.is_active }}">
+                                                data-template-is-active="{{ template.is_active }}"
+                                                data-template-applies-to-expression="{{ template.applies_to_expression }}"
+                                                data-template-applies-to-proposal="{{ template.applies_to_proposal }}">
                                             Editar
                                         </button>
                                         <button type="button"
@@ -89,6 +103,18 @@
                         <input type="checkbox" name="is_active" value="on" class="form-check-input" checked>
                         <label class="form-check-label">Activa</label>
                     </div>
+
+                    <!-- Applies to Expressions -->
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="applies_to_expression" value="on" class="form-check-input" checked>
+                        <label class="form-check-label">Aplica a Expresiones</label>
+                    </div>
+
+                    <!-- Applies to Proposals -->
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="applies_to_proposal" value="on" class="form-check-input" checked>
+                        <label class="form-check-label">Aplica a Propuestas</label>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -123,6 +149,19 @@
                         <input type="checkbox" name="is_active" value="on" class="form-check-input" id="edit-template-is-active">
                         <label class="form-check-label">Activa</label>
                     </div>
+
+                    <!-- Applies to Expressions -->
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="applies_to_expression" value="on" class="form-check-input" id="edit-template-applies-to-expression">
+                        <label class="form-check-label">Aplica a Expresiones</label>
+                    </div>
+
+                    <!-- Applies to Proposals -->
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="applies_to_proposal" value="on" class="form-check-input" id="edit-template-applies-to-proposal">
+                        <label class="form-check-label">Aplica a Propuestas</label>
+                    </div>
+
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -157,6 +196,9 @@ document.getElementById('templateForm').addEventListener('submit', function(e) {
     e.preventDefault(); // Stop full page submit
     const form = e.target;
     const formData = new FormData(form);
+    // ONLY read from THIS form (not entire document)
+    formData.append('applies_to_expression', form.querySelector('input[name="applies_to_expression"]:checked') ? 'on' : '');
+    formData.append('applies_to_proposal', form.querySelector('input[name="applies_to_proposal"]:checked') ? 'on' : '');
     const url = form.action;
 
     fetch(url, {
@@ -217,7 +259,11 @@ document.addEventListener('click', function(e) {
     document.getElementById('edit-template-id').value = templateId;
     document.getElementById('edit-template-name').value = templateName;
     document.getElementById('edit-template-description').value = templateDescription;
-    document.getElementById('edit-template-is-active').checked = templateIsActive;
+    document.getElementById('edit-template-is-active').checked = templateIsActive === 'True';
+
+    // Populate applies_to_expression and applies_to_proposal
+    document.getElementById('edit-template-applies-to-expression').checked = templateAppliesToExpression === 'True';
+    document.getElementById('edit-template-applies-to-proposal').checked = templateAppliesToProposal === 'True';
 
     // Show modal
     const modalInstance = bootstrap.Modal.getInstance(document.getElementById('editTemplateModal'));
@@ -236,6 +282,9 @@ document.getElementById('editTemplateForm').addEventListener('submit', function(
 
     const form = this;
     const formData = new FormData(form);
+    // ONLY read from THIS form (not entire document)
+    formData.append('applies_to_expression', form.querySelector('input[name="applies_to_expression"]:checked') ? 'on' : '');
+    formData.append('applies_to_proposal', form.querySelector('input[name="applies_to_proposal"]:checked') ? 'on' : '');
 
     fetch(form.action, {
         method: 'POST',
@@ -252,12 +301,36 @@ document.getElementById('editTemplateForm').addEventListener('submit', function(
             if (row) {
                 row.querySelector('td strong').textContent = data.name;
                 row.querySelector('td:nth-child(2)').textContent = data.description;
-                const badge = row.querySelector('.badge');
+                //const badge = row.querySelector('.badge');
+                // Update "Estado" badge
+                const estadoBadge = row.querySelector('td:nth-child(3) .badge');
+                estadoBadge.textContent = data.is_active ? 'Activa' : 'Inactiva';
+                estadoBadge.className = `badge bg-${data.is_active ? 'success' : 'secondary'}`;
+                // Update "Aplica a" badge
+                const aplicaBadge = row.querySelector('td:nth-child(5) .badge');
+                if (data.applies_to_expression && data.applies_to_proposal) {
+                    aplicaBadge.textContent = 'Expresiones & Propuestas';
+                    aplicaBadge.className = 'badge bg-primary';
+                } else if (data.applies_to_expression) {
+                    aplicaBadge.textContent = 'Expresiones';
+                    aplicaBadge.className = 'badge bg-info';
+                } else if (data.applies_to_proposal) {
+                    aplicaBadge.textContent = 'Propuestas';
+                    aplicaBadge.className = 'badge bg-success';
+                } else {
+                    aplicaBadge.textContent = 'Ninguno';
+                    aplicaBadge.className = 'badge bg-danger';
+                }
+
                 badge.textContent = data.is_active ? 'Activa' : 'Inactiva';
                 badge.className = `badge bg-${data.is_active ? 'success' : 'secondary'}`;
             }
 
-            bootstrap.Modal.getInstance(document.getElementById('editTemplateModal')).hide();
+            //bootstrap.Modal.getInstance(document.getElementById('editTemplateModal')).hide();
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editTemplateModal'));
+            if (modal) {
+                modal.hide();
+            }
             showMessage('success', `Plantilla "${data.name}" actualizada exitosamente.`);
         } else {
             alert('Error: ' + (data.error || 'Desconocido'));
