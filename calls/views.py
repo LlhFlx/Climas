@@ -1587,6 +1587,62 @@ def apply_proposal(request, expression_id):
     post_data = {}
     
     if request.method == 'POST':
+        if request.POST.get('ajax_upload') == '1':
+            print("Here...")
+            try:
+                file = request.FILES.get('commitment_document')
+                institution_id = request.POST.get('institution_id')
+                proposal_id = request.POST.get('proposal_id')
+
+                if not file or not institution_id or not proposal_id:
+                    return JsonResponse({'success': False, 'error': 'Archivo, institución o propuesta no especificados.'})
+
+                # Validate file type
+                allowed_mime_types = [
+                    'application/pdf',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                ]
+                if file.content_type not in allowed_mime_types:
+                    return JsonResponse({'success': False, 'error': 'Solo se permiten archivos PDF o DOCX.'})
+
+                # Validate file size (10 MB)
+                if file.size > 10 * 1024 * 1024:
+                    return JsonResponse({'success': False, 'error': 'El archivo no puede exceder 10 MB.'})
+
+                institution = Institution.objects.get(id=institution_id)
+                proposal = Proposal.objects.get(pk=proposal_id)
+                print(institution.name)
+                print(proposal.id)
+                print(proposal.project_title)
+                print(proposal.communication_strategy)
+
+                # Validate institution is linked to proposal
+                if not proposal.partner_institutions.filter(id=institution_id).exists():
+                    return JsonResponse({'success': False, 'error': 'Institución no asignada a esta propuesta.'})
+
+                doc = ProposalDocument.objects.create(
+                    proposal=proposal,
+                    file=file,
+                    document_type='commitment',
+                    uploaded_by=request.user.customuser
+                )
+
+                # Link to proposal's M2M commitments
+                proposal.partner_institution_commitments.add(doc)
+
+                return JsonResponse({
+                    'success': True,
+                    'id': doc.id,
+                    'name': doc.name,
+                    'url': doc.file.url,
+                })
+
+            except Institution.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Institución no encontrada.'})
+            except Proposal.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Propuesta no encontrada.'})
+            except Exception as e:
+                return JsonResponse({'success': False, 'error': 'Error interno del servidor. Por favor, inténtelo de nuevo.'})
         # Capture all POST data
         post_data = {
             'principal_research_experience': request.POST.get('principal_research_experience', '').strip(),
@@ -1623,16 +1679,16 @@ def apply_proposal(request, expression_id):
         if post_data['project_location']:
             proposal.project_location = Country.objects.get(id=post_data['project_location'])
 
-        # Partner institutions
-        institution_ids = request.POST.getlist('partner_institution_ids')
-        proposal.partner_institutions.clear()
-        for inst_id in institution_ids:
-            if inst_id.isdigit():
-                try:
-                    inst = Institution.objects.get(id=int(inst_id))
-                    proposal.partner_institutions.add(inst)
-                except Institution.DoesNotExist:
-                    continue
+        # # Partner institutions
+        # institution_ids = request.POST.getlist('partner_institution_ids')
+        # proposal.partner_institutions.clear()
+        # for inst_id in institution_ids:
+        #     if inst_id.isdigit():
+        #         try:
+        #             inst = Institution.objects.get(id=int(inst_id))
+        #             proposal.partner_institutions.add(inst)
+        #         except Institution.DoesNotExist:
+        #             continue
 
         # Timeline document
         if 'timeline_document' in request.FILES:
@@ -1663,20 +1719,24 @@ def apply_proposal(request, expression_id):
                 proposal.budget_document = None
 
         # Commitment letters (multiple files)
+        # This is for non-AJAX case — e.g., user uploaded multiple files in one go
         if 'commitment_documents' in request.FILES:
             for file in request.FILES.getlist('commitment_documents'):
-                ProposalDocument.objects.create(
+                doc = ProposalDocument.objects.create(
                     proposal=proposal,
                     file=file,
                     document_type='commitment',
                     uploaded_by=request.user.customuser
                 )
+                proposal.partner_institution_commitments.add(doc)
 
-        # Handle document removal
+        # Handle removal of individual commitment docs (via AJAX or form)
         if request.POST.get('remove_document'):
             doc_id = request.POST.get('remove_document')
             try:
                 doc = ProposalDocument.objects.get(id=doc_id, proposal=proposal)
+                # Remove from M2M
+                proposal.partner_institution_commitments.remove(doc)
                 doc.delete()
             except ProposalDocument.DoesNotExist:
                 pass

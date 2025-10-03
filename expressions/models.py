@@ -125,9 +125,9 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
             try:
                 # Always look in Expression table
                 old = Expression.objects.get(pk=self.pk)
-                print("Old is:",old)
-                print("Old.created_at is:", old.created_at)
-                print("Old.user_id is:", old.user_id)
+                # print("Old is:",old)
+                # print("Old.created_at is:", old.created_at)
+                # print("Old.user_id is:", old.user_id)
                 if old.created_at:
                     self.created_at = old.created_at
             except Expression.DoesNotExist:

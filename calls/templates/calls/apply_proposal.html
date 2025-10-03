@@ -102,7 +102,7 @@
                             <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-section" data-institution-id="{{ inst.id }}">Eliminar</button>
                         </div>
 
-                        <!-- ✅ Show ALL commitment documents linked to THIS proposal AND associated with THIS institution -->
+                        <!-- Show ALL commitment documents linked to THIS proposal AND associated with THIS institution -->
                         {% for doc in proposal.partner_institution_commitments.all %}
                             {% if doc.document_type == 'commitment' %}
                                 <!-- Only show if this doc's proposal has this institution -->
@@ -118,7 +118,7 @@
 
                         <!-- Upload form for this institution -->
                         <div class="input-group mb-2">
-                            <input type="file" name="commitment_documents_{{ inst.id }}" class="form-control" accept=".pdf,.docx">
+                            <input type="file" name="commitment_document" class="form-control" accept=".pdf,.docx">
                             <button type="button" class="btn btn-outline-primary upload-commitment" data-institution-id="{{ inst.id }}">Cargar</button>
                         </div>
                     </div>
@@ -126,7 +126,7 @@
             </div>
 
             <!-- Hidden field to store selected institution IDs -->
-            <input type="hidden" name="partner_institution_ids" value="{% for inst in proposal.partner_institutions.all %}{{ inst.id }},{% endfor %}">
+            <!-- <input type="hidden" name="partner_institution_ids" value="{% for inst in proposal.partner_institutions.all %}{{ inst.id }},{% endfor %}"> -->
         </div>
 
         <!-- 3. Community Country + Description -->
@@ -273,11 +273,18 @@
 document.addEventListener('DOMContentLoaded', function() {
     const institutionSearchInput = document.querySelector('.institution-search');
     const addInstitutionButton = document.querySelector('.add-institution');
-    const hiddenIdsInput = document.querySelector('input[name="partner_institution_ids"]');
     const listContainer = document.getElementById('partner-institutions-list');
     const commitmentContainer = document.getElementById('commitment-documents-container');
     const institutionsScript = document.getElementById('institutions-json');
     const institutionsList = JSON.parse(institutionsScript.textContent);
+
+    // function updatePartnerInstitutionIdsField() {
+    //     const ids = [];
+    //     document.querySelectorAll('#partner-institutions-list [data-institution-id]').forEach(el => {
+    //         ids.push(el.dataset.institutionId);
+    //     });
+    //     hiddenIdsInput.value = ids.join(',');
+    // }
 
     // -------------------------------
     // INSTITUTION SEARCH & SELECTION
@@ -328,21 +335,51 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const div = document.createElement('div');
-        div.className = 'd-flex align-items-center mb-2 p-2 bg-light rounded';
-        div.dataset.institutionId = id;
-        div.innerHTML = `
-            <span class="me-2">${name}</span>
-            <button type="button" class="btn btn-sm btn-outline-danger remove-institution" data-institution-id="${id}">Eliminar</button>
-        `;
-        listContainer.appendChild(div);
+        const btn = document.querySelector(`.add-institution`);
+        btn.disabled = true;
+        btn.textContent = 'Agregando...';
 
-        // Update hidden field
-        const currentIds = hiddenIdsInput.value.split(',').filter(x => x);
-        currentIds.push(id);
-        hiddenIdsInput.value = currentIds.join(',');
+        const formData = new FormData();
+        formData.append('institution_id', id);
+        formData.append('proposal_id', document.querySelector('[name="proposal_id"]').value);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
 
-        createCommitmentSection(id, name);
+        fetch('{% url "proposals:add_institution_to_proposal" %}', {
+            method: 'POST',
+            body: formData,
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const div = document.createElement('div');
+                div.className = 'd-flex align-items-center mb-2 p-2 bg-light rounded';
+                div.dataset.institutionId = data.institution_id;
+                div.innerHTML = `
+                    <span class="me-2">${data.institution_name}</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-institution" data-institution-id="${data.institution_id}">Eliminar</button>
+                `;
+                listContainer.appendChild(div);
+
+                // Update hidden field
+
+                // Create commitment section
+                createCommitmentSection(data.institution_id, data.institution_name);
+
+                // Reset button
+                btn.disabled = false;
+                btn.textContent = 'Agregar';
+            } else {
+                alert('Error al agregar institución: ' + data.error);
+                btn.disabled = false;
+                btn.textContent = 'Agregar';
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert('Error de red. Por favor, inténtelo de nuevo.');
+            btn.disabled = false;
+            btn.textContent = 'Agregar';
+        });
     }
 
     // -------------------------------
@@ -362,7 +399,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-section" data-institution-id="${institutionId}">Eliminar</button>
             </div>
             <div class="input-group mb-2">
-                <input type="file" name="commitment_documents_${institutionId}" class="form-control" accept=".pdf,.docx">
+                <input type="file" name="commitment_document" class="form-control" accept=".pdf,.docx">
                 <button type="button" class="btn btn-outline-primary upload-commitment" data-institution-id="${institutionId}">Cargar</button>
             </div>
         `;
@@ -390,36 +427,109 @@ document.addEventListener('DOMContentLoaded', function() {
     // Remove institution
     listContainer.addEventListener('click', function(e) {
         if (e.target.classList.contains('remove-institution')) {
+            const btn = e.target;
             const id = e.target.dataset.institutionId;
-            e.target.closest('.d-flex').remove();
 
-            let ids = hiddenIdsInput.value.split(',').filter(x => x !== id);
-            hiddenIdsInput.value = ids.join(',');
+            if (!confirm('¿Está seguro de eliminar esta institución? Esta acción no se puede deshacer.')) {
+                return;
+            }
 
-            const commitSection = commitmentContainer.querySelector(`.commitment-doc-section[data-institution-id="${id}"]`);
-            if (commitSection) commitSection.remove();
+            // Show loading state
+            btn.disabled = true;
+            btn.textContent = 'Eliminando...';
+
+            const formData = new FormData();
+            formData.append('institution_id', id);
+            formData.append('proposal_id', document.querySelector('[name="proposal_id"]').value);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('{% url "proposals:remove_institution_from_proposal" %}', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove from DOM
+                    e.target.closest('.d-flex').remove();
+
+                    // Remove commitment section if exists
+                    const commitSection = commitmentContainer.querySelector(`.commitment-doc-section[data-institution-id="${data.institution_id}"]`);
+                    if (commitSection) commitSection.remove();
+
+                    // Update hidden field
+
+                    // Reset button state (though it's removed, just in case)
+                    btn.disabled = false;
+                } else {
+                    alert('Error al eliminar institución: ' + data.error);
+                    btn.disabled = false;
+                    btn.textContent = 'Eliminar';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Error de red. Por favor, inténtelo de nuevo.');
+                btn.disabled = false;
+                btn.textContent = 'Eliminar';
+            });
         }
     });
 
     // Remove commitment section
     commitmentContainer.addEventListener('click', function(e) {
         if (e.target.classList.contains('remove-commitment-section')) {
+            const btn = e.target;
             const id = e.target.dataset.institutionId;
-            e.target.closest('.card').remove();
 
-            const instDiv = listContainer.querySelector(`[data-institution-id="${id}"]`);
-            if (instDiv) instDiv.remove();
+            if (!confirm('¿Está seguro de eliminar esta institución y todas sus cartas de compromiso? Esta acción no se puede deshacer.')) {
+                return;
+            }
 
-            let ids = hiddenIdsInput.value.split(',').filter(x => x !== id);
-            hiddenIdsInput.value = ids.join(',');
+            btn.disabled = true;
+            btn.textContent = 'Eliminando...';
+
+            const formData = new FormData();
+            formData.append('institution_id', id);
+            formData.append('proposal_id', document.querySelector('[name="proposal_id"]').value);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('{% url "proposals:remove_institution_from_proposal" %}', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove UI elements
+                    e.target.closest('.card').remove();
+                    const instDiv = listContainer.querySelector(`[data-institution-id="${data.institution_id}"]`);
+                    if (instDiv) instDiv.remove();
+
+
+                    btn.disabled = false;
+                    btn.textContent = 'Eliminar';
+                } else {
+                    alert('Error al eliminar institución: ' + data.error);
+                    btn.disabled = false;
+                    btn.textContent = 'Eliminar';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Error de red. Por favor, inténtelo de nuevo.');
+                btn.disabled = false;
+                btn.textContent = 'Eliminar';
+            });
         }
     });
 
     // Upload commitment document
     commitmentContainer.addEventListener('click', function(e) {
         if (e.target.classList.contains('upload-commitment')) {
-            const id = e.target.dataset.institutionId;
-            const fileInput = e.target.previousElementSibling;
+            const btn = e.target; // Reference to the button
+            const fileInput = btn.previousElementSibling;
+            const id = btn.dataset.institutionId;
             const file = fileInput.files[0];
             const proposalId = document.querySelector('[name="proposal_id"]').value;
 
@@ -428,10 +538,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            // DISABLE BUTTON & SHOW LOADING TEXT
+            btn.disabled = true;
+            btn.textContent = 'Subiendo...';
+
             const formData = new FormData();
             formData.append('commitment_document', file);
             formData.append('institution_id', id);
             formData.append('proposal_id', proposalId);
+            formData.append('ajax_upload', '1');
             formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
 
             fetch('', {
@@ -448,8 +563,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <a href="${data.url}" target="_blank" class="btn btn-sm btn-outline-secondary me-2">Ver</a>
                         <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-doc" data-doc-id="${data.id}">Borrar</button>
                     `;
-                    e.target.closest('.card').querySelector('.input-group').after(docDiv);
-                    fileInput.value = '';
+                    btn.closest('.card').querySelector('.input-group').after(docDiv);
+                    fileInput.value = ''; // Clear file input
                 } else {
                     alert('Error al cargar: ' + data.error);
                 }
@@ -457,6 +572,11 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(err => {
                 console.error(err);
                 alert('Error de red. Por favor, inténtelo de nuevo.');
+            })
+            .finally(() => {
+                // ALWAYS REENABLE BUTTON, EVEN ON ERROR
+                btn.disabled = false;
+                btn.textContent = 'Cargar';
             });
         }
     });
