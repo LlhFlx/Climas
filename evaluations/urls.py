@@ -75,6 +75,14 @@ urlpatterns = [
         views.evaluate_expression, 
         name='evaluate_expression'),
 
+    path('serve-pdf/<int:evaluation_id>/<str:doc_type>/', 
+        views.serve_pdf, 
+        name='serve_pdf'),
+
+    path('get-document-url/<int:evaluation_id>/<str:doc_type>/', 
+        views.get_document_url, 
+        name='get_document_url'),
+
     # Coordinator: View All Evaluations
     path('coordinator/evaluations/all/', 
         views.coordinator_view_evaluations, 

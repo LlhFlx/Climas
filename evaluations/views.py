@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.apps import apps
 import json
+from django.urls import reverse 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -18,6 +19,8 @@ from calls.models import Call
 from evaluations.utils import approve_if_auto_approved
 from django.db import transaction
 from decimal import Decimal
+from django.core.exceptions import PermissionDenied
+from django.views.decorators.clickjacking import xframe_options_exempt 
 #from proposals.models import Proposal
 
 @login_required
@@ -640,6 +643,14 @@ def evaluate_expression(request, evaluation_id):
         category__template=template
     ).select_related('category').order_by('category__order', 'order')
 
+    # Determine target type and get proposal-specific data if needed
+    target = evaluation.target
+    print("target", target)
+    print(isinstance(target, Expression))
+    print(isinstance(target, Proposal))
+    # target_type = 'expression' if isinstance(target, Expression) else 'proposal'
+    target_type = 'proposal' if isinstance(target, Proposal) else 'expression'
+
     if request.method == 'POST':
         total_score = 0
         try:
@@ -729,10 +740,37 @@ def evaluate_expression(request, evaluation_id):
 
         return redirect('evaluations:evaluator_dashboard')
 
+
+    # Prepare proposal-specific fields to pass to template (only if Proposal)
+    proposal_fields = {}
+    if target_type == 'proposal':
+        proposal_fields = {
+            'principal_research_experience': target.principal_research_experience,
+            'community_country': target.community_country,
+            'community_description': target.community_description,
+            'project_location': target.project_location,
+            'duration_months': target.duration_months,
+            'summary': target.summary,
+            'context_problem_justification': target.context_problem_justification,
+            'specific_objectives': target.specific_objectives,
+            'methodology_analytical_plan_ethics': target.methodology_analytical_plan_ethics,
+            'equity_inclusion': target.equity_inclusion,
+            'communication_strategy': target.communication_strategy,
+            'risk_analysis_mitigation': target.risk_analysis_mitigation,
+            'research_team': target.research_team,
+            'timeline_document': target.timeline_document,
+            'budget_document': target.budget_document,
+            'partner_institutions': target.partner_institutions.all(),
+            'partner_institution_commitments': target.partner_institution_commitments.all(),
+        }
+
+
     context = {
         'evaluation': evaluation,
         'template': template,
         'items': items,
+        'target_type': target_type,
+        'proposal_fields': proposal_fields, 
     }
     return render(request, 'evaluations/evaluate_expression.html', context)
 
@@ -853,4 +891,87 @@ def evaluation_detail_json(request, evaluation_id):
         'status': evaluation.status.name,
 
         'is_own_evaluation': is_evaluator,
+    })
+
+@login_required
+@xframe_options_exempt
+def serve_pdf(request, evaluation_id, doc_type):
+    """
+    Securely serve a PDF file (timeline or budget) associated with an evaluation.
+    Only the assigned evaluator can access it.
+    """
+
+    # Get the evaluation
+    evaluation = get_object_or_404(Evaluation, id=evaluation_id)
+
+    # Ensure user is the evaluator
+    if request.user.customuser != evaluation.evaluator:
+        raise PermissionDenied("No permission to view this document.")
+
+    # Ensure evaluation is completed
+    # if evaluation.status.name != "Completada":
+    #     raise PermissionDenied("Document not available until evaluation is completed.")
+
+    # Map doc_type to the correct field on the target
+    target = evaluation.target
+    if not hasattr(target, 'timeline_document') and not hasattr(target, 'budget_document'):
+        raise Http404("Document type not supported.")
+
+    doc_field = None
+    if doc_type == 'timeline':
+        doc_field = getattr(target, 'timeline_document', None)
+    elif doc_type == 'budget':
+        doc_field = getattr(target, 'budget_document', None)
+    else:
+        raise Http404("Invalid document type.")
+
+    if not doc_field:
+        raise Http404("Document not found.")
+
+    # Ensure file exists
+    if not doc_field.file:
+        raise Http404("File not found.")
+
+    # Serve the file securely
+    response = FileResponse(
+        doc_field.file.open('rb'),
+        content_type='application/pdf',
+        as_attachment=False  # This makes it display in-browser
+    )
+    response['Content-Disposition'] = f'inline; filename="{doc_field.name}"'
+    return response
+
+@login_required
+def get_document_url(request, evaluation_id, doc_type):
+    """
+    Returns the secure URL to view a document (PDF, DOCX, XLSX, etc.) via Google Docs Viewer.
+    Only the evaluator can access it.
+    """
+    evaluation = get_object_or_404(Evaluation, id=evaluation_id)
+
+    if request.user.customuser != evaluation.evaluator:
+        raise PermissionDenied("No permission to view this document.")
+
+    target = evaluation.target
+    doc_field = None
+
+    if doc_type == 'timeline':
+        doc_field = getattr(target, 'timeline_document', None)
+    elif doc_type == 'budget':
+        doc_field = getattr(target, 'budget_document', None)
+    else:
+        return JsonResponse({'success': False, 'error': 'Invalid document type.'})
+
+    if not doc_field or not doc_field.file:
+        return JsonResponse({'success': False, 'error': 'Document not found.'})
+
+    # Return the *secure* Django URL - Google will fetch it
+    secure_url = request.build_absolute_uri(
+        f"{reverse('evaluations:serve_pdf', args=[evaluation_id, doc_type])}"
+    )
+
+    return JsonResponse({
+        'success': True,
+        'secure_url': secure_url,
+        'filename': doc_field.name
     })

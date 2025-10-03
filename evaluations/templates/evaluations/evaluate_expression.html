@@ -6,6 +6,13 @@
     <h3>Evaluando: "{{ evaluation.target.project_title }}"</h3>
     <p><strong>Convocatoria:</strong> {{ evaluation.call.title }}</p>
     <p><strong>Plantilla:</strong> {{ evaluation.template.name }}</p>
+    <p><strong>Tipo:</strong> 
+        {% if target_type == 'expression' %}
+            <span class="badge bg-info">Expresión</span>
+        {% else %}
+            <span class="badge bg-success">Propuesta</span>
+        {% endif %}
+    </p>
 
     <hr>
 
@@ -19,6 +26,100 @@
             <li class="list-group-item"><strong>Problema:</strong> {{ evaluation.target.problem|truncatewords:50 }}</li>
             <li class="list-group-item"><strong>Objetivo General:</strong> {{ evaluation.target.general_objective|truncatewords:50 }}</li>
             <li class="list-group-item"><strong>Metodología:</strong> {{ evaluation.target.methodology|truncatewords:50 }}</li>
+
+            <!-- PROPOSAL-SPECIFIC FIELDS (ONLY IF TARGET IS PROPOSAL) -->
+            {% if target_type == 'proposal' %}
+                <li class="list-group-item"><strong>Experiencia en Investigación del Investigador Principal:</strong> {{ proposal_fields.principal_research_experience|default:"No proporcionado"|linebreaks }}</li>
+                <li class="list-group-item"><strong>País de la Comunidad:</strong> {{ proposal_fields.community_country.name|default:"No especificado" }}</li>
+                <li class="list-group-item"><strong>Descripción de la Comunidad:</strong> {{ proposal_fields.community_description|default:"No proporcionada"|linebreaks }}</li>
+                <li class="list-group-item"><strong>País de Implementación del Proyecto:</strong> {{ proposal_fields.project_location.name|default:"No especificado" }}</li>
+                <li class="list-group-item"><strong>Duración del Proyecto (meses):</strong> {{ proposal_fields.duration_months|default:"No especificada" }}</li>
+                <li class="list-group-item"><strong>Resumen:</strong> {{ proposal_fields.summary|default:"No proporcionado"|linebreaks }}</li>
+                <li class="list-group-item"><strong>Contexto, Problema y Justificación:</strong> {{ proposal_fields.context_problem_justification|default:"No proporcionado"|linebreaks }}</li>
+                <li class="list-group-item"><strong>Objetivos Específicos:</strong> {{ proposal_fields.specific_objectives|default:"No proporcionados"|linebreaks }}</li>
+                <li class="list-group-item"><strong>Metodología, Plan Analítico y Ética:</strong> {{ proposal_fields.methodology_analytical_plan_ethics|default:"No proporcionado"|linebreaks }}</li>
+                <li class="list-group-item"><strong>Equidad, Género, Interseccionalidad e Inclusión:</strong> {{ proposal_fields.equity_inclusion|default:"No proporcionado"|linebreaks }}</li>
+                <li class="list-group-item"><strong>Estrategia de Comunicación:</strong> {{ proposal_fields.communication_strategy|default:"No proporcionada"|linebreaks }}</li>
+                <li class="list-group-item"><strong>Riesgos y Mitigación:</strong> {{ proposal_fields.risk_analysis_mitigation|default:"No proporcionado"|linebreaks }}</li>
+                <li class="list-group-item"><strong>Equipo de Investigación:</strong> {{ proposal_fields.research_team|default:"No proporcionado"|linebreaks }}</li>
+
+                <!-- Documents -->
+                {% if proposal_fields.timeline_document %}
+                    <li class="list-group-item">
+                        <strong>Cronograma:</strong>
+                        <div class="mt-2">
+                            <embed
+                                src="{% url 'evaluations:serve_pdf' evaluation.id 'timeline' %}"
+                                type="application/pdf"
+                                width="100%"
+                                height="500px"
+                                class="border rounded"
+                            />
+                            <p class="mt-2 text-muted">
+                                <small>
+                                    <a href="{% url 'evaluations:serve_pdf' evaluation.id 'timeline' %}" target="_blank" class="text-decoration-none">
+                                        ↓ Ver en nueva pestaña
+                                    </a>
+                                </small>
+                            </p>
+                        </div>
+                    </li>
+                {% endif %}
+                {% if proposal_fields.budget_document %}
+                    <li class="list-group-item">
+                        <strong>Presupuesto:</strong>
+                        <div class="mt-2">
+                            <!-- <embed
+                                src="{% url 'evaluations:serve_pdf' evaluation.id 'budget' %}"
+                                type="application/pdf"
+                                width="100%"
+                                height="500px"
+                                class="border rounded"
+                            /> -->
+                            <!-- Google Docs Viewer for ANY file type -->
+                            <iframe
+                                src="https://docs.google.com/gview?url={% url 'evaluations:serve_pdf' evaluation.id 'budget' %}&embedded=true"
+                                width="100%"
+                                height="600px"
+                                style="border: none;"
+                                frameborder="0"
+                            ></iframe>
+                            <p class="mt-2 text-muted">
+                                <small>
+                                    <a href="{% url 'evaluations:serve_pdf' evaluation.id 'budget' %}" target="_blank" class="text-decoration-none">
+                                        ↓ Ver en nueva pestaña
+                                    </a>
+                                </small>
+                            </p>
+                        </div>
+                    </li>
+                {% endif %}
+
+                <!-- Partner Institutions -->
+                {% if proposal_fields.partner_institutions %}
+                    <li class="list-group-item">
+                        <strong>Instituciones Aliadas:</strong>
+                        <ul class="mt-1">
+                            {% for inst in proposal_fields.partner_institutions %}
+                                <li>{{ inst.name }}</li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endif %}
+
+                <!-- Commitment Letters -->
+                {% if proposal_fields.partner_institution_commitments %}
+                    <li class="list-group-item">
+                        <strong>Cartas de Compromiso:</strong>
+                        <ul class="mt-1">
+                            {% for doc in proposal_fields.partner_institution_commitments %}
+                                <li><a href="{{ doc.file.url }}" target="_blank" class="text-decoration-none">{{ doc.name }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endif %}
+            {% endif %}
+
         </ul>
     </div>
 
