@@ -17,6 +17,7 @@ from common.models import Status
 from django.contrib.contenttypes.models import ContentType
 from calls.models import Call
 from evaluations.utils import approve_if_auto_approved
+from budgets.models import BudgetItem
 from django.db import transaction
 from decimal import Decimal
 from django.core.exceptions import PermissionDenied
@@ -651,6 +652,92 @@ def evaluate_expression(request, evaluation_id):
     # target_type = 'expression' if isinstance(target, Expression) else 'proposal'
     target_type = 'proposal' if isinstance(target, Proposal) else 'expression'
 
+    # Prepare proposal-specific fields to pass to template (only if Proposal)
+    proposal_fields = {}
+    if target_type == 'proposal':
+        proposal_fields = {
+            'principal_research_experience': target.principal_research_experience,
+            'community_country': target.community_country,
+            'community_description': target.community_description,
+            'project_location': target.project_location,
+            'duration_months': target.duration_months,
+            'summary': target.summary,
+            'context_problem_justification': target.context_problem_justification,
+            'specific_objectives': target.specific_objectives,
+            'methodology_analytical_plan_ethics': target.methodology_analytical_plan_ethics,
+            'equity_inclusion': target.equity_inclusion,
+            'communication_strategy': target.communication_strategy,
+            'risk_analysis_mitigation': target.risk_analysis_mitigation,
+            'research_team': target.research_team,
+            'timeline_document': target.timeline_document,
+            'budget_document': target.budget_document,
+            'partner_institutions': target.partner_institutions.all(),
+            'partner_institution_commitments': target.partner_institution_commitments.all(),
+        }
+    
+    # EXTRA DATA: Products, Team Members, Budget Items, Responses
+    # Extract related objects using correct _set syntax
+    try:
+        # Products
+        if hasattr(target, 'product_set') and target.product_set.exists():
+            products = list(
+                target.product_set.prefetch_related('strategic_effects').all()
+            )
+            for product in products:
+                print(f"Product: {product.title}")
+                effects = product.strategic_effects.all()
+                for effect in effects:
+                    print(f"  → Effect: {effect.name}")
+                print(f"\nProduct ID is: {product.id} - Title: {product.title}")
+                if effects:
+                    for effect in effects:
+                        print(f"    {effect.id} - {effect.name}")
+                else:
+                    print("   No strategic effects linked.")
+        else:
+            print("Error loading products:", e)
+            products = []
+
+        # Team Members
+        if hasattr(target, 'teammember_set') and target.teammember_set.exists():
+            team_members = list(target.teammember_set.all())
+        else:
+            team_members = []
+
+        # Budget Items
+        existing_budget_items = BudgetItem.objects.filter(expression=target.id).select_related('category', 'period')
+        for item in existing_budget_items:
+            print(item.id, item.category.name, item.period.name)
+        
+        # Dynamic Question Responses
+        print(target)
+        responses = {}
+        try:
+            # Use correct related name
+            response_qs = target.form_responses.select_related('shared_question')
+            if response_qs.exists():
+                for r in response_qs:
+                    question_text = r.shared_question.question
+                    responses[question_text] = r.value.strip() if r.value else "No respondido"
+        except Exception as e:
+            print("Error accessing form_responses:", str(e))
+            # Fallback: try default reverse accessor
+            try:
+                from proponent_forms.models import ProponentResponse
+                response_qs = ProponentResponse.objects.filter(expression=target).select_related('shared_question')
+                for r in response_qs:
+                    question_text = r.shared_question.question
+                    responses[question_text] = r.value.strip() if r.value else "No respondido"
+            except:
+                pass
+
+    except Exception as e:
+        print("Error loading extended fields:", e)
+        products = []
+        team_members = []
+        budget_items = []
+        responses = {}
+
     if request.method == 'POST':
         total_score = 0
         try:
@@ -689,13 +776,6 @@ def evaluate_expression(request, evaluation_id):
                 # THRESHOLD LOGIC - SAFE DECIMAL ARITHMETIC
                 # Convert to Decimal
                 total_score_decimal = Decimal(str(total_score))
-
-                # Calculate ratio safely
-                # if evaluation.max_possible_score == 0:
-                #     ratio = Decimal('0')
-                # else:
-                #     ratio = total_score_decimal / evaluation.max_possible_score
-                # Recalculate max_possible_score first!
                 evaluation.total_score = total_score_decimal
                 evaluation.max_possible_score = evaluation.template.get_total_max_score()
 
@@ -710,6 +790,7 @@ def evaluate_expression(request, evaluation_id):
                 evaluation.status = status_completada
                 evaluation.submission_datetime = timezone.now()
                 evaluation.save()
+
                 # Auto-approve check (if applicable)
                 target = evaluation.target
                 target_type = 'expression' if isinstance(target, Expression) else 'proposal'
@@ -728,6 +809,12 @@ def evaluate_expression(request, evaluation_id):
                 'evaluation': evaluation,
                 'template': template,
                 'items': items,
+                'target_type': target_type,
+                'proposal_fields': proposal_fields,
+                'products': products,
+                'team_members': team_members,
+                'existing_budget_items': existing_budget_items,
+                'responses': responses,
             })
         except Exception as e:
             messages.error(request, "Ocurrió un error al guardar la evaluación.")
@@ -736,41 +823,26 @@ def evaluate_expression(request, evaluation_id):
                 'evaluation': evaluation,
                 'template': template,
                 'items': items,
+                'target_type': target_type,
+                'proposal_fields': proposal_fields,
+                'products': products,
+                'team_members': team_members,
+                'existing_budget_items': existing_budget_items,
+                'responses': responses,
             })
 
         return redirect('evaluations:evaluator_dashboard')
-
-
-    # Prepare proposal-specific fields to pass to template (only if Proposal)
-    proposal_fields = {}
-    if target_type == 'proposal':
-        proposal_fields = {
-            'principal_research_experience': target.principal_research_experience,
-            'community_country': target.community_country,
-            'community_description': target.community_description,
-            'project_location': target.project_location,
-            'duration_months': target.duration_months,
-            'summary': target.summary,
-            'context_problem_justification': target.context_problem_justification,
-            'specific_objectives': target.specific_objectives,
-            'methodology_analytical_plan_ethics': target.methodology_analytical_plan_ethics,
-            'equity_inclusion': target.equity_inclusion,
-            'communication_strategy': target.communication_strategy,
-            'risk_analysis_mitigation': target.risk_analysis_mitigation,
-            'research_team': target.research_team,
-            'timeline_document': target.timeline_document,
-            'budget_document': target.budget_document,
-            'partner_institutions': target.partner_institutions.all(),
-            'partner_institution_commitments': target.partner_institution_commitments.all(),
-        }
-
 
     context = {
         'evaluation': evaluation,
         'template': template,
         'items': items,
         'target_type': target_type,
-        'proposal_fields': proposal_fields, 
+        'proposal_fields': proposal_fields,
+        'products': products,
+        'team_members': team_members,
+        'existing_budget_items': existing_budget_items,
+        'responses': responses,
     }
     return render(request, 'evaluations/evaluate_expression.html', context)
 

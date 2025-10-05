@@ -149,7 +149,8 @@ class ProponentResponse(TimestampMixin, models.Model):
     expression = models.ForeignKey(
         'expressions.Expression',
         on_delete=models.CASCADE,
-        verbose_name="Expresión de Interés"
+        verbose_name="Expresión de Interés",
+        related_name='form_responses'
     )
 
     shared_question = models.ForeignKey(

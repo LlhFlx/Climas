@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'widget_tweaks',
 
     'captcha',
+    'django.contrib.humanize',
 
     'core.apps.CoreConfig',
     'common.apps.CommonConfig',
