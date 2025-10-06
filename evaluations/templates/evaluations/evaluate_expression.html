@@ -239,16 +239,45 @@
                     <p><strong>{{ item.question }}</strong> (Max: {{ item.max_score }})</p>
                     <div class="row">
                         <div class="col-md-6">
-                            <label for="item_{{ item.id }}">Puntaje (0 - {{ item.max_score }})</label>
-                            <input type="number"
-                                   step="0.1"
-                                   min="0"
-                                   max="{{ item.max_score }}"
-                                   name="item_{{ item.id }}"
-                                   id="item_{{ item.id }}"
-                                   class="form-control"
-                                   required>
+
+                            {% if item.field_type == 'dropdown' and item.options %}
+                                <label for="item_{{ item.id }}">Seleccione una opción</label>
+                                <select name="item_{{ item.id }}" id="item_{{ item.id }}" class="form-select" required>
+                                    <option value="">-- Seleccione --</option>
+                                    {% for option in item.options %}
+                                        <option value="{{ option }}">{{ option }}</option>
+                                    {% endfor %}
+                                </select>
+
+                            {% elif item.field_type == 'number' %}
+                                <label for="item_{{ item.id }}">Puntaje (0 - {{ item.max_score }})</label>
+                                <input type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max="{{ item.max_score }}"
+                                    name="item_{{ item.id }}"
+                                    id="item_{{ item.id }}"
+                                    class="form-control"
+                                    required>
+
+                            {% elif item.field_type == 'text' %}
+                                <label for="item_{{ item.id }}">Respuesta</label>
+                                <textarea name="item_{{ item.id }}" id="item_{{ item.id }}" class="form-control" rows="2" required></textarea>
+
+                            {% else %}
+                                <!-- Fallback to number input -->
+                                <label for="item_{{ item.id }}">Puntaje (0 - {{ item.max_score }})</label>
+                                <input type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max="{{ item.max_score }}"
+                                    name="item_{{ item.id }}"
+                                    id="item_{{ item.id }}"
+                                    class="form-control"
+                                    required>
+                            {% endif %}
                         </div>
+
                         <div class="col-md-6">
                             <label for="comment_{{ item.id }}">Comentario</label>
                             <textarea name="comment_{{ item.id }}" id="comment_{{ item.id }}" class="form-control" rows="2"></textarea>
