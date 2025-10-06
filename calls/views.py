@@ -1081,16 +1081,16 @@ def apply_call(request, call_pk):
     # Initialize post_data here - always exists, even on GET
     post_data = {}
     doc_form = ExpressionDocumentForm()
-    print("Check documents")
+    # print("Check documents")
     if documents.exists():
-        print("Check documents... They exist.")
+        # print("Check documents... They exist.")
         doc_form.fields['file'].required = False
-        print(doc_form.fields['file'].required )
+        # print(doc_form.fields['file'].required )
 
     if request.method == 'POST':
         #print(request.POST)
-        print('remove_document' in request.POST)
-        print(request.POST.get('remove_document'))
+        # print('remove_document' in request.POST)
+        # print(request.POST.get('remove_document'))
         if request.method == "POST" and 'remove_document' in request.POST:
             doc_id = request.POST.get('remove_document')
             ExpressionDocument.objects.filter(id=doc_id, expression=expression).delete()
@@ -1230,9 +1230,28 @@ def apply_call(request, call_pk):
                 #print('Project Members', request.POST)
                 ProjectTeamMember.objects.filter(expression=expression).delete()
                 team_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('team_member_person_'))
+
+                # print("START DEBUG")
+                # print("POST keys:")
+                # for k in request.POST.keys():
+                #     print(f"'{k}'")
+
+                # print("Team indices:", team_indices)
+                # for i in team_indices:
+                #     key = f"team_member_person_id_{i}"
+                #     print(f"Checking key: '{key}' -> {key in request.POST}")
+                #     print(f"Raw index repr: {repr(i)}")
+                # print(request.POST.get('team_member_person_id_0'))
+                # print("END DEBUG")
+                print("Team indices", team_indices)
+                #print("POST dict is:",request.POST)
                 for index in team_indices:
-                    person_id = request.POST.get(f'team_member_person_{index}')
+                    person_id = request.POST.get(f'team_member_person_id_{index}')
                     role = request.POST.get(f'team_member_role_{index}', '').strip()
+                    print(f'team_member_person_id_{index}')
+                    print("Person ID:", request.POST.get(f'team_member_person_id_{index}'))
+                    print("Person ID:", person_id)
+                    print(request.POST.get(f'team_member_role_{index}', '').strip())
                     if person_id and person_id.strip() and role:
                         member = ProjectTeamMember.objects.create(
                             expression=expression,
@@ -1336,7 +1355,7 @@ def apply_call(request, call_pk):
                     # But we don't want to show a "required" error if there's already a document.
                     # So, if there are existing documents, we make the form NOT required for this submission.
                     if documents.exists():
-                        print("Documents exist...")
+                        # print("Documents exist...")
                         # Temporarily make the file field not required for this validation
                         doc_form.fields['file'].required = False
                         # We don't validate it here because we're not uploading, but we need to pass it to the template
