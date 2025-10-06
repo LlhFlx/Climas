@@ -1243,15 +1243,15 @@ def apply_call(request, call_pk):
                 #     print(f"Raw index repr: {repr(i)}")
                 # print(request.POST.get('team_member_person_id_0'))
                 # print("END DEBUG")
-                print("Team indices", team_indices)
-                #print("POST dict is:",request.POST)
+                # print("Team indices", team_indices)
+                # print("POST dict is:",request.POST)
                 for index in team_indices:
                     person_id = request.POST.get(f'team_member_person_id_{index}')
                     role = request.POST.get(f'team_member_role_{index}', '').strip()
-                    print(f'team_member_person_id_{index}')
-                    print("Person ID:", request.POST.get(f'team_member_person_id_{index}'))
-                    print("Person ID:", person_id)
-                    print(request.POST.get(f'team_member_role_{index}', '').strip())
+                    # print(f'team_member_person_id_{index}')
+                    # print("Person ID:", request.POST.get(f'team_member_person_id_{index}'))
+                    # print("Person ID:", person_id)
+                    # print(request.POST.get(f'team_member_role_{index}', '').strip())
                     if person_id and person_id.strip() and role:
                         member = ProjectTeamMember.objects.create(
                             expression=expression,
@@ -1260,8 +1260,9 @@ def apply_call(request, call_pk):
                             status_id=request.POST.get(f'team_member_status_{index}'),
                             start_date=request.POST.get(f'team_member_start_date_{index}'),
                             end_date=request.POST.get(f'team_member_end_date_{index}'),
-                            institution_id=request.POST.get(f'team_member_institution_id_{index}')
+                            institution_id=request.POST.get(f'team_member_institution_{index}')
                         )
+                        # print("Member inst ID:", member.institution_id)
                         # Antecedents
                         axis_ids = request.POST.getlist(f'team_member_antecedent_axis_{index}')
                         descriptions = request.POST.getlist(f'team_member_antecedent_description_{index}')

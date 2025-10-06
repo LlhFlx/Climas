@@ -309,11 +309,28 @@
                         <input type="text" name="team_member_role_{{ forloop.counter0 }}" class="form-control" value="{{ member.role }}" required>
                     </div>
                     <!-- Institution -->
-                    <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=institution_id_{{ index }}" 
-                    target="_blank" 
-                    class="btn btn-outline-primary mt-2">
-                        + Crear
-                    </a>
+                    <div class="mb-3">
+                        <label class="form-label">Institución *</label>
+                        <div class="input-group">
+                            <input type="text"
+                                class="form-control institution-search"
+                                placeholder="Buscar institución..."
+                                aria-label="Institución"
+                                value="{% if member.institution %}{{ member.institution.name }}{% endif %}"
+                            >
+                            <input type="hidden"
+                                name="team_member_institution_{{ forloop.counter0 }}"
+                                class="institution-id"
+                                value="{% if member.institution %}{{ member.institution.id }}{% endif %}"
+                            >
+                        </div>
+                        <small class="form-text text-muted">Escriba para buscar.</small>
+                        <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=team_member_institution_{{ forloop.counter0 }}" 
+                        target="_blank" 
+                        class="btn btn-outline-primary mt-2">
+                            + Crear
+                        </a>
+                    </div>
                     <!-- Dates -->
                     <div class="row mb-3">
                         <div class="col-md-6">

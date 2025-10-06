@@ -683,25 +683,42 @@ def evaluate_expression(request, evaluation_id):
             products = list(
                 target.product_set.prefetch_related('strategic_effects').all()
             )
-            for product in products:
-                print(f"Product: {product.title}")
-                effects = product.strategic_effects.all()
-                for effect in effects:
-                    print(f"  → Effect: {effect.name}")
-                print(f"\nProduct ID is: {product.id} - Title: {product.title}")
-                if effects:
-                    for effect in effects:
-                        print(f"    {effect.id} - {effect.name}")
-                else:
-                    print("   No strategic effects linked.")
+            # for product in products:
+            #     print(f"Product: {product.title}")
+            #     effects = product.strategic_effects.all()
+            #     for effect in effects:
+            #         print(f"  → Effect: {effect.name}")
+            #     print(f"\nProduct ID is: {product.id} - Title: {product.title}")
+            #     if effects:
+            #         for effect in effects:
+            #             print(f"    {effect.id} - {effect.name}")
+            #     else:
+            #         print("   No strategic effects linked.")
         else:
             print("Error loading products:", e)
             products = []
 
-        # Team Members
-        if hasattr(target, 'teammember_set') and target.teammember_set.exists():
-            team_members = list(target.teammember_set.all())
-        else:
+        # # Team Members
+        # if hasattr(target, 'projectteammember_set') and target.teammember_set.exists():
+        #     team_members = list(target.teammember_set.all())
+        # else:
+        #     team_members = []
+
+        # print("Team Members", team_members)
+
+        try:
+            # Safe: use the actual related_name or default _set
+            if hasattr(target, 'team_members'):  
+                team_members = list(target.team_members.all())
+            else:
+                # Fallback: try default _set name
+                rel_name = 'projectteammember_set'
+                if hasattr(target, rel_name):
+                    team_members = list(getattr(target, rel_name).all())
+                else:
+                    team_members = []
+        except Exception as e:
+            print("Error loading team members:", str(e))
             team_members = []
 
         # Budget Items

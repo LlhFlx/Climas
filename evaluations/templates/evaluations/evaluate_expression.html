@@ -64,10 +64,29 @@
                     <ul class="mt-1">
                         {% for member in team_members %}
                             <li>
-                                <strong>{{ member.person.first_name }} {{ member.person.first_last_name }}</strong>,
-                                Rol: {{ member.role }},
-                                Inst.: {{ member.institution.name }}
+                                <strong>{{ member.person.first_name }} {{ member.person.first_last_name }}</strong> <br>
+                                Rol: {{ member.role }}<br>
+                                Institución.: {{ member.institution.name }}<br>
                                 <small>({{ member.start_date|date:"Y-m-d" }} → {{ member.end_date|date:"Y-m-d" }})</small>
+                                
+                                {% if member.thematic_antecedents.exists %}
+                                    <ul class="mt-2">
+                                        {% for antecedent in member.thematic_antecedents.all %}
+                                            <li>
+                                                <em>Eje Temático:</em> {{ antecedent.thematic_axis.name }}<br>
+                                                <em>Descripción:</em> {{ antecedent.description }}<br>
+                                                {% if antecedent.evidence_url %}
+                                                    <em>Evidencia:</em>
+                                                    <a href="{{ antecedent.evidence_url }}" target="_blank">
+                                                        {{ antecedent.evidence_url }}
+                                                    </a><br>
+                                                {% endif %}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <p class="text-muted mb-0 mt-1">Sin antecedentes temáticos registrados.</p>
+                                {% endif %}
                             </li>
                         {% endfor %}
                     </ul>
