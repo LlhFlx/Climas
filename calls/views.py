@@ -1741,6 +1741,7 @@ def apply_proposal(request, expression_id):
         # Commitment letters (multiple files)
         # This is for non-AJAX case — e.g., user uploaded multiple files in one go
         if 'commitment_documents' in request.FILES:
+            proposal.refresh_from_db()
             for file in request.FILES.getlist('commitment_documents'):
                 doc = ProposalDocument.objects.create(
                     proposal=proposal,
@@ -1748,7 +1749,9 @@ def apply_proposal(request, expression_id):
                     document_type='commitment',
                     uploaded_by=request.user.customuser
                 )
-                proposal.partner_institution_commitments.add(doc)
+                # proposal.partner_institution_commitments.add(doc)
+                fresh_proposal = Proposal.objects.get(pk=proposal.pk)
+                fresh_proposal.partner_institution_commitments.add(doc)
 
         # Handle removal of individual commitment docs (via AJAX or form)
         if request.POST.get('remove_document'):
