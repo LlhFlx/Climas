@@ -333,6 +333,152 @@
             }
         }
     });
+
+    // UNIVERSAL WORD COUNTER - GLOBAL SCOPE
+    document.addEventListener('DOMContentLoaded', function() {
+        /**
+         * Utility: Count words in text
+         */
+        function countWords(text) {
+            return text.trim() ? text.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
+        }
+
+        /**
+         * Single Textarea Counter
+         */
+        function initWordCounter(textarea) {
+            const maxWords = parseInt(textarea.getAttribute('data-word-limit'), 10);
+            if (!maxWords) return;
+
+            // Create or get counter element
+            let counterEl = document.getElementById(`counter-${textarea.id}`);
+            if (!counterEl) {
+                counterEl = document.createElement('small');
+                counterEl.id = `counter-${textarea.id}`;
+                counterEl.className = 'form-text d-block mt-1';
+                textarea.parentNode.insertBefore(counterEl, textarea.nextSibling);
+            }
+
+            function update() {
+                const value = textarea.value || '';
+                const wordCount = countWords(value);
+                const isOver = wordCount > maxWords;
+
+                counterEl.className = `form-text d-block mt-1 ${isOver ? 'text-danger' : 'text-muted'}`;
+                counterEl.textContent = `${wordCount} / ${maxWords} palabras`;
+
+                // Optional: Highlight input if over
+                if (textarea.classList.contains('form-control')) {
+                    textarea.classList.toggle('border-danger', isOver);
+                }
+            }
+
+            // Initial + live updates
+            update();
+            textarea.addEventListener('input', update);
+
+            return { validate: () => countWords(textarea.value) <= maxWords };
+        }
+
+        /**
+         * Container-Based Total Word Counter
+         */
+        function initContainerWordCounter(container) {
+            const totalLimit = parseInt(container.getAttribute('data-total-limit'), 10);
+            if (!totalLimit) return;
+
+            const selector = container.getAttribute('data-textarea-selector') || 'textarea[data-word-limit]';
+            const textareas = container.querySelectorAll(selector);
+
+            const outputId = container.getAttribute('data-output-id');
+            const counterEl = outputId ? document.getElementById(outputId) : null;
+
+            function update() {
+                let total = 0;
+                textareas.forEach(ta => {
+                    const value = ta.value || '';
+                    total += countWords(value);
+                });
+
+                const isOver = total > totalLimit;
+
+                if (counterEl) {
+                    counterEl.className = `form-text d-block mt-1 ${isOver ? 'text-danger fw-bold' : 'text-muted'}`;
+                    counterEl.innerHTML = `<strong>Total:</strong> ${total} / ${totalLimit} palabras`;
+                }
+
+                // Update individual borders
+                textareas.forEach(ta => {
+                    if (ta.classList.contains('form-control')) {
+                        ta.classList.remove('border-danger', 'border-success');
+                        if (isOver) ta.classList.add('border-danger');
+                    }
+                });
+            }
+
+            // Live update
+            container.addEventListener('input', update, true); // true = capture phase
+            update(); // initial
+
+            return { validate: () => {
+                update(); // always recalc
+                return !counterEl || countWords(counterEl.textContent.split(' ')[1]) <= totalLimit;
+            }};
+        }
+
+        /**
+         * Auto-initialize all marked elements on page load
+         */
+        function autoInitCounters() {
+            // Init single counters
+            document.querySelectorAll('textarea[data-word-limit]').forEach(initWordCounter);
+
+            // Init container counters
+            document.querySelectorAll('[data-total-limit]').forEach(initContainerWordCounter);
+        }
+
+        /**
+         * Expose globally so dynamic fields can use it
+         */
+        window.initWordCounter = initWordCounter;
+        window.initContainerWordCounter = initContainerWordCounter;
+        window.countWords = countWords;
+
+        // Run on load
+        autoInitCounters();
+
+        // Attach to all forms: prevent submit if over limit
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                let valid = true;
+
+                // Check individual fields
+                form.querySelectorAll('textarea[data-word-limit]').forEach(ta => {
+                    const limit = parseInt(ta.getAttribute('data-word-limit'), 10);
+                    if (countWords(ta.value) > limit) {
+                        valid = false;
+                    }
+                });
+
+                // Check containers
+                form.querySelectorAll('[data-total-limit]').forEach(container => {
+                    const totalLimit = parseInt(container.getAttribute('data-total-limit'), 10);
+                    let totalWords = 0;
+                    const selector = container.getAttribute('data-textarea-selector') || 'textarea[data-word-limit]';
+                    container.querySelectorAll(selector).forEach(ta => {
+                        totalWords += countWords(ta.value);
+                    });
+                    if (totalWords > totalLimit) valid = false;
+                });
+
+                if (!valid) {
+                    e.preventDefault();
+                    alert("Uno o más campos exceden el límite de palabras. Revise y corrija.");
+                }
+            });
+        });
+    });
+
     </script>
 {% endblock %}
 </body>

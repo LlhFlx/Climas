@@ -1364,6 +1364,142 @@ def apply_call(request, call_pk):
                     # If there are NO documents, we leave document_form as is (required=True) so it validates
                     #   if the user tries to submit without uploading.
 
+                # -------------------------------
+                # FINAL WORD COUNT VALIDATION BLOCK
+                # -------------------------------
+
+                has_errors = False  # Reset for word count checks
+
+                # === 1. SINGLE FIELD: Project Title (max 15 words) ===
+                title = request.POST.get('project_title', '').strip()
+                if title:
+                    words = [w for w in title.split() if w]
+                    if len(words) > 50:
+                        messages.error(request, "El título del proyecto no puede tener más de 15 palabras.")
+                        has_errors = True
+
+                # === 2. CATEGORY: All Product Descriptions Combined (max 600 words) ===
+                product_desc_words = 0
+                product_indices_set = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('product_description_'))
+                for index in product_indices_set:
+                    desc = request.POST.get(f'product_description_{index}', '').strip()
+                    if desc:
+                        word_count = len([w for w in desc.split() if w])
+                        product_desc_words += word_count
+
+                if product_desc_words > 600:
+                    messages.error(request, f"Las descripciones de productos combinadas exceden el límite de 600 palabras ({product_desc_words}).")
+                    has_errors = True
+
+                # === 3. CATEGORY: All Team Member Roles + Antecedents (max 500 words) ===
+                team_member_words = 900
+                team_indices_set = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('team_member_role_'))
+                for index in team_indices_set:
+                    role = request.POST.get(f'team_member_role_{index}', '').strip()
+                    antecedent_descriptions = request.POST.getlist(f'team_member_antecedent_description_{index}')
+                    if role:
+                        team_member_words += len([w for w in role.split() if w])
+                    for desc in antecedent_descriptions:
+                        if desc.strip():
+                            team_member_words += len([w for w in desc.split() if w])
+
+                if team_member_words > 500:
+                    messages.error(request, f"Los roles y antecedentes de colaboradores no deben exceder 500 palabras ({team_member_words}).")
+                    has_errors = True
+
+                # === 4. CATEGORY: All Budget Item Notes (max 100 words) ===
+                budget_notes_words = 0
+                budget_indices_set = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('budget_item_notes_'))
+                for index in budget_indices_set:
+                    note = request.POST.get(f'budget_item_notes_{index}', '').strip()
+                    if note:
+                        budget_notes_words += len([w for w in note.split() if w])
+
+                if budget_notes_words > 100:
+                    messages.error(request, f"Las notas del presupuesto no deben superar 100 palabras en total ({budget_notes_words}).")
+                    has_errors = True
+
+                # === 5. SINGLE FIELDS: Other Text Fields ===
+                field_limits = {
+                    'problem': 50,
+                    'general_objective': 50,
+                    'methodology': 1500,
+                }
+
+                for field_name, max_words in field_limits.items():
+                    value = request.POST.get(field_name, '').strip()
+                    if not value:
+                        continue
+                    word_count = len([w for w in value.split() if w])
+                    if word_count > max_words:
+                        human_names = {
+                            'problem': 'Descripción del Problema',
+                            'general_objective': 'Objetivo General',
+                            'methodology': 'Metodología'
+                        }
+                        messages.error(
+                            request,
+                            f"{human_names[field_name]} no debe exceder {max_words} palabras ({word_count} detectadas)."
+                        )
+                        has_errors = True
+
+                # If any word count fails, stop here
+                if has_errors:
+                    # Re-fetch fresh state
+                    expression.refresh_from_db()
+                    context = {
+                        'call': call,
+                        'expression': expression,
+                        'form_questions': form_questions,
+                        'existing_responses': {
+                            pr.shared_question.id: pr.value 
+                            for pr in ProponentResponse.objects.filter(expression=expression)
+                        },
+                        'thematic_axes': thematic_axes,
+                        'countries': countries,
+                        'strategic_effects': strategic_effects,
+                        'strategic_effects_json': json.dumps([
+                            {
+                                'id': effect.id, 
+                                'name': effect.name,
+                                'thematic_axis_id': str(effect.thematic_axis_id)
+                            }
+                            for effect in strategic_effects
+                        ], cls=DjangoJSONEncoder),
+                        'existing_products': Product.objects.filter(expression=expression).prefetch_related('strategic_effects'),
+                        'existing_team_members': ProjectTeamMember.objects.filter(expression=expression).prefetch_related('thematic_antecedents'),
+                        'statuses': Status.objects.all().order_by('name'),
+                        'institutions': list(Institution.objects.filter(is_active=True).order_by('name').values('id', 'name')),
+                        'institution_types': institution_types,
+                        'people': people,
+                        'people_json': [
+                            {
+                                'id': person.id,
+                                'first_name': person.first_name,
+                                'first_last_name': person.first_last_name
+                            }
+                            for person in people
+                        ],
+                        'budget_categories': budget_categories,
+                        'budget_periods': budget_periods,
+                        'existing_budget_items': BudgetItem.objects.filter(expression=expression).select_related('category', 'period'),
+                        'scale_choices': scale_choices,
+                        'scale_choices_json': json.dumps([
+                            {
+                                'name': s.name,
+                                'description': s.description,
+                                'min_amount': float(s.min_amount),
+                                'max_amount': float(s.max_amount) if s.max_amount else None
+                            } 
+                            for s in scale_choices
+                        ], cls=DjangoJSONEncoder),
+                        'documents': documents,
+                        'document_form': doc_form,
+                        'intersectionality_scopes': IntersectionalityScope.objects.filter(is_active=True).order_by('name'),
+                        'post_data': post_data,
+                    }
+                    return render(request, 'calls/apply_call.html', context)
+
                 # Submit or save
                 if 'submit_application' in request.POST:
                     if not expression.primary_institution_id:
@@ -1763,6 +1899,77 @@ def apply_proposal(request, expression_id):
                 doc.delete()
             except ProposalDocument.DoesNotExist:
                 pass
+
+        # -------------------------------
+        # FINAL WORD COUNT VALIDATION BLOCK
+        # -------------------------------
+
+        has_word_errors = False
+
+        def count_words(text):
+            return len([w for w in text.strip().split() if w])
+
+        field_limits = [
+            ('principal_research_experience', 250, "Experiencia en investigación del Investigador/a Principal"),
+            ('summary', 250, "Resumen"),
+            ('context_problem_justification', 400, "Contexto, problema y justificación"),
+            ('specific_objectives', 200, "Objetivos específicos"),
+            ('methodology_analytical_plan_ethics', 1500, "Metodología, planeamiento analítico y aspectos éticos"),
+            ('equity_inclusion', 250, "Equidad, género, interseccionalidad e inclusión"),
+            ('communication_strategy', 100, "Estrategia de comunicación"),
+            ('risk_analysis_mitigation', 200, "Riesgos y plan de mitigación"),
+            ('research_team', 900, "Equipo de investigación"),
+            ('community_description', 150, "Descripción de la Comunidad"),
+        ]
+
+        for field_name, max_words, label in field_limits:
+            value = post_data.get(field_name, '')
+            if not value:
+                continue
+            word_count = count_words(value)
+            if word_count > max_words:
+                messages.error(
+                    request,
+                    f"{label}: Máximo {max_words} palabras. Tienes {word_count}."
+                )
+                has_word_errors = True
+
+        # If any word count fails, re-render with error messages
+        if has_word_errors:
+            # Re-fetch fresh proposal
+            try:
+                proposal = Proposal.objects.select_related(
+                    'expression_ptr__call',
+                    'expression_ptr__user',
+                    'expression_ptr__thematic_axis',
+                    'expression_ptr__implementation_country',
+                    'expression_ptr__primary_institution',
+                    'community_country',
+                    'project_location',
+                    'timeline_document',
+                    'budget_document',
+                ).prefetch_related(
+                    'partner_institutions',
+                    'proposal_documents'
+                ).get(pk=proposal.pk)
+            except Proposal.DoesNotExist:
+                pass
+
+            context = {
+                'call': expression.call,
+                'expression': expression,
+                'proposal': proposal,
+                'countries': countries,
+                'institutions': institutions,
+                'commitment_docs': commitment_docs,
+                'timeline_doc': timeline_doc,
+                'budget_doc': budget_doc,
+                'post_data': post_data,
+                'proposal_id': proposal.id,
+            }
+            return render(request, 'calls/apply_proposal.html', context)
+
+        #  ALL VALIDATIONS PASSED, THEN SAVE PROPOSAL
 
         # Save
         proposal.save()
