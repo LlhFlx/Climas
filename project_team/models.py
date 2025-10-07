@@ -6,16 +6,11 @@ from core.models import TimestampMixin
 # from thematic_axes.models import ThematicAxis
 
 
-class ProjectTeamMember(TimestampMixin, models.Model):
+class BaseProjectTeamMember(TimestampMixin, models.Model):
     """
     Miembro del equipo de proyecto asignado a una Expresión de Interés.
     Define su rol, fechas y estado.
     """
-    expression = models.ForeignKey(
-        'expressions.Expression',
-        on_delete=models.CASCADE,
-        verbose_name="Expresión de Interés"
-    )
     person = models.ForeignKey(
         'people.Person',
         on_delete=models.PROTECT,
@@ -43,31 +38,65 @@ class ProjectTeamMember(TimestampMixin, models.Model):
     end_date = models.DateField(verbose_name="Fecha de Finalización")
 
     class Meta:
-        db_table = 'project_team_member'
-        verbose_name = "Miembro del Equipo de Proyecto"
-        verbose_name_plural = "Miembros del Equipo de Proyecto"
-        unique_together = ('expression', 'person')
-        ordering = ['expression', 'role']
+        abstract = True
 
     def __str__(self):
         return f"{self.person} - {self.role} ({self.institution.name if self.institution else 'Sin Institución'})"
-
-
-class InvestigatorThematicAxisAntecedent(TimestampMixin, models.Model):
-    """
-    Antecedente del investigador en un eje temático específico.
-    """
-    team_member = models.ForeignKey(
-        'project_team.ProjectTeamMember',
-        on_delete=models.CASCADE,
-        related_name='thematic_antecedents',
-        verbose_name="Miembro del Equipo"
-    )
-    thematic_axis = models.ForeignKey(
-        'thematic_axes.ThematicAxis',
+    
+class ExpressionTeamMember(BaseProjectTeamMember, models.Model):
+    expression = models.ForeignKey(
+        'expressions.Expression',
         on_delete=models.PROTECT,
-        verbose_name="Eje Temático"
+        related_name='expression_team_members',
+        verbose_name="Expresión"
     )
+
+    class Meta:
+        db_table = 'expression_teammember'
+        verbose_name = "Miembro del Equipo (Expresión)"
+        verbose_name_plural = "Miembros del Equipo (Expresión)"
+        unique_together = ('expression', 'person')
+        ordering = ['expression', 'role']
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+class ProposalTeamMember(BaseProjectTeamMember):
+    """
+    Team member linked to a Formal Proposal.
+    Can be modified independently from Expression version.
+    """
+    proposal = models.ForeignKey(
+        'proposals.Proposal',
+        on_delete=models.PROTECT,
+        related_name='proposal_team_members',
+        verbose_name="Propuesta"
+    )
+
+    # Upload CV for this member
+    cv_file = models.FileField(
+        upload_to='proposal_team_cv/%Y/%m/%d/',
+        null=True,
+        blank=True,
+        verbose_name="C.V. Adjunto"
+    )
+
+    class Meta:
+        db_table = 'proposal_teammember'
+        verbose_name = "Miembro del Equipo (Propuesta)"
+        verbose_name_plural = "Miembros del Equipo (Propuesta)"
+        unique_together = ('proposal', 'person')
+        ordering = ['proposal', 'role']
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+    @property
+    def has_cv(self):
+        return bool(self.cv_file)
+
+
+class BaseInvestigatorThematicAntecedent(TimestampMixin, models.Model):
     description = models.TextField(verbose_name="Descripción del Antecedente")
     evidence_url = models.URLField(
         blank=True,
@@ -75,9 +104,54 @@ class InvestigatorThematicAxisAntecedent(TimestampMixin, models.Model):
     )
 
     class Meta:
+        abstract=True
+
+class ExpressionInvestigatorThematicAntecedent(BaseInvestigatorThematicAntecedent):
+    """
+    Antecedente del investigador en un eje temático específico.
+    Asociado con un miembro de la Expresión.
+    """
+    team_member = models.ForeignKey(
+        'project_team.ExpressionTeamMember',
+        on_delete=models.CASCADE,
+        related_name='expression_thematic_antecedents',
+        verbose_name="Miembro del Equipo (Expresión)"
+    )
+    thematic_axis = models.ForeignKey(
+        'thematic_axes.ThematicAxis',
+        on_delete=models.PROTECT,
+        verbose_name="Eje Temático"
+    )    
+
+    class Meta:
         db_table = 'investigator_thematic_antecedent'
-        verbose_name = "Antecedente en Eje Temático"
-        verbose_name_plural = "Antecedentes en Ejes Temáticos"
+        verbose_name = "Antecedente en Eje Temático (Expresión)"
+        verbose_name_plural = "Antecedentes en Ejes Temáticos (Expresión)"
+
+    def __str__(self):
+        return f"{self.team_member.person} - {self.thematic_axis}"
+
+class ProposalInvestigatorThematicAntecedent(BaseInvestigatorThematicAntecedent):
+    """
+    Antecedente temático para un miembro de la Propuesta.
+    Permite diferencias respecto a la Expresión.
+    """
+    team_member = models.ForeignKey(
+        'project_team.ProposalTeamMember',
+        on_delete=models.CASCADE,
+        related_name='thematic_antecedents',
+        verbose_name="Miembro del Equipo (Propuesta)"
+    )
+    thematic_axis = models.ForeignKey(
+        'thematic_axes.ThematicAxis',
+        on_delete=models.PROTECT,
+        verbose_name="Eje Temático"
+    )
+
+    class Meta:
+        db_table = 'proposal_investigator_antecedent'
+        verbose_name = "Antecedente en Eje Temático (Propuesta)"
+        verbose_name_plural = "Antecedentes en Ejes Temáticos (Propuesta)"
 
     def __str__(self):
         return f"{self.team_member.person} - {self.thematic_axis}"
@@ -88,7 +162,7 @@ class InvestigatorCondition(TimestampMixin, models.Model):
     Condición específica de participación del investigador.
     """
     team_member = models.ForeignKey(
-        'project_team.ProjectTeamMember',
+        'project_team.ExpressionTeamMember',
         on_delete=models.CASCADE,
         related_name='conditions',
         verbose_name="Miembro del Equipo"

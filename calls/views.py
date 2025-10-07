@@ -5,37 +5,39 @@ from django.contrib import messages
 from django.utils import timezone
 from django.http import HttpResponseForbidden, JsonResponse, FileResponse, Http404
 from django.core.serializers import serialize
+from django.core.serializers.json import DjangoJSONEncoder
 from .models import Call
-from .forms import CallForm, SharedQuestionForm
+from .forms import CallForm, SharedQuestionForm # For create_shared_question
 from proponent_forms.models import SharedQuestion
 from common.models import Status, Scale
 from proponent_forms.models import ProponentForm, ProponentFormQuestion, ProponentResponse # For setup_call
 # from proponent_forms.models import ProponentForm, ProponentFormQuestion  
-from .forms import SharedQuestionForm  # For create_shared_question
-
 from institutions.models import Institution, InstitutionType
 from thematic_axes.models import ThematicAxis
 from strategic_effects.models import StrategicEffect
-from budgets.models import BudgetCategory, BudgetPeriod
+from budgets.models import BudgetCategory, BudgetPeriod, ProposalBudgetItem
 from geo.models import Country, DocumentType
 from people.models import Person
 from expressions.models import Expression, ExpressionDocument
 from expressions.forms import ExpressionDocumentForm
-from proposals.models import Proposal, ProposalDocument
+from proposals.models import Proposal, ProposalDocument, ProposalSpecificObjective
 from accounts.models import CustomUser
-
 from products.models import Product
 from django.forms import modelformset_factory
 from django import forms
 from django.contrib.contenttypes.models import ContentType
-
 import json
-from django.core.serializers.json import DjangoJSONEncoder
-
-from project_team.models import ProjectTeamMember, InvestigatorCondition, InvestigatorThematicAxisAntecedent
+from project_team.models import (
+    ExpressionTeamMember, 
+    InvestigatorCondition, 
+    ExpressionInvestigatorThematicAntecedent, 
+    ProposalTeamMember, 
+    ProposalInvestigatorThematicAntecedent
+)
 from intersectionality.models import IntersectionalityScope
 from budgets.models import BudgetCategory, BudgetItem, BudgetPeriod
 from evaluations.models import Evaluation, EvaluationResponse, EvaluationTemplate, TemplateCategory, TemplateItem
+from cbo.models import CBORelevantRole
 
 @login_required
 def coordinator_dashboard(request):
@@ -1228,7 +1230,7 @@ def apply_call(request, call_pk):
 
                 # Team Members
                 #print('Project Members', request.POST)
-                ProjectTeamMember.objects.filter(expression=expression).delete()
+                ExpressionTeamMember.objects.filter(expression=expression).delete()
                 team_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('team_member_person_'))
 
                 # print("START DEBUG")
@@ -1253,7 +1255,7 @@ def apply_call(request, call_pk):
                     # print("Person ID:", person_id)
                     # print(request.POST.get(f'team_member_role_{index}', '').strip())
                     if person_id and person_id.strip() and role:
-                        member = ProjectTeamMember.objects.create(
+                        member = ExpressionTeamMember.objects.create(
                             expression=expression,
                             person_id=person_id,
                             role=role,
@@ -1269,7 +1271,7 @@ def apply_call(request, call_pk):
                         urls = request.POST.getlist(f'team_member_antecedent_url_{index}')
                         for i, axis_id in enumerate(axis_ids):
                             if i < len(descriptions) and descriptions[i].strip():
-                                InvestigatorThematicAxisAntecedent.objects.create(
+                                ExpressionInvestigatorThematicAntecedent.objects.create(
                                     team_member=member,
                                     thematic_axis_id=axis_id,
                                     description=descriptions[i].strip(),
@@ -1467,7 +1469,7 @@ def apply_call(request, call_pk):
                             for effect in strategic_effects
                         ], cls=DjangoJSONEncoder),
                         'existing_products': Product.objects.filter(expression=expression).prefetch_related('strategic_effects'),
-                        'existing_team_members': ProjectTeamMember.objects.filter(expression=expression).prefetch_related('thematic_antecedents'),
+                        'existing_team_members': ExpressionTeamMember.objects.filter(expression=expression).prefetch_related('thematic_antecedents'),
                         'statuses': Status.objects.all().order_by('name'),
                         'institutions': list(Institution.objects.filter(is_active=True).order_by('name').values('id', 'name')),
                         'institution_types': institution_types,
@@ -1558,7 +1560,7 @@ def apply_call(request, call_pk):
             for effect in strategic_effects
         ], cls=DjangoJSONEncoder),
         'existing_products': Product.objects.filter(expression=expression).prefetch_related('strategic_effects'),
-        'existing_team_members': ProjectTeamMember.objects.filter(expression=expression).prefetch_related('thematic_antecedents'),
+        'existing_team_members': ExpressionTeamMember.objects.filter(expression=expression).prefetch_related('thematic_antecedents'),
         'statuses': Status.objects.all().order_by('name'),
         'institutions': institutions_list,
         'institution_types': institution_types,
@@ -1739,12 +1741,16 @@ def apply_proposal(request, expression_id):
     timeline_doc = proposal.timeline_document
     budget_doc = proposal.budget_document
 
+    # Load existing proposal-level data
+    existing_proposal_budget_items = ProposalBudgetItem.objects.filter(proposal=proposal)
+    existing_proposal_team_members = ProposalTeamMember.objects.filter(proposal=proposal)
+    existing_cbo_roles = CBORelevantRole.objects.filter(cbo__in=proposal.community_organizations.all())
+
     # Initialize post_data
     post_data = {}
     
     if request.method == 'POST':
         if request.POST.get('ajax_upload') == '1':
-            print("Here...")
             try:
                 file = request.FILES.get('commitment_document')
                 institution_id = request.POST.get('institution_id')
@@ -1767,10 +1773,6 @@ def apply_proposal(request, expression_id):
 
                 institution = Institution.objects.get(id=institution_id)
                 proposal = Proposal.objects.get(pk=proposal_id)
-                print(institution.name)
-                print(proposal.id)
-                print(proposal.project_title)
-                print(proposal.communication_strategy)
 
                 # Validate institution is linked to proposal
                 if not proposal.partner_institutions.filter(id=institution_id).exists():
@@ -1801,6 +1803,8 @@ def apply_proposal(request, expression_id):
                 return JsonResponse({'success': False, 'error': 'Error interno del servidor. Por favor, inténtelo de nuevo.'})
         # Capture all POST data
         post_data = {
+            'project_title_override': request.POST.get('project_title_override', '').strip(),
+            'thematic_axis_override': request.POST.get('thematic_axis_override'),
             'principal_research_experience': request.POST.get('principal_research_experience', '').strip(),
             'community_description': request.POST.get('community_description', '').strip(),
             'duration_months': request.POST.get('duration_months', 12),
@@ -1814,6 +1818,9 @@ def apply_proposal(request, expression_id):
             'research_team': request.POST.get('research_team', '').strip(),
             'community_country': request.POST.get('community_country'),
             'project_location': request.POST.get('project_location'),
+            'principal_investigator_title': request.POST.get('principal_investigator_title', '').strip(),
+            'principal_investigator_position': request.POST.get('principal_investigator_position', '').strip(),
+            'primary_institution_id': request.POST.get('primary_institution_id'),
         }
 
         # Update Proposal fields
@@ -1828,12 +1835,29 @@ def apply_proposal(request, expression_id):
         proposal.communication_strategy = post_data['communication_strategy']
         proposal.risk_analysis_mitigation = post_data['risk_analysis_mitigation']
         proposal.research_team = post_data['research_team']
+        proposal.principal_investigator_title = post_data['principal_investigator_title']
+        proposal.principal_investigator_position = post_data['principal_investigator_position']
 
         # Country fields
         if post_data['community_country']:
             proposal.community_country = Country.objects.get(id=post_data['community_country'])
         if post_data['project_location']:
             proposal.project_location = Country.objects.get(id=post_data['project_location'])
+
+        if post_data['primary_institution_id'] and post_data['primary_institution_id'].isdigit():
+            try:
+                proposal.primary_institution = Institution.objects.get(id=int(post_data['primary_institution_id']))
+            except Institution.DoesNotExist:
+                pass
+
+        # Handle optional title/axis override
+        if post_data['project_title_override']:
+            proposal.project_title_override = post_data['project_title_override']
+        if post_data['thematic_axis_override']:
+            try:
+                proposal.thematic_axis_override = ThematicAxis.objects.get(id=post_data['thematic_axis_override'])
+            except ThematicAxis.DoesNotExist:
+                pass
 
         # # Partner institutions
         # institution_ids = request.POST.getlist('partner_institution_ids')
@@ -1899,6 +1923,95 @@ def apply_proposal(request, expression_id):
                 doc.delete()
             except ProposalDocument.DoesNotExist:
                 pass
+
+        # ============================
+        # SAVE PROPOSAL-SPECIFIC ITEMS
+        # ============================
+
+        # Specific Objectives (new table)
+        ProposalSpecificObjective.objects.filter(proposal=proposal).delete()
+        obj_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('objective_title_'))
+        for idx in obj_indices:
+            title = request.POST.get(f'objective_title_{idx}', '').strip()
+            desc = request.POST.get(f'objective_description_{idx}', '').strip()
+            if title:
+                ProposalSpecificObjective.objects.create(
+                    proposal=proposal,
+                    title=title,
+                    description=desc
+                )
+
+        # Budget Items (separate relation)
+        ProposalBudgetItem.objects.filter(proposal=proposal).delete()
+        budget_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('proposal_budget_category_'))
+        total_budget = 0
+        for idx in budget_indices:
+            cat_id = request.POST.get(f'proposal_budget_category_{idx}')
+            period_id = request.POST.get(f'proposal_budget_period_{idx}')
+            amount_str = request.POST.get(f'proposal_budget_amount_{idx}', '').strip()
+            notes = request.POST.get(f'proposal_budget_notes_{idx}', '').strip()
+
+            if not cat_id or not period_id or not amount_str:
+                continue
+
+            try:
+                amount = float(amount_str)
+                if amount <= 0:
+                    raise ValueError()
+
+                category = BudgetCategory.objects.get(id=cat_id)
+                period = BudgetPeriod.objects.get(id=period_id)
+
+                item = ProposalBudgetItem.objects.create(
+                    proposal=proposal,
+                    category=category,
+                    period=period,
+                    amount=amount,
+                    notes=notes
+                )
+                total_budget += amount
+            except Exception:
+                messages.warning(request, f"Ítem de presupuesto inválido: {idx}")
+
+        proposal.total_requested_budget = total_budget
+
+        # Team Members (separate from Expression)
+        ProposalTeamMember.objects.filter(proposal=proposal).delete()
+        team_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('proposal_team_member_person_id_'))
+        for idx in team_indices:
+            person_id = request.POST.get(f'proposal_team_member_person_id_{idx}')
+            role = request.POST.get(f'proposal_team_member_role_{idx}', '').strip()
+            inst_id = request.POST.get(f'proposal_team_member_institution_{idx}')
+
+            if not person_id or not role:
+                continue
+
+            try:
+                member = ProposalTeamMember.objects.create(
+                    proposal=proposal,
+                    person_id=int(person_id),
+                    role=role,
+                    institution_id=inst_id,
+                    start_date=request.POST.get(f'proposal_team_member_start_date_{idx}'),
+                    end_date=request.POST.get(f'proposal_team_member_end_date_{idx}'),
+                    status_id=request.POST.get(f'proposal_team_member_status_{idx}'),
+                )
+
+                # Save antecedents
+                axes = request.POST.getlist(f'proposal_team_member_antecedent_axis_{idx}')
+                descs = request.POST.getlist(f'proposal_team_member_antecedent_description_{idx}')
+                urls = request.POST.getlist(f'proposal_team_member_antecedent_url_{idx}')
+                for i, axis_id in enumerate(axes):
+                    if i < len(descs) and descs[i].strip():
+                        
+                        ProposalInvestigatorThematicAntecedent.objects.create(
+                            team_member=member,
+                            thematic_axis_id=int(axis_id),
+                            description=descs[i],
+                            evidence_url=urls[i] if i < len(urls) else ''
+                        )
+            except Exception as e:
+                messages.warning(request, f"Error al guardar colaborador: {str(e)}")
 
         # -------------------------------
         # FINAL WORD COUNT VALIDATION BLOCK
@@ -1995,21 +2108,11 @@ def apply_proposal(request, expression_id):
             messages.success(request, "Propuesta guardada como borrador.")
             return redirect('calls:researcher_dashboard')
 
-    # Re-fetch fresh proposal
-    proposal = Proposal.objects.select_related(
-        'expression_ptr__call',
-        'expression_ptr__user',
-        'expression_ptr__thematic_axis',
-        'expression_ptr__implementation_country',
-        'expression_ptr__primary_institution',
-        'community_country',
-        'project_location',
-        'timeline_document',
-        'budget_document',
-    ).prefetch_related(
-        'partner_institutions',
-        'proposal_documents'
-    ).get(pk=proposal.pk)
+    # Re-fetch fresh state
+    try:
+        proposal.refresh_from_db()
+    except:
+        pass
 
     context = {
         'call': expression.call,
@@ -2020,6 +2123,9 @@ def apply_proposal(request, expression_id):
         'commitment_docs': commitment_docs,
         'timeline_doc': timeline_doc,
         'budget_doc': budget_doc,
+        'existing_proposal_budget_items': ProposalBudgetItem.objects.filter(proposal=proposal),
+        'existing_proposal_team_members': ProposalTeamMember.objects.filter(proposal=proposal),
+        'all_cbos': CBO.objects.filter(is_active=True).order_by('name'), 
         'post_data': post_data,
         'proposal_id': proposal.id, 
     }

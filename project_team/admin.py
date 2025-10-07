@@ -1,9 +1,9 @@
 from django.contrib import admin
-from .models import ProjectTeamMember, InvestigatorThematicAxisAntecedent, InvestigatorCondition
+from .models import ExpressionTeamMember, ExpressionInvestigatorThematicAntecedent, InvestigatorCondition
 
 
 class InvestigatorThematicAxisAntecedentInline(admin.TabularInline):
-    model = InvestigatorThematicAxisAntecedent
+    model = ExpressionInvestigatorThematicAntecedent
     extra = 1
     fields = ('thematic_axis', 'description', 'evidence_url')
     verbose_name = "Antecedente"
@@ -18,7 +18,7 @@ class InvestigatorConditionInline(admin.TabularInline):
     verbose_name_plural = "Condiciones de Participación"
 
 
-@admin.register(ProjectTeamMember)
+@admin.register(ExpressionTeamMember)
 class ProjectTeamMemberAdmin(admin.ModelAdmin):
     list_display = ('person', 'role', 'expression', 'status', 'start_date', 'end_date')
     list_filter = ('role', 'status', 'expression__call', 'start_date')
@@ -41,7 +41,7 @@ class ProjectTeamMemberAdmin(admin.ModelAdmin):
     )
 
 
-@admin.register(InvestigatorThematicAxisAntecedent)
+@admin.register(ExpressionInvestigatorThematicAntecedent)
 class InvestigatorThematicAxisAntecedentAdmin(admin.ModelAdmin):
     list_display = ('team_member', 'thematic_axis', 'description')
     list_filter = ('thematic_axis', 'team_member__expression__call')

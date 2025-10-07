@@ -2,6 +2,7 @@ from django.db import models
 from core.models import TimestampMixin, CreatedByMixin
 from expressions.models import Expression
 from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
 
 class BudgetCategory(TimestampMixin, CreatedByMixin, models.Model):
     """
@@ -57,16 +58,13 @@ class BudgetPeriod(TimestampMixin, CreatedByMixin, models.Model):
     def __str__(self):
         return self.name
 
-class BudgetItem(TimestampMixin, models.Model):
+class BaseBudgetItem(models.Model):
     """
     Ítem de presupuesto para una expresión.
     Relaciona categoría, período y monto.
+    Base abstracta para cualquier Ítem de presupuesto.
+    Permite compartir la estructura entre la expresión y la propuesta.
     """
-    expression = models.ForeignKey(
-        'expressions.Expression',
-        on_delete=models.CASCADE,
-        verbose_name="Expresión de Interés"
-    )
     category = models.ForeignKey(
         'budgets.BudgetCategory',
         on_delete=models.PROTECT,
@@ -86,11 +84,47 @@ class BudgetItem(TimestampMixin, models.Model):
     notes = models.TextField(blank=True, verbose_name="Notas")
 
     class Meta:
+        abstract = True  # This prevents DB table creation
+
+    def clean(self):
+        if self.amount < 0:
+            raise ValidationError("El monto no puede ser negativo.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+class BudgetItem(TimestampMixin, BaseBudgetItem):
+    expression = models.ForeignKey(
+        'expressions.Expression',
+        on_delete=models.CASCADE,
+        verbose_name="Expresión de Interés"
+    )
+
+    class Meta:
         db_table = 'budget_item'
-        verbose_name = "Ítem de Presupuesto"
-        verbose_name_plural = "Ítems de Presupuesto"
+        verbose_name = "Ítem de Presupuesto (Expresión)"
+        verbose_name_plural = "Ítems de Presupuesto (Expresión)"
         unique_together = ('expression', 'category', 'period')
         ordering = ['category__name', 'period__order']
 
     def __str__(self):
-        return f"{self.expression.project_title} - {self.category.name} ({self.period.name})"
+        return f"{self.expression.project_title} - {self.category.name} ({self.period.name}): {self.amount}"
+
+class ProposalBudgetItem(TimestampMixin, BaseBudgetItem):
+    proposal = models.ForeignKey(
+        'proposals.Proposal',
+        on_delete=models.CASCADE,
+        related_name='budget_items'
+    )
+
+    class Meta(BaseBudgetItem.Meta):
+        db_table = 'proposal_budget_item'
+        verbose_name = "Ítem de Presupuesto (Propuesta)"
+        verbose_name_plural = "Ítems de Presupuesto (Propuesta)"
+        unique_together = ('proposal', 'category', 'period')
+        ordering = ['category__name', 'period__order']
+
+    def __str__(self):
+        return f"{self.proposal.project_title} - {self.category.name} ({self.period.name}): {self.amount}"
+    

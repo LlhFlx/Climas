@@ -125,7 +125,7 @@ from django.contrib.contenttypes.models import ContentType
 import json
 from django.core.serializers.json import DjangoJSONEncoder
 
-from project_team.models import ProjectTeamMember, InvestigatorCondition, InvestigatorThematicAxisAntecedent
+from project_team.models import ExpressionTeamMember, InvestigatorCondition, ExpressionInvestigatorThematicAntecedent
 from intersectionality.models import IntersectionalityScope
 from budgets.models import BudgetCategory, BudgetItem, BudgetPeriod
 from evaluations.models import Evaluation, EvaluationResponse, EvaluationTemplate, TemplateCategory, TemplateItem
@@ -1299,13 +1299,13 @@ def apply_call(request, call_pk):
 
                 # Team Members
                 #print('Project Members', request.POST)
-                ProjectTeamMember.objects.filter(expression=expression).delete()
+                ExpressionTeamMember.objects.filter(expression=expression).delete()
                 team_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('team_member_person_'))
                 for index in team_indices:
                     person_id = request.POST.get(f'team_member_person_{index}')
                     role = request.POST.get(f'team_member_role_{index}', '').strip()
                     if person_id and person_id.strip() and role:
-                        member = ProjectTeamMember.objects.create(
+                        member = ExpressionTeamMember.objects.create(
                             expression=expression,
                             person_id=person_id,
                             role=role,
@@ -1320,7 +1320,7 @@ def apply_call(request, call_pk):
                         urls = request.POST.getlist(f'team_member_antecedent_url_{index}')
                         for i, axis_id in enumerate(axis_ids):
                             if i < len(descriptions) and descriptions[i].strip():
-                                InvestigatorThematicAxisAntecedent.objects.create(
+                                ExpressionInvestigatorThematicAntecedent.objects.create(
                                     team_member=member,
                                     thematic_axis_id=axis_id,
                                     description=descriptions[i].strip(),
@@ -1470,7 +1470,7 @@ def apply_call(request, call_pk):
             for effect in strategic_effects
         ], cls=DjangoJSONEncoder),
         'existing_products': Product.objects.filter(expression=expression).prefetch_related('strategic_effects'),
-        'existing_team_members': ProjectTeamMember.objects.filter(expression=expression).prefetch_related('thematic_antecedents'),
+        'existing_team_members': ExpressionTeamMember.objects.filter(expression=expression).prefetch_related('thematic_antecedents'),
         'statuses': Status.objects.all().order_by('name'),
         'institutions': institutions_list,
         'institution_types': institution_types,

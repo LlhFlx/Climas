@@ -68,38 +68,243 @@ class ProjectLeaderExperience(TimestampMixin, models.Model):
 # ===== From: proposals/models.py =====
 
 from django.db import models
-
 from django.contrib.contenttypes.fields import GenericRelation
-from expressions.models import Expression 
+from expressions.models import Expression
+from common.models import Status
+from geo.models import Country
+from django.core.validators import MinValueValidator
+from django.utils import timezone
+from core.models import TimestampMixin
+import os
+from uuid import uuid4
+from django.utils.text import get_valid_filename
+from django.utils import timezone
+from common.models import Status
+
+def proposal_file_upload_path(instance, filename):
+    """
+    Custom upload path: /proposal_documents/{timeline|budget|commitment}/{year}/{month}/{day}/<uuid>-<filename>
+    Ensures unique filenames, safe names, and organized storage.
+    """
+    ext = os.path.splitext(filename)[1]  # Get extension (.pdf, .docx, etc.)
+    safe_name = get_valid_filename(filename)  # Sanitize filename
+    new_filename = f"{uuid4().hex[:8]}-{safe_name}"  # Unique prefix + safe name
+
+    doc_type = instance.document_type  # 'timeline', 'budget', 'commitment'
+    now = timezone.now()
+    
+    return f'proposal_documents/{doc_type}/{now.year}/{now.month}/{now.day}/{new_filename}'
 
 class Proposal(Expression):
     """
-    Propuesta formal — expresión aprobada con campos adicionales.
+    Propuesta formal: expresión aprobada con campos adicionales.
     Hereda todos los campos de Expression, más los nuevos.
     """
-    # NEW FIELDS specific to Proposal
-    budget_breakdown = models.TextField(
-        verbose_name="Desglose Presupuestario",
-        help_text="Detalles de asignación de fondos por actividad"
-    )
-    implementation_plan = models.TextField(
-        verbose_name="Plan de Implementación",
-        help_text="Fases, cronograma, hitos"
-    )
-    risk_analysis = models.TextField(
-        verbose_name="Análisis de Riesgos",
-        help_text="Riesgos identificados y planes de mitigación"
-    )
-    sustainability_plan = models.TextField(
-        verbose_name="Plan de Sostenibilidad",
-        help_text="Cómo se mantendrá el proyecto después del financiamiento"
+    # === NEW FIELDS SPECIFIC TO PROPOSAL ===
+
+    project_title_override = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Si se especifica, sobrescribe el título de la expresión.",
+        verbose_name="Título del Proyecto"
     )
 
+    thematic_axis_override = models.ForeignKey(
+        'thematic_axes.ThematicAxis',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Si se especifica, sobrescribe el eje temático de la expresión.",
+        verbose_name="Eje Temático",
+        limit_choices_to={'is_active': True}
+    )
+
+    # Principal investigator role/title
+    principal_investigator_title = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Título del Investigador Principal"
+    )
+    principal_investigator_position = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Cargo actual del Investigador Principal"
+    )
+
+    # Community-based organizations
+    community_organizations = models.ManyToManyField(
+        'cbo.CBO',
+        verbose_name="Organizaciones Comunitarias (CBO)",
+        blank=True,
+        related_name='proposals'
+    )
+
+    # Total_requested_budget (auto-calculated)
+    total_requested_budget = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Presupuesto Total Solicitado"
+    )
+
+    # 1. Research Experience
+    principal_research_experience = models.TextField(
+        verbose_name="Experiencia en investigación del Investigador/a Principal",
+        help_text="Máximo 250 palabras",
+        max_length=1000,
+        blank=True,
+    )
+
+    # 2. Partner Institutions (multiple) + Attachments
+    partner_institutions = models.ManyToManyField(
+        'institutions.Institution',
+        verbose_name="Nombre y país de las instituciones aliadas",
+        blank=True,
+        related_name='proposals_as_partner',
+    )
+    partner_institution_commitments = models.ManyToManyField(
+        'proposals.ProposalDocument',
+        verbose_name="Cartas de compromiso institucional",
+        blank=True,
+        related_name='proposals_for_commitments',
+    )
+
+    # 3. Community and Country (text field + country dropdown)
+    community_country = models.ForeignKey(
+        Country,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="País donde se desarrolla la comunidad",
+        help_text="País de la comunidad involucrada",
+        related_name='proposals_as_community_country', 
+    )
+    community_description = models.TextField(
+        verbose_name="Comunidad y país",
+        help_text="Descripción de la comunidad y su contexto",
+        blank=True,
+    )
+
+    # 4. Project Location (country dropdown)
+    project_location = models.ForeignKey(
+        Country,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="País donde se desarrollará el proyecto",
+        help_text="País principal de implementación",
+        related_name='proposals_as_project_location',
+    )
+
+    # 5. Duration (months)
+    duration_months = models.PositiveIntegerField(
+        verbose_name="Duración del proyecto",
+        help_text="Número de meses",
+        validators=[MinValueValidator(1)],
+        null=True,
+        blank=True,
+    )
+
+    # 6. Summary (max 250 words)
+    summary = models.TextField(
+        verbose_name="Resumen",
+        help_text="Síntesis descriptiva de la propuesta (máximo 250 palabras)",
+        max_length=1000,
+        blank=True,
+    )
+
+    # 7. Context, Problem & Justification (max 400 words)
+    context_problem_justification = models.TextField(
+        verbose_name="Contexto, problema y justificación",
+        help_text="Máximo 400 palabras",
+        max_length=1600,
+        blank=True,
+    )
+
+    # # 8. Specific Objectives (max 200 words)
+    # specific_objectives = models.TextField(
+    #     verbose_name="Objetivos específicos",
+    #     help_text="Máximo 200 palabras",
+    #     max_length=800,
+    #     blank=True,
+    # )
+
+    # 9. Methodology, Analytical Plan & Ethics (max 1500 words)
+    methodology_analytical_plan_ethics = models.TextField(
+        verbose_name="Metodología, planeamiento analítico y aspectos éticos",
+        help_text="Máximo 1500 palabras",
+        max_length=6000,
+        blank=True,
+    )
+
+    # 10. Equity, Gender, Intersectionality, Inclusion (max 250 words)
+    equity_inclusion = models.TextField(
+        verbose_name="Equidad, género, interseccionalidad e inclusión",
+        help_text="Máximo 250 palabras",
+        max_length=1000,
+        blank=True,
+    )
+
+    # 11. Timeline (file upload)
+    timeline_document = models.ForeignKey(
+        'proposals.ProposalDocument',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Cronograma",
+        related_name='proposals_timeline',
+        help_text="Archivo adjunto (PDF, DOCX)"
+    )
+
+    # 12. Communication Strategy (max 100 words)
+    communication_strategy = models.TextField(
+        verbose_name="Estrategia de comunicación",
+        help_text="Máximo 100 palabras",
+        max_length=400,
+        blank=True,
+    )
+
+    # 13. Risk Analysis & Mitigation (max 200 words)
+    risk_analysis_mitigation = models.TextField(
+        verbose_name="Riesgos y plan de mitigación de riesgos",
+        help_text="Máximo 200 palabras",
+        max_length=800,
+        blank=True,
+    )
+
+    # 14. Research Team (max 900 words)
+    research_team = models.TextField(
+        verbose_name="Equipo de investigación",
+        help_text="Máximo 900 palabras",
+        max_length=3600,
+        blank=True,
+    )
+
+    # 15. Budget (file upload)
+    budget_document = models.ForeignKey(
+        'proposals.ProposalDocument',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Presupuesto",
+        related_name='proposals_budget',
+        help_text="Archivo adjunto (PDF, DOCX)"
+    )
+
+    # Generic relation for evaluations (keep from Expression)
     evaluations = GenericRelation(
         'evaluations.Evaluation',
         content_type_field='target_content_type',
         object_id_field='target_object_id',
         related_query_name='proposal'
+    )
+
+    proposal_status = models.ForeignKey(
+        'common.Status',
+        on_delete=models.PROTECT,
+        verbose_name="Estado de la Propuesta",
+        help_text="Estado del ciclo de vida de la propuesta (Borrador, Enviada, Aprobada, etc.)"
     )
 
     class Meta:
@@ -109,6 +314,81 @@ class Proposal(Expression):
 
     def __str__(self):
         return f"PROPUESTA: {self.project_title}"
+
+
+class ProposalDocument(TimestampMixin, models.Model):
+    """
+    Document uploaded as part of the Proposal (e.g., timeline, budget, commitment letters).
+    """
+    proposal = models.ForeignKey(
+        Proposal,
+        on_delete=models.CASCADE,
+        related_name='proposal_documents',
+        verbose_name="Propuesta"
+    )
+    file = models.FileField(
+        # upload_to='proposal_documents/%Y/%m/%d/',
+        upload_to=proposal_file_upload_path,
+        verbose_name="Archivo",
+        help_text="Sube archivos como PDF, DOCX. Máximo 10MB.",
+        max_length=500
+    )
+    name = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Nombre del archivo"
+    )
+    uploaded_by = models.ForeignKey(
+        'accounts.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name="Cargado por"
+    )
+    document_type = models.CharField(
+        max_length=50,
+        choices=[
+            ('timeline', 'Cronograma'),
+            ('budget', 'Presupuesto'),
+            ('commitment', 'Carta de Compromiso'),
+        ],
+        verbose_name="Tipo de Documento"
+    )
+
+    class Meta:
+        db_table = 'proposal_document'
+        verbose_name = "Documento de Propuesta"
+        verbose_name_plural = "Documentos de Propuesta"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name or self.file.name} ({self.get_document_type_display()})"
+
+    def save(self, *args, **kwargs):
+        # Only set name if not already set and file exists
+        if not self.name and self.file:
+            self.name = os.path.basename(self.file.name)
+        super().save(*args, **kwargs)
+
+class ProposalSpecificObjective(TimestampMixin):
+    """
+    Objetivos específicos para la Propuesta.
+    Pueden diferir de los de la Expresión.
+    """
+    proposal = models.ForeignKey(
+        'proposals.Proposal',
+        on_delete=models.CASCADE,
+        related_name='specific_objectives'
+    )
+    title = models.CharField(max_length=200, verbose_name="Título")
+    description = models.TextField(verbose_name="Descripción", blank=True)
+
+    class Meta:
+        db_table = 'proposal_specific_objective'
+        verbose_name = "Objetivo Específico (Propuesta)"
+        verbose_name_plural = "Objetivos Específicos (Propuesta)"
+
+    def __str__(self):
+        return f"{self.title} ({self.proposal})"
 
 # ===== From: proponent_forms/models.py =====
 
@@ -263,7 +543,8 @@ class ProponentResponse(TimestampMixin, models.Model):
     expression = models.ForeignKey(
         'expressions.Expression',
         on_delete=models.CASCADE,
-        verbose_name="Expresión de Interés"
+        verbose_name="Expresión de Interés",
+        related_name='form_responses'
     )
 
     shared_question = models.ForeignKey(
@@ -582,8 +863,23 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
 
     def save(self, *args, **kwargs):
         # Auto-set submission_datetime on first save (when status changes to submitted)
-        if not self.submission_datetime and self.status.name.lower() == 'submitted':
-            self.submission_datetime = self.updated_at
+        # Only apply logic if status is set
+        if self.pk:  # Updating existing Expression/Proposal
+            try:
+                # Always look in Expression table
+                old = Expression.objects.get(pk=self.pk)
+                # print("Old is:",old)
+                # print("Old.created_at is:", old.created_at)
+                # print("Old.user_id is:", old.user_id)
+                if old.created_at:
+                    self.created_at = old.created_at
+            except Expression.DoesNotExist:
+                pass
+
+        if self.status_id and not self.submission_datetime:
+            if self.status.name.lower() == 'submitted':
+                self.submission_datetime = self.updated_at
+
         super().save(*args, **kwargs)
     
     @property
@@ -1038,16 +1334,11 @@ from core.models import TimestampMixin
 # from thematic_axes.models import ThematicAxis
 
 
-class ProjectTeamMember(TimestampMixin, models.Model):
+class BaseProjectTeamMember(TimestampMixin, models.Model):
     """
     Miembro del equipo de proyecto asignado a una Expresión de Interés.
     Define su rol, fechas y estado.
     """
-    expression = models.ForeignKey(
-        'expressions.Expression',
-        on_delete=models.CASCADE,
-        verbose_name="Expresión de Interés"
-    )
     person = models.ForeignKey(
         'people.Person',
         on_delete=models.PROTECT,
@@ -1075,31 +1366,65 @@ class ProjectTeamMember(TimestampMixin, models.Model):
     end_date = models.DateField(verbose_name="Fecha de Finalización")
 
     class Meta:
-        db_table = 'project_team_member'
-        verbose_name = "Miembro del Equipo de Proyecto"
-        verbose_name_plural = "Miembros del Equipo de Proyecto"
-        unique_together = ('expression', 'person')
-        ordering = ['expression', 'role']
+        abstract = True
 
     def __str__(self):
         return f"{self.person} - {self.role} ({self.institution.name if self.institution else 'Sin Institución'})"
-
-
-class InvestigatorThematicAxisAntecedent(TimestampMixin, models.Model):
-    """
-    Antecedente del investigador en un eje temático específico.
-    """
-    team_member = models.ForeignKey(
-        'project_team.ProjectTeamMember',
-        on_delete=models.CASCADE,
-        related_name='thematic_antecedents',
-        verbose_name="Miembro del Equipo"
-    )
-    thematic_axis = models.ForeignKey(
-        'thematic_axes.ThematicAxis',
+    
+class ExpressionTeamMember(BaseProjectTeamMember, models.Model):
+    expression = models.ForeignKey(
+        'expressions.Expression',
         on_delete=models.PROTECT,
-        verbose_name="Eje Temático"
+        related_name='expression_team_members',
+        verbose_name="Expresión"
     )
+
+    class Meta:
+        db_table = 'expression_teammember'
+        verbose_name = "Miembro del Equipo (Expresión)"
+        verbose_name_plural = "Miembros del Equipo (Expresión)"
+        unique_together = ('expression', 'person')
+        ordering = ['expression', 'role']
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+class ProposalTeamMember(BaseProjectTeamMember):
+    """
+    Team member linked to a Formal Proposal.
+    Can be modified independently from Expression version.
+    """
+    proposal = models.ForeignKey(
+        'proposals.Proposal',
+        on_delete=models.PROTECT,
+        related_name='proposal_team_members',
+        verbose_name="Propuesta"
+    )
+
+    # Upload CV for this member
+    cv_file = models.FileField(
+        upload_to='proposal_team_cv/%Y/%m/%d/',
+        null=True,
+        blank=True,
+        verbose_name="C.V. Adjunto"
+    )
+
+    class Meta:
+        db_table = 'proposal_teammember'
+        verbose_name = "Miembro del Equipo (Propuesta)"
+        verbose_name_plural = "Miembros del Equipo (Propuesta)"
+        unique_together = ('proposal', 'person')
+        ordering = ['proposal', 'role']
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+    @property
+    def has_cv(self):
+        return bool(self.cv_file)
+
+
+class BaseInvestigatorThematicAntecedent(TimestampMixin, models.Model):
     description = models.TextField(verbose_name="Descripción del Antecedente")
     evidence_url = models.URLField(
         blank=True,
@@ -1107,9 +1432,54 @@ class InvestigatorThematicAxisAntecedent(TimestampMixin, models.Model):
     )
 
     class Meta:
+        abstract=True
+
+class ExpressionInvestigatorThematicAntecedent(BaseInvestigatorThematicAntecedent):
+    """
+    Antecedente del investigador en un eje temático específico.
+    Asociado con un miembro de la Expresión.
+    """
+    team_member = models.ForeignKey(
+        'project_team.ExpressionTeamMember',
+        on_delete=models.CASCADE,
+        related_name='expression_thematic_antecedents',
+        verbose_name="Miembro del Equipo (Expresión)"
+    )
+    thematic_axis = models.ForeignKey(
+        'thematic_axes.ThematicAxis',
+        on_delete=models.PROTECT,
+        verbose_name="Eje Temático"
+    )    
+
+    class Meta:
         db_table = 'investigator_thematic_antecedent'
-        verbose_name = "Antecedente en Eje Temático"
-        verbose_name_plural = "Antecedentes en Ejes Temáticos"
+        verbose_name = "Antecedente en Eje Temático (Expresión)"
+        verbose_name_plural = "Antecedentes en Ejes Temáticos (Expresión)"
+
+    def __str__(self):
+        return f"{self.team_member.person} - {self.thematic_axis}"
+
+class ProposalInvestigatorThematicAntecedent(BaseInvestigatorThematicAntecedent):
+    """
+    Antecedente temático para un miembro de la Propuesta.
+    Permite diferencias respecto a la Expresión.
+    """
+    team_member = models.ForeignKey(
+        'project_team.ProposalTeamMember',
+        on_delete=models.CASCADE,
+        related_name='thematic_antecedents',
+        verbose_name="Miembro del Equipo (Propuesta)"
+    )
+    thematic_axis = models.ForeignKey(
+        'thematic_axes.ThematicAxis',
+        on_delete=models.PROTECT,
+        verbose_name="Eje Temático"
+    )
+
+    class Meta:
+        db_table = 'proposal_investigator_antecedent'
+        verbose_name = "Antecedente en Eje Temático (Propuesta)"
+        verbose_name_plural = "Antecedentes en Ejes Temáticos (Propuesta)"
 
     def __str__(self):
         return f"{self.team_member.person} - {self.thematic_axis}"
@@ -1120,7 +1490,7 @@ class InvestigatorCondition(TimestampMixin, models.Model):
     Condición específica de participación del investigador.
     """
     team_member = models.ForeignKey(
-        'project_team.ProjectTeamMember',
+        'project_team.ExpressionTeamMember',
         on_delete=models.CASCADE,
         related_name='conditions',
         verbose_name="Miembro del Equipo"
@@ -1189,6 +1559,13 @@ def __str__(self):
 
 from django.db import models
 from core.models import TimestampMixin
+
+from django.core.validators import RegexValidator
+
+phone_regex = RegexValidator(
+    regex=r'^\+?1?\d{9,15}$',
+    message="El número debe estar en formato internacional."
+)
 
 
 class CBO(TimestampMixin, models.Model):
@@ -1312,6 +1689,7 @@ class CBORelevantRole(TimestampMixin, models.Model):
 
     def clean(self):
         from django.core.exceptions import ValidationError
+        super().clean()
         if not self.predefined_role and not self.custom_role:
             raise ValidationError("Debe seleccionar un rol predefinido o ingresar uno personalizado.")
         if self.predefined_role and self.custom_role:
@@ -1323,6 +1701,7 @@ from django.db import models
 from core.models import TimestampMixin, CreatedByMixin
 from expressions.models import Expression
 from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
 
 class BudgetCategory(TimestampMixin, CreatedByMixin, models.Model):
     """
@@ -1378,16 +1757,13 @@ class BudgetPeriod(TimestampMixin, CreatedByMixin, models.Model):
     def __str__(self):
         return self.name
 
-class BudgetItem(TimestampMixin, models.Model):
+class BaseBudgetItem(models.Model):
     """
     Ítem de presupuesto para una expresión.
     Relaciona categoría, período y monto.
+    Base abstracta para cualquier Ítem de presupuesto.
+    Permite compartir la estructura entre la expresión y la propuesta.
     """
-    expression = models.ForeignKey(
-        'expressions.Expression',
-        on_delete=models.CASCADE,
-        verbose_name="Expresión de Interés"
-    )
     category = models.ForeignKey(
         'budgets.BudgetCategory',
         on_delete=models.PROTECT,
@@ -1407,14 +1783,51 @@ class BudgetItem(TimestampMixin, models.Model):
     notes = models.TextField(blank=True, verbose_name="Notas")
 
     class Meta:
+        abstract = True  # This prevents DB table creation
+
+    def clean(self):
+        if self.amount < 0:
+            raise ValidationError("El monto no puede ser negativo.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+class BudgetItem(TimestampMixin, BaseBudgetItem):
+    expression = models.ForeignKey(
+        'expressions.Expression',
+        on_delete=models.CASCADE,
+        verbose_name="Expresión de Interés"
+    )
+
+    class Meta:
         db_table = 'budget_item'
-        verbose_name = "Ítem de Presupuesto"
-        verbose_name_plural = "Ítems de Presupuesto"
+        verbose_name = "Ítem de Presupuesto (Expresión)"
+        verbose_name_plural = "Ítems de Presupuesto (Expresión)"
         unique_together = ('expression', 'category', 'period')
         ordering = ['category__name', 'period__order']
 
     def __str__(self):
-        return f"{self.expression.project_title} - {self.category.name} ({self.period.name})"
+        return f"{self.expression.project_title} - {self.category.name} ({self.period.name}): {self.amount}"
+
+class ProposalBudgetItem(TimestampMixin, BaseBudgetItem):
+    proposal = models.ForeignKey(
+        'proposals.Proposal',
+        on_delete=models.CASCADE,
+        related_name='budget_items'
+    )
+
+    class Meta(BaseBudgetItem.Meta):
+        db_table = 'proposal_budget_item'
+        verbose_name = "Ítem de Presupuesto (Propuesta)"
+        verbose_name_plural = "Ítems de Presupuesto (Propuesta)"
+        unique_together = ('proposal', 'category', 'period')
+        ordering = ['category__name', 'period__order']
+
+    def __str__(self):
+        return f"{self.proposal.project_title} - {self.category.name} ({self.period.name}): {self.amount}"
+    
+
 
 # ===== From: evaluations/models.py =====
 

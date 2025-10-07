@@ -26,13 +26,58 @@ def proposal_file_upload_path(instance, filename):
     
     return f'proposal_documents/{doc_type}/{now.year}/{now.month}/{now.day}/{new_filename}'
 
-
 class Proposal(Expression):
     """
     Propuesta formal: expresión aprobada con campos adicionales.
     Hereda todos los campos de Expression, más los nuevos.
     """
     # === NEW FIELDS SPECIFIC TO PROPOSAL ===
+
+    project_title_override = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Si se especifica, sobrescribe el título de la expresión.",
+        verbose_name="Título del Proyecto"
+    )
+
+    thematic_axis_override = models.ForeignKey(
+        'thematic_axes.ThematicAxis',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Si se especifica, sobrescribe el eje temático de la expresión.",
+        verbose_name="Eje Temático",
+        limit_choices_to={'is_active': True}
+    )
+
+    # Principal investigator role/title
+    principal_investigator_title = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Título del Investigador Principal"
+    )
+    principal_investigator_position = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Cargo actual del Investigador Principal"
+    )
+
+    # Community-based organizations
+    community_organizations = models.ManyToManyField(
+        'cbo.CBO',
+        verbose_name="Organizaciones Comunitarias (CBO)",
+        blank=True,
+        related_name='proposals'
+    )
+
+    # Total_requested_budget (auto-calculated)
+    total_requested_budget = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Presupuesto Total Solicitado"
+    )
 
     # 1. Research Experience
     principal_research_experience = models.TextField(
@@ -108,13 +153,13 @@ class Proposal(Expression):
         blank=True,
     )
 
-    # 8. Specific Objectives (max 200 words)
-    specific_objectives = models.TextField(
-        verbose_name="Objetivos específicos",
-        help_text="Máximo 200 palabras",
-        max_length=800,
-        blank=True,
-    )
+    # # 8. Specific Objectives (max 200 words)
+    # specific_objectives = models.TextField(
+    #     verbose_name="Objetivos específicos",
+    #     help_text="Máximo 200 palabras",
+    #     max_length=800,
+    #     blank=True,
+    # )
 
     # 9. Methodology, Analytical Plan & Ethics (max 1500 words)
     methodology_analytical_plan_ethics = models.TextField(
@@ -254,3 +299,24 @@ class ProposalDocument(TimestampMixin, models.Model):
         if not self.name and self.file:
             self.name = os.path.basename(self.file.name)
         super().save(*args, **kwargs)
+
+class ProposalSpecificObjective(TimestampMixin):
+    """
+    Objetivos específicos para la Propuesta.
+    Pueden diferir de los de la Expresión.
+    """
+    proposal = models.ForeignKey(
+        'proposals.Proposal',
+        on_delete=models.CASCADE,
+        related_name='specific_objectives'
+    )
+    title = models.CharField(max_length=200, verbose_name="Título")
+    description = models.TextField(verbose_name="Descripción", blank=True)
+
+    class Meta:
+        db_table = 'proposal_specific_objective'
+        verbose_name = "Objetivo Específico (Propuesta)"
+        verbose_name_plural = "Objetivos Específicos (Propuesta)"
+
+    def __str__(self):
+        return f"{self.title} ({self.proposal})"

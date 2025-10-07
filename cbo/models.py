@@ -1,6 +1,13 @@
 from django.db import models
 from core.models import TimestampMixin
 
+from django.core.validators import RegexValidator
+
+phone_regex = RegexValidator(
+    regex=r'^\+?1?\d{9,15}$',
+    message="El número debe estar en formato internacional."
+)
+
 
 class CBO(TimestampMixin, models.Model):
     """
@@ -123,6 +130,7 @@ class CBORelevantRole(TimestampMixin, models.Model):
 
     def clean(self):
         from django.core.exceptions import ValidationError
+        super().clean()
         if not self.predefined_role and not self.custom_role:
             raise ValidationError("Debe seleccionar un rol predefinido o ingresar uno personalizado.")
         if self.predefined_role and self.custom_role:

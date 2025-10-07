@@ -59,6 +59,66 @@
         <!-- Proposal Fields -->
         <h4 class="mb-4">Información de la Propuesta Formal</h4>
 
+        <!-- 0.1. Project Title Override -->
+        <div class="mb-3">
+            <label class="form-label">Título del Proyecto (Opcional)</label>
+            <input type="text"
+                name="project_title_override"
+                class="form-control"
+                value="{{ post_data.project_title_override|default:'' }}"
+                placeholder="Puede sobrescribir el título anterior">
+            <small class="form-text text-muted">Máximo 50 palabras</small>
+        </div>
+
+        <!-- 0.2. Thematic Axis Override -->
+        <div class="mb-3">
+            <label class="form-label">Eje Temático (Opcional)</label>
+            <select name="thematic_axis_override" class="form-select">
+                <option value="">-- Mantener eje de expresión --</option>
+                {% for axis in thematic_axes %}
+                    <option value="{{ axis.id }}" {% if post_data.thematic_axis_override == axis.id|stringformat:"i" %}selected{% endif %}>
+                        {{ axis.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- 0.3. Principal Investigator Role & Title -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Título del Investigador Principal *</label>
+                <input type="text"
+                    name="principal_investigator_title"
+                    class="form-control"
+                    value="{{ proposal.principal_investigator_title }}">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Cargo Actual del Investigador Principal *</label>
+                <input type="text"
+                    name="principal_investigator_position"
+                    class="form-control"
+                    value="{{ proposal.principal_investigator_position }}">
+            </div>
+        </div>
+
+        <!-- 0.4. Primary Institution (Proposal Level) -->
+        <div class="mb-3">
+            <label class="form-label">Institución Principal *</label>
+            <div class="input-group">
+                <input type="text"
+                    name="primary_institution_search"
+                    class="form-control institution-search"
+                    placeholder="Buscar..."
+                    value="{% if proposal.primary_institution %}{{ proposal.primary_institution.name }}{% endif %}">
+                <input type="hidden"
+                    name="primary_institution_id"
+                    value="{% if proposal.primary_institution %}{{ proposal.primary_institution.id }}{% endif %}">
+            </div>
+            <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=primary_institution_id"
+            target="_blank"
+            class="btn btn-outline-primary mt-2">+ Crear</a>
+            <small class="form-text text-muted">Seleccione o cree una nueva.</small>
+        </div>
         <!-- 1. Principal Research Experience -->
         <div class="mb-3">
             <label class="form-label">Experiencia en investigación del Investigador/a Principal *</label>
@@ -183,9 +243,30 @@
 
         <!-- 8. Specific Objectives -->
         <div class="mb-3">
-            <label class="form-label">Objetivos específicos *</label>
-            <textarea name="specific_objectives" class="form-control" rows="3" maxlength="800" required>{{ proposal.specific_objectives }}</textarea>
-            <small class="form-text text-muted">Máximo 200 palabras</small>
+            <label class="form-label">Objetivos Específicos</label>
+            <p class="text-muted">Agregue objetivos específicos adicionales o modificados.</p>
+            <div id="specific-objectives-container">
+                {% for obj in proposal.specific_objectives.all %}
+                    <div class="card mb-3 p-3 objective-entry">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Objetivo {{ forloop.counter }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-objective">Eliminar</button>
+                        </div>
+                        <div class="mb-3">
+                            <label>Título *</label>
+                            <input type="text" name="objective_title_{{ forloop.counter0 }}" class="form-control" value="{{ obj.title }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Descripción</label>
+                            <textarea name="objective_description_{{ forloop.counter0 }}" class="form-control" rows="3">{{ obj.description }}</textarea>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="alert alert-info">No hay objetivos específicos definidos.</div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-objective-btn" class="btn btn-outline-secondary">+ Agregar Objetivo</button>
+            <small class="form-text text-muted">Máximo 200 palabras por objetivo</small>
         </div>
 
         <!-- 9. Methodology, Analytical Plan & Ethics -->
@@ -255,6 +336,78 @@
                 {% endif %}
             </div>
             <small class="form-text text-muted">Suba un archivo (PDF, DOCX)</small>
+        </div>
+
+        <!-- BUDGET ITEMS -->
+        <div class="mb-4">
+            <h5>Presupuesto Detallado</h5>
+            <p class="text-muted">Defina el presupuesto para esta propuesta.</p>
+            <div id="proposal-budget-container">
+                {% for item in existing_proposal_budget_items %}
+                    <div class="card mb-3 p-3 budget-item">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fs-6 mb-0">Ítem {{ forloop.counter }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-budget-item">Eliminar</button>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-md-4">
+                                <label>Categoría</label>
+                                <select name="proposal_budget_category_{{ forloop.counter0 }}" class="form-select" required>
+                                    {% for cat in budget_categories %}
+                                        <option value="{{ cat.id }}" {% if item.category_id == cat.id %}selected{% endif %}>
+                                            {{ cat.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label>Periodo</label>
+                                <select name="proposal_budget_period_{{ forloop.counter0 }}" class="form-select" required>
+                                    {% for period in budget_periods %}
+                                        <option value="{{ period.id }}" {% if item.period_id == period.id %}selected{% endif %}>
+                                            {{ period.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label>Monto (COP)</label>
+                                <input type="number"
+                                    name="proposal_budget_amount_{{ forloop.counter0 }}"
+                                    class="form-control"
+                                    step="0.01"
+                                    min="0"
+                                    value="{{ item.amount }}"
+                                    required>
+                            </div>
+                            <div class="col-md-1 d-flex align-items-end">
+                                <button type="button" class="btn btn-outline-danger w-100 remove-budget-item">✕</button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label>Notas</label>
+                            <textarea name="proposal_budget_notes_{{ forloop.counter0 }}" class="form-control" rows="1">{{ item.notes }}</textarea>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="alert alert-info">No se han agregado ítems de presupuesto.</div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-proposal-budget-btn" class="btn btn-outline-primary">+ Agregar Ítem</button>
+        </div>
+
+        <!-- COMMUNITY-BASED ORGANIZATIONS -->
+        <div class="mb-3">
+            <label class="form-label">Organizaciones Comunitarias (CBO)</label>
+            <p class="text-muted">Seleccione las organizaciones que participan en este proyecto.</p>
+            <select name="cbo_ids" class="form-select" multiple>
+                {% for cbo in all_cbos %}
+                    <option value="{{ cbo.id }}" {% if cbo in proposal.community_organizations.all %}selected{% endif %}>
+                        {{ cbo.name }} ({{ cbo.number_of_members }} miembros)
+                    </option>
+                {% endfor %}
+            </select>
+            <small class="form-text text-muted">Puede seleccionar múltiples organizaciones.</small>
         </div>
 
         <!-- Submit Buttons -->
