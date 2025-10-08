@@ -22,11 +22,15 @@ class BaseProduct(TimestampMixin, CreatedByMixin, models.Model):
     )
 
     start_date = models.DateField(
-        verbose_name="Fecha de Inicio"
+        verbose_name="Fecha de Inicio",
+        blank=True,
+        null=True
     )
 
     end_date = models.DateField(
-        verbose_name="Fecha de Finalizacion"
+        verbose_name="Fecha de Finalizacion",
+        blank=True,
+        null=True
     )
 
     strategic_effects = models.ManyToManyField(
