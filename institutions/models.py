@@ -1,6 +1,7 @@
 from django.db import models
 from core.models import TimestampMixin, AddressMixin, CreatedByMixin
 from django.utils.translation import gettext_lazy as _
+from django.core.validators import RegexValidator
 
 class InstitutionType(TimestampMixin, CreatedByMixin):
     """
@@ -83,6 +84,19 @@ class Institution(TimestampMixin, AddressMixin, CreatedByMixin):
         "Numero de Registro Tributario",
         max_length=50,
         help_text="NUmero de registro tributario."
+    )
+
+    phone_number = models.CharField(
+        "Teléfono",
+        max_length=20,
+        blank=True,
+        validators=[
+            RegexValidator(
+                regex=r'^\+?\d{7,15}$',
+                message="Ingrese un número de teléfono válido (7 a 15 dígitos, puede incluir + al inicio)."
+            )
+        ],
+        help_text="Ejemplo: +573001234567"
     )
 
     is_active = models.BooleanField(

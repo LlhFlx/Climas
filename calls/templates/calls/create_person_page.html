@@ -13,8 +13,12 @@
             </div>
         {% endfor %}
     {% endif %}
+
     <form method="post">
         {% csrf_token %}
+        <input type="hidden" name="return_url" value="{{ request.GET.return_url }}">
+        <input type="hidden" name="field_name" value="{{ request.GET.field_name }}">
+
         <div class="mb-3">
             <label class="form-label">Nombre *</label>
             <input type="text" name="first_name" class="form-control" required>

@@ -37,7 +37,8 @@ from project_team.models import (
 from intersectionality.models import IntersectionalityScope
 from budgets.models import BudgetCategory, BudgetItem, BudgetPeriod
 from evaluations.models import Evaluation, EvaluationResponse, EvaluationTemplate, TemplateCategory, TemplateItem
-from cbo.models import CBORelevantRole
+from cbo.models import CBORelevantRole, CBO, CBOAntecedent
+from django.db import transaction
 
 @login_required
 def coordinator_dashboard(request):
@@ -66,7 +67,12 @@ def coordinator_dashboard(request):
     strategic_effects = StrategicEffect.objects.filter(is_active=True).order_by('name')
     budget_categories = BudgetCategory.objects.filter(is_active=True).order_by('name')
     budget_periods = BudgetPeriod.objects.all().order_by('order', 'name')
+    # Filter people NOT linked to any CustomUser (for safe assignment)
+    users_with_person = CustomUser.objects.exclude(person__isnull=True).values_list('person_id', flat=True)
+    people_without_user = Person.objects.exclude(id__in=users_with_person).order_by('first_name', 'first_last_name')
     people = Person.objects.filter(created_by__isnull=False).order_by('first_name', 'first_last_name')
+
+
     # Get all templates
     templates = EvaluationTemplate.objects.all().order_by('-is_active', 'name')
     # print(f"Templates are {templates}")
@@ -116,6 +122,7 @@ def coordinator_dashboard(request):
         'budget_categories': budget_categories,
         'budget_periods': budget_periods,
         'people': people,
+        'people_without_user': people_without_user, 
         'templates': templates,
     }
     return render(request, 'calls/coordinator_dashboard.html', context)
@@ -466,19 +473,50 @@ def create_call(request):
 def create_institution(request):
     if request.method == 'POST':
         try:
-            name = request.POST.get('name')
+            name = request.POST.get('name', '').strip()
             institution_type_id = request.POST.get('institution_type')
             country_id = request.POST.get('country')
-            tax_register_number = request.POST.get('tax_register_number')
-            acronym = request.POST.get('acronym', '')
-            website = request.POST.get('website', '')
+            tax_register_number = request.POST.get('tax_register_number', '').strip()
+            acronym = request.POST.get('acronym', '').strip()
+            website = request.POST.get('website', '').strip()
             is_active = request.POST.get('is_active') == 'on'
+            legal_rep_id = request.POST.get('legal_representative') or None
+            admin_rep_id = request.POST.get('administrative_representative') or None
 
+            # AddressMixin fields
+            address_line1 = request.POST.get('address_line1', '').strip()
+            address_line2 = request.POST.get('address_line2', '').strip()
+            city = request.POST.get('city', '').strip()
+            state = request.POST.get('state', '').strip()
+
+            # Phone
+            phone_number = request.POST.get('phone_number', '').strip()
+            print(name, institution_type_id, country_id, tax_register_number)
             if not all([name, institution_type_id, country_id, tax_register_number]):
                 return JsonResponse({'success': False, 'error': 'Name, type, country, and tax number are required.'})
 
-            institution_type = InstitutionType.objects.get(id=institution_type_id)
-            country = Country.objects.get(id=country_id)
+            try:
+                institution_type = InstitutionType.objects.get(id=institution_type_id)
+                country = Country.objects.get(id=country_id)
+            except Country.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'País inválido.'})
+            except InstitutionType.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Tipo de institución inválido.'})
+
+            # Optional relations
+            legal_rep = None
+            if legal_rep_id:
+                try:
+                    legal_rep = Person.objects.get(id=legal_rep_id)
+                except Person.DoesNotExist:
+                    pass
+
+            admin_rep = None
+            if admin_rep_id:
+                try:
+                    admin_rep = Person.objects.get(id=admin_rep_id)
+                except Person.DoesNotExist:
+                    pass
 
             institution = Institution.objects.create(
                 name=name,
@@ -488,14 +526,24 @@ def create_institution(request):
                 acronym=acronym,
                 website=website,
                 is_active=is_active,
-                created_by=request.user
+                created_by=request.user,
+                legal_representative=legal_rep,
+                administrative_representative=admin_rep,
+                address_line1=address_line1,
+                address_line2=address_line2,
+                city=city,
+                state=state,
+                phone_number=phone_number,
             )
+
+            messages.success(request, f"Institución '{name}' creada con éxito.")
 
             return JsonResponse({
                 'success': True, 
                 'id': institution.id, 
                 'name': institution.name,
-                'type': institution.institution_type.name
+                'type': institution.institution_type.name,
+                'country': institution.country.name,
             })
         
         except Exception as e:
@@ -504,22 +552,63 @@ def create_institution(request):
     return JsonResponse({'success': False, 'error': 'Invalid request method.'})
 
 @login_required
+@transaction.atomic
 def create_person_page(request):
+    """
+    Create a new Person from any context (researcher or coordinator).
+    Redirects back to calling page with auto-fill support.
+    """
+    # Get return URL from query string
+    return_url = request.GET.get('return_url') or request.POST.get('return_url')
+
+    # If no return_url is provided, fall back based on user role
+    if not return_url:
+        user_role = getattr(request.user.customuser.role, 'name', '')
+        if user_role == 'Researcher':
+            return_url = 'calls:researcher_dashboard'
+        elif user_role == 'Coordinator':
+            return_url = 'calls:coordinator_dashboard'
+        else:
+            return_url = 'home'  # Safe fallback
+
+    field_name = request.GET.get('field_name', '') or request.POST.get('field_name', '')
+
     if request.method == 'POST':
         first_name = request.POST.get('first_name')
         first_last_name = request.POST.get('first_last_name')
         if not all([first_name, first_last_name]):
             messages.error(request, 'Nombre y apellido son requeridos.')
+            # Stay in same context
+            context = {
+                'return_url': return_url,
+                'field_name': field_name,
+            }
+            return render(request, 'calls/create_person_page.html', context)
         else:
             try:
                 person = Person.objects.create(
                     first_name=first_name.strip(),
                     first_last_name=first_last_name.strip(),
+                    document_type=DocumentType.objects.first(),
+                    document_number=f"TEMP-{Person.objects.count()}",
+                    gender='N',
                     created_by=request.user
                 )
+
+                # Build success redirect URL
+                if return_url.startswith('/'):
+                    pass  # Already absolute
+                elif ':' in return_url:
+                    return_url = f"/{return_url.replace(':', '/')}"
+
+                # Add success parameters
+                url_parts = return_url.split('?')[0]
+                final_url = f"{url_parts}?created_id={person.id}&field_name={field_name}"
+
                 messages.success(request, f'Persona "{person.first_name} {person.first_last_name}" creada exitosamente.')
                 # Redirect back to the calling page (passed via URL)
-                return redirect(request.GET.get('return_url', 'calls:researcher_dashboard'))
+                # return redirect(request.GET.get('return_url', 'calls:researcher_dashboard'))
+                return redirect(final_url)
             except Exception as e:
                 messages.error(request, str(e))
     # Always render the form on GET or after error

@@ -99,6 +99,35 @@
                         </div>
                     </div>
 
+                    <!-- Address Fields -->
+                    <div class="mb-3">
+                        <label class="form-label">Address Line 1</label>
+                        <input type="text" name="address_line1" class="form-control" placeholder="Calle, número, barrio">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Address Line 2 (Optional)</label>
+                        <input type="text" name="address_line2" class="form-control" placeholder="Piso, oficina, referencias">
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">City</label>
+                            <input type="text" name="city" class="form-control">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">State / Department</label>
+                            <input type="text" name="state" class="form-control">
+                        </div>
+                    </div>
+
+                    <!-- Phone Number -->
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number</label>
+                        <input type="tel" name="phone_number" class="form-control"
+                               placeholder="+57(601)1234567 or +1 555 123 4567">
+                    </div>
+
+
                     <div class="mb-3">
                         <label class="form-label">Tax Register Number *</label>
                         <input type="text" name="tax_register_number" class="form-control" required>
@@ -110,23 +139,40 @@
                     </div>
 
                     <div class="row">
+                        <!-- Legal Representative -->
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Legal Representative</label>
+                            <label class="form-label">Representante Legal</label>
                             <select name="legal_representative" class="form-select">
-                                <option value="">-- Select Person --</option>
-                                {% for person in people %}
+                                <option value="">-- Seleccionar Persona --</option>
+                                {% for person in people_without_user %}
                                     <option value="{{ person.id }}">{{ person.first_name }} {{ person.first_last_name }}</option>
                                 {% endfor %}
                             </select>
+                            <!-- Create Person Button -->
+                            <a href="{% url 'calls:create_person_page' %}?return_url={{ request.get_full_path }}&field_name=legal_representative"
+                            target="_blank"
+                            class="btn btn-outline-primary mt-2">
+                                + Crear
+                            </a>
+                            <small class="form-text text-muted">Escriba para buscar o cree una nueva persona.</small>
                         </div>
+
+                        <!-- Administrative Representative -->
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Administrative Representative</label>
+                            <label class="form-label">Representante Administrativo</label>
                             <select name="administrative_representative" class="form-select">
-                                <option value="">-- Select Person --</option>
-                                {% for person in people %}
+                                <option value="">-- Seleccionar Persona --</option>
+                                {% for person in people_without_user %}
                                     <option value="{{ person.id }}">{{ person.first_name }} {{ person.first_last_name }}</option>
                                 {% endfor %}
                             </select>
+                            <!-- Create Person Button -->
+                            <a href="{% url 'calls:create_person_page' %}?return_url={{ request.get_full_path }}&field_name=administrative_representative"
+                            target="_blank"
+                            class="btn btn-outline-primary mt-2">
+                                + Crear
+                            </a>
+                            <small class="form-text text-muted">Escriba para buscar o cree una nueva persona.</small>
                         </div>
                     </div>
 
@@ -143,3 +189,34 @@
         </div>
     </div>
 </div>
+
+{% block extra_js %}
+<script>
+// On load: check URL params
+const urlParams = new URLSearchParams(window.location.search);
+const createdId = urlParams.get('created_id');
+const fieldName = urlParams.get('field_name');
+
+if (createdId && fieldName) {
+    const select = document.querySelector(`[name="${fieldName}"]`);
+    if (select) {
+        // Find option with value = createdId
+        let option = Array.from(select.options).find(opt => opt.value === createdId);
+        if (!option) {
+            // Dynamically add it
+            option = document.createElement('option');
+            option.value = createdId;
+            option.textContent = `Persona ${createdId}`;
+            select.appendChild(option);
+        }
+        select.value = createdId;
+
+        // Remove params after processing
+        const newUrl = new URL(window.location);
+        newUrl.searchParams.delete('created_id');
+        newUrl.searchParams.delete('field_name');
+        window.history.replaceState({}, '', newUrl);
+    }
+}
+</script>
+{% endblock %}
