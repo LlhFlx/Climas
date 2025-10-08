@@ -1409,8 +1409,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // EVENT LISTENERS
     // -------------------------------
 
-    setupInstitutionAutocomplete();
-
     // Click "Agregar" button
     addInstitutionButton.addEventListener('click', function() {
         const query = institutionSearchInput.value.trim();
@@ -1524,59 +1522,68 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Upload commitment document
-    commitmentContainer.addEventListener('click', function(e) {
-        if (e.target.classList.contains('upload-commitment')) {
-            const btn = e.target; // Reference to the button
-            const fileInput = btn.previousElementSibling;
-            const id = btn.dataset.institutionId;
-            const file = fileInput.files[0];
-            const proposalId = document.querySelector('[name="proposal_id"]').value;
+    document.getElementById('commitment-documents-container')?.addEventListener('click', async function(e) {
+        const btn = e.target.closest('.upload-commitment');
+        if (!btn) return;
 
-            if (!file) {
-                alert('Por favor, seleccione un archivo.');
-                return;
+        const container = btn.closest('.card'); // Each institution section
+        const fileInput = container.querySelector('input[type="file"]');
+        const file = fileInput?.files[0];
+        const institutionId = btn.dataset.institutionId;
+        const proposalId = document.querySelector('[name="proposal_id"]')?.value;
+
+        // Validate inputs
+        if (!file) {
+            alert('Por favor seleccione un archivo.');
+            return;
+        }
+        if (!institutionId) {
+            alert('Error interno: ID de institución no encontrada.');
+            console.error("Button dataset:", btn.dataset);
+            return;
+        }
+
+        // Show loading state
+        btn.disabled = true;
+        btn.textContent = 'Subiendo...';
+
+        const formData = new FormData();
+        formData.append('commitment_document', file);
+        formData.append('institution_id', institutionId);
+        formData.append('proposal_id', proposalId);
+        formData.append('ajax_upload', '1');
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        try {
+            const response = await fetch('', { method: 'POST', body: formData });
+            const data = await response.json();
+
+            if (data.success) {
+                // Create success message div
+                const docDiv = document.createElement('div');
+                docDiv.className = 'd-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded';
+                docDiv.innerHTML = `
+                    <span class="flex-grow-1">${data.name}</span>
+                    <a href="${data.url}" target="_blank" class="btn btn-sm btn-outline-secondary me-2">Ver</a>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-doc" data-doc-id="${data.id}">Borrar</button>
+                `;
+                // Insert after upload row
+                container.querySelector('.input-group').after(docDiv);
+
+                // Reset input
+                fileInput.value = '';
+
+            } else {
+                alert('Error al cargar: ' + (data.error || 'Desconocido'));
             }
 
-            // DISABLE BUTTON & SHOW LOADING TEXT
-            btn.disabled = true;
-            btn.textContent = 'Subiendo...';
-
-            const formData = new FormData();
-            formData.append('commitment_document', file);
-            formData.append('institution_id', id);
-            formData.append('proposal_id', proposalId);
-            formData.append('ajax_upload', '1');
-            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-
-            fetch('', {
-                method: 'POST',
-                body: formData,
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const docDiv = document.createElement('div');
-                    docDiv.className = 'd-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded';
-                    docDiv.innerHTML = `
-                        <span class="flex-grow-1">${data.name}</span>
-                        <a href="${data.url}" target="_blank" class="btn btn-sm btn-outline-secondary me-2">Ver</a>
-                        <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-doc" data-doc-id="${data.id}">Borrar</button>
-                    `;
-                    btn.closest('.card').querySelector('.input-group').after(docDiv);
-                    fileInput.value = ''; // Clear file input
-                } else {
-                    alert('Error al cargar: ' + data.error);
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert('Error de red. Por favor, inténtelo de nuevo.');
-            })
-            .finally(() => {
-                // ALWAYS REENABLE BUTTON, EVEN ON ERROR
-                btn.disabled = false;
-                btn.textContent = 'Cargar';
-            });
+        } catch (err) {
+            console.error('Upload failed:', err);
+            alert('Error de red. Verifique conexión o tamaño del archivo.');
+        } finally {
+            // Always re-enable button
+            btn.disabled = false;
+            btn.textContent = 'Cargar';
         }
     });
 
