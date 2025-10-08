@@ -39,6 +39,7 @@ from budgets.models import BudgetCategory, BudgetItem, BudgetPeriod
 from evaluations.models import Evaluation, EvaluationResponse, EvaluationTemplate, TemplateCategory, TemplateItem
 from cbo.models import CBORelevantRole, CBO, CBOAntecedent
 from django.db import transaction
+from collections import defaultdict
 
 @login_required
 def coordinator_dashboard(request):
@@ -1854,8 +1855,16 @@ def apply_proposal(request, expression_id):
     existing_budget_items = ProposalBudgetItem.objects.filter(proposal=proposal).select_related('category', 'period')
 
     commitment_docs = proposal.proposal_documents.filter(document_type='commitment')
+    partner_institutions = proposal.partner_institutions.all()
+    docs_by_institution = defaultdict(list)
+    for doc in commitment_docs:
+        if doc.linked_institution:
+            docs_by_institution[doc.linked_institution].append(doc)
+
     timeline_doc = proposal.timeline_document
     budget_doc = proposal.budget_document
+
+
 
     # Initialize post_data
     post_data = {}
@@ -2019,7 +2028,7 @@ def apply_proposal(request, expression_id):
                 proposal.budget_document = None
 
         # Commitment letters (multiple files)
-        # This is for non-AJAX case — e.g., user uploaded multiple files in one go
+        # This is for non-AJAX case: e.g., user uploaded multiple files in one go
         if 'commitment_documents' in request.FILES:
             proposal.refresh_from_db()
             for file in request.FILES.getlist('commitment_documents'):
@@ -2290,6 +2299,8 @@ def apply_proposal(request, expression_id):
                 'existing_proposal_products': existing_products,
                 'existing_proposal_team_members': existing_team_members,
                 'existing_proposal_budget_items': existing_budget_items,
+                'partner_institutions': partner_institutions,
+                'docs_by_institution': docs_by_institution,
                 'post_data': post_data,
                 'proposal_id': proposal.id,
             }
@@ -2353,6 +2364,8 @@ def apply_proposal(request, expression_id):
         'existing_proposal_products': existing_products,
         'existing_proposal_team_members': existing_team_members,
         'existing_proposal_budget_items': existing_budget_items,
+        'partner_institutions': partner_institutions,
+        'docs_by_institution': docs_by_institution,
         'post_data': post_data,
         'proposal_id': proposal.id, 
     }
@@ -2416,6 +2429,7 @@ def upload_commitment_document(request):
             proposal=proposal,
             file=file,
             document_type='commitment',
+            linked_institution=institution,
             uploaded_by=request.user.customuser
         )
 

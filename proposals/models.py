@@ -275,6 +275,18 @@ class ProposalDocument(TimestampMixin, models.Model):
         null=True,
         verbose_name="Cargado por"
     )
+
+    # Track which institution this document is for
+    linked_institution = models.ForeignKey(
+        'institutions.Institution',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Institución Asociada",
+        help_text="Solo si el documento es específico para una institución (ej: carta de compromiso)"
+    )
+
+
     document_type = models.CharField(
         max_length=50,
         choices=[

@@ -176,6 +176,31 @@
                             {% endif %}
                         {% endfor %}
 
+                        {% for inst, docs in docs_by_institution.items %}
+                            <h4 class="mt-4">{{ inst.name }}</h4>
+                            {% if docs %}
+                                {% for doc in docs %}
+                                    <div class="d-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded">
+                                        <span class="flex-grow-1">{{ doc.name }}</span>
+                                        <a href="{% url 'proposals:download_proposal_document' doc.id %}"
+                                        target="_blank"
+                                        class="btn btn-sm btn-outline-secondary me-2">
+                                            Ver
+                                        </a>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-danger remove-commitment-doc"
+                                                data-doc-id="{{ doc.id }}">
+                                            Borrar
+                                        </button>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted small">No hay documentos de compromiso asociados a esta institución.</p>
+                            {% endif %}
+                        {% endfor %}
+
+
+
                         <!-- Upload form for this institution -->
                         <div class="input-group mb-2">
                             <input type="file" name="commitment_document" class="form-control" accept=".pdf,.docx">
