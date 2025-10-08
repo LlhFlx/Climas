@@ -977,6 +977,7 @@ class IntersectionalityScope(TimestampMixin, models.Model):
 from django.db import models
 from core.models import TimestampMixin, AddressMixin, CreatedByMixin
 from django.utils.translation import gettext_lazy as _
+from django.core.validators import RegexValidator
 
 class InstitutionType(TimestampMixin, CreatedByMixin):
     """
@@ -1059,6 +1060,19 @@ class Institution(TimestampMixin, AddressMixin, CreatedByMixin):
         "Numero de Registro Tributario",
         max_length=50,
         help_text="NUmero de registro tributario."
+    )
+
+    phone_number = models.CharField(
+        "Teléfono",
+        max_length=20,
+        blank=True,
+        validators=[
+            RegexValidator(
+                regex=r'^\+?\d{7,15}$',
+                message="Ingrese un número de teléfono válido (7 a 15 dígitos, puede incluir + al inicio)."
+            )
+        ],
+        help_text="Ejemplo: +573001234567"
     )
 
     is_active = models.BooleanField(
@@ -1203,7 +1217,57 @@ from core.models import TimestampMixin, CreatedByMixin
 from expressions.models import Expression
 from strategic_effects.models import StrategicEffect
 
-class Product(TimestampMixin, CreatedByMixin, models.Model):
+
+class BaseProduct(TimestampMixin, CreatedByMixin, models.Model):
+    """
+    Clase base para Productos (Expression o Proposal).
+    """
+    title = models.CharField(
+        max_length=200,
+        verbose_name="Titulo del Producto"
+    )
+
+    description = models.TextField(
+        verbose_name="Descripcion"
+    )
+
+    outcome = models.TextField(
+        verbose_name="Resultado o impacto."
+    )
+
+    start_date = models.DateField(
+        verbose_name="Fecha de Inicio",
+        blank=True,
+        null=True
+    )
+
+    end_date = models.DateField(
+        verbose_name="Fecha de Finalizacion",
+        blank=True,
+        null=True
+    )
+
+    strategic_effects = models.ManyToManyField(
+        'strategic_effects.StrategicEffect',
+        related_name="%(class)s_products",  # dynamic related name per subclass
+        blank=True,
+        verbose_name="Efectos Estrategicos"
+    )
+
+    status = models.ForeignKey(
+        'common.Status',
+        on_delete=models.PROTECT,
+        verbose_name="Estado"
+    )
+
+    class Meta:
+        abstract = True
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title
+    
+class ExpressionProduct(BaseProduct):
     """
     Producto derivado de una Expresión de Interés.
     Puede estar asociado a múltiples efectos estratégicos.
@@ -1214,43 +1278,25 @@ class Product(TimestampMixin, CreatedByMixin, models.Model):
         verbose_name="Expresion de Interes"
     )
 
-    title = models.CharField(
-        max_length=200,
-        verbose_name="Titulo del Producto"
-    )
+    class Meta:
+        db_table = 'expression_product'
+        verbose_name = "Producto de Expresión"
+        verbose_name_plural = "Productos de Expresión"
 
-    description = models.TextField(
-        verbose_name="Descripcion"
-    )
-
-    outcome = models.TextField(verbose_name="Resultado o impacto.")
-
-    start_date = models.DateField(verbose_name="Fecha de Inicio")
-
-    end_date = models.DateField(verbose_name="Fecha de Finalizacion")
-
-    strategic_effects = models.ManyToManyField(
-        'strategic_effects.StrategicEffect',
-        related_name='products',
-        blank=True,
-        verbose_name="Efectos Estrategicos"
-    )
- 
-    status = models.ForeignKey(
-        'common.Status',
-        on_delete=models.PROTECT,
-        verbose_name="Estado"
+class ProposalProduct(BaseProduct):
+    """
+    Producto derivado de una Propuesta.
+    """
+    proposal = models.ForeignKey(
+        'proposals.Proposal',
+        on_delete=models.CASCADE,
+        verbose_name="Propuesta"
     )
 
     class Meta:
-        db_table = 'product'
-        verbose_name = "Producto"
-        verbose_name_plural = "Productos"
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return self.title
-
+        db_table = 'proposal_product'
+        verbose_name = "Producto de Propuesta"
+        verbose_name_plural = "Productos de Propuesta"
 
 # ===== From: calls/models.py =====
 
@@ -1448,7 +1494,9 @@ class ExpressionInvestigatorThematicAntecedent(BaseInvestigatorThematicAnteceden
     thematic_axis = models.ForeignKey(
         'thematic_axes.ThematicAxis',
         on_delete=models.PROTECT,
-        verbose_name="Eje Temático"
+        verbose_name="Eje Temático",
+        blank=True,
+        null=True
     )    
 
     class Meta:
@@ -1467,7 +1515,7 @@ class ProposalInvestigatorThematicAntecedent(BaseInvestigatorThematicAntecedent)
     team_member = models.ForeignKey(
         'project_team.ProposalTeamMember',
         on_delete=models.CASCADE,
-        related_name='thematic_antecedents',
+        related_name='proposal_thematic_antecedents',
         verbose_name="Miembro del Equipo (Propuesta)"
     )
     thematic_axis = models.ForeignKey(
@@ -1588,6 +1636,11 @@ class CBO(TimestampMixin, models.Model):
     contact_email = models.EmailField(
         blank=True,
         verbose_name="Correo de Contacto"
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Activa"
     )
 
     class Meta:

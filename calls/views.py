@@ -2272,6 +2272,14 @@ def apply_proposal(request, expression_id):
                 'institutions': institutions,
                 'thematic_axes': thematic_axes,
                 'strategic_effects': strategic_effects,
+                'strategic_effects_json': json.dumps([
+                    {
+                        'id': effect.id,
+                        'name': effect.name,
+                        'thematic_axis_id': effect.thematic_axis_id
+                    }
+                    for effect in strategic_effects
+                ], cls=DjangoJSONEncoder),
                 'budget_categories': budget_categories,
                 'budget_periods': budget_periods,
                 'all_cbos': all_cbos,
@@ -2327,6 +2335,14 @@ def apply_proposal(request, expression_id):
         'institutions': institutions,
         'thematic_axes': thematic_axes,
         'strategic_effects': strategic_effects,
+        'strategic_effects_json': json.dumps([
+                    {
+                        'id': effect.id,
+                        'name': effect.name,
+                        'thematic_axis_id': effect.thematic_axis_id
+                    }
+                    for effect in strategic_effects
+                ], cls=DjangoJSONEncoder),
         'budget_categories': budget_categories,
         'budget_periods': budget_periods,
         'all_cbos': all_cbos,

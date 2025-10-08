@@ -844,7 +844,7 @@ def evaluate_expression(request, evaluation_id):
                 'proposal_fields': proposal_fields,
                 'products': products,
                 'team_members': team_members,
-                'existing_budget_items': existing_budget_items,
+                #'existing_budget_items': existing_budget_items,
                 'responses': responses,
             })
 
@@ -858,7 +858,7 @@ def evaluate_expression(request, evaluation_id):
         'proposal_fields': proposal_fields,
         'products': products,
         'team_members': team_members,
-        'existing_budget_items': existing_budget_items,
+        #'existing_budget_items': existing_budget_items,
         'responses': responses,
     }
     return render(request, 'evaluations/evaluate_expression.html', context)

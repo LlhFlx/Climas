@@ -107,7 +107,7 @@
             <div class="input-group">
                 <input type="text"
                     name="primary_institution_search"
-                    class="form-control institution-search"
+                    class="form-control institution-search-primary"
                     placeholder="Buscar..."
                     value="{% if proposal.primary_institution %}{{ proposal.primary_institution.name }}{% endif %}">
                 <input type="hidden"
@@ -135,7 +135,7 @@
             <div class="input-group mb-3">
                 <input type="text"
                     name="partner_institution_search"
-                    class="form-control institution-search"
+                    class="form-control institution-search-partner"
                     placeholder="Buscar institución..."
                     aria-label="Buscar institución"
                     value=""
@@ -615,6 +615,7 @@
 
 {% block extra_js %}
 {{ institutions|json_script:"institutions-json" }}
+{{ strategic_effects_json|json_script:"strategic-effects-data" }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const institutionSearchInput = document.querySelector('.institution-search');
@@ -632,28 +633,27 @@ document.addEventListener('DOMContentLoaded', function() {
     //     hiddenIdsInput.value = ids.join(',');
     // }
 
-    // -------------------------------
-    // INSTITUTION SEARCH & SELECTION
-    // -------------------------------
-    function setupInstitutionAutocomplete() {
-        institutionSearchInput.addEventListener('input', function () {
+    // ============================
+    // 1. PRIMARY INSTITUTION SEARCH
+    // ============================
+
+    const primarySearch = document.querySelector('.institution-search-primary');
+    if (primarySearch) {
+        primarySearch.addEventListener('input', function () {
             const query = this.value.trim().toLowerCase();
             const results = institutionsList.filter(inst =>
                 inst.name.toLowerCase().includes(query)
             );
 
-            // Enable/disable "Agregar" button
-            addInstitutionButton.disabled = !query || results.length === 0;
-
-            // Clear old suggestions
-            let suggestions = document.querySelector('.suggestions-list');
+            // Clear previous suggestions
+            let suggestions = document.querySelector('.suggestions-list-primary');
             if (suggestions) suggestions.remove();
 
             if (!query || results.length === 0) return;
 
-            // Create suggestion list
+            // Create suggestion dropdown
             suggestions = document.createElement('ul');
-            suggestions.className = 'suggestions-list list-group position-absolute w-100 mt-1 shadow-sm';
+            suggestions.className = 'suggestions-list-primary list-group position-absolute w-100 mt-1 shadow-sm';
             suggestions.style.maxHeight = '200px';
             suggestions.style.overflowY = 'auto';
             suggestions.style.zIndex = '1000';
@@ -663,27 +663,96 @@ document.addEventListener('DOMContentLoaded', function() {
                 li.className = 'list-group-item cursor-pointer';
                 li.textContent = inst.name;
                 li.dataset.id = inst.id;
+                li.dataset.type = inst.institution_type_name; // optional
                 li.addEventListener('click', () => {
-                    addInstitution(inst.id, inst.name);
-                    institutionSearchInput.value = '';
-                    institutionSearchInput.focus();
+                    primarySearch.value = inst.name;
+                    document.querySelector('[name="primary_institution_id"]').value = inst.id;
                     suggestions.remove();
                 });
                 suggestions.appendChild(li);
             });
 
-            institutionSearchInput.parentElement.appendChild(suggestions);
+            primarySearch.parentElement.appendChild(suggestions);
+        });
+
+        // Hide suggestions on blur
+        primarySearch.addEventListener('blur', function () {
+            setTimeout(() => {
+                const suggestions = document.querySelector('.suggestions-list-primary');
+                if (suggestions) suggestions.remove();
+            }, 200);
         });
     }
 
-    function addInstitution(id, name) {
+    // ============================
+    // 2. PARTNER INSTITUTIONS – MULTI ADD
+    // ============================
+
+    const partnerSearch = document.querySelector('.institution-search-partner');
+    const addBtn = document.querySelector('.add-institution');
+    
+    function updatePartnerSuggestions() {
+        if (!partnerSearch) return;
+
+        const query = partnerSearch.value.trim().toLowerCase();
+        const results = institutionsList.filter(inst =>
+            inst.name.toLowerCase().includes(query)
+        );
+
+        addBtn.disabled = !query || results.length === 0;
+
+        // Clear old suggestions
+        let suggestions = document.querySelector('.suggestions-list-partner');
+        if (suggestions) suggestions.remove();
+
+        if (!query || results.length === 0) return;
+
+        // Build new ones
+        suggestions = document.createElement('ul');
+        suggestions.className = 'suggestions-list-partner list-group position-absolute w-100 mt-1 shadow-sm';
+        suggestions.style.maxHeight = '200px';
+        suggestions.style.overflowY = 'auto';
+        suggestions.style.zIndex = '1000';
+
+        results.forEach(inst => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item cursor-pointer';
+            li.textContent = inst.name;
+            li.dataset.id = inst.id;
+            li.dataset.name = inst.name;
+            li.addEventListener('click', () => {
+                addPartnerInstitution(inst.id, inst.name);
+                partnerSearch.value = '';
+                partnerSearch.focus();
+                suggestions.remove();
+            });
+            suggestions.appendChild(li);
+        });
+
+        partnerSearch.parentElement.appendChild(suggestions);
+    }
+
+    // Attach to input
+    partnerSearch?.addEventListener('input', updatePartnerSuggestions);
+
+    // Click outside → hide suggestions
+    document.addEventListener('click', function(e) {
+        const isPrimary = e.target.closest('.institution-search-primary');
+        const isPartner = e.target.closest('.institution-search-partner');
+        const isDropdown = e.target.classList.contains('cursor-pointer');
+
+        if (!isPrimary && !isPartner && !isDropdown) {
+            document.querySelector('.suggestions-list-primary')?.remove();
+            document.querySelector('.suggestions-list-partner')?.remove();
+        }
+    });
+
+    // Add partner institution
+    function addPartnerInstitution(id, name) {
         if (listContainer.querySelector(`[data-institution-id="${id}"]`)) {
+            alert(`La institución "${name}" ya fue agregada.`);
             return;
         }
-
-        const btn = document.querySelector(`.add-institution`);
-        btn.disabled = true;
-        btn.textContent = 'Agregando...';
 
         const formData = new FormData();
         formData.append('institution_id', id);
@@ -694,7 +763,7 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             body: formData,
         })
-        .then(response => response.json())
+        .then(r => r.json())
         .then(data => {
             if (data.success) {
                 const div = document.createElement('div');
@@ -705,28 +774,65 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button type="button" class="btn btn-sm btn-outline-danger remove-institution" data-institution-id="${data.institution_id}">Eliminar</button>
                 `;
                 listContainer.appendChild(div);
-
-                // Update hidden field
-
-                // Create commitment section
                 createCommitmentSection(data.institution_id, data.institution_name);
-
-                // Reset button
-                btn.disabled = false;
-                btn.textContent = 'Agregar';
             } else {
-                alert('Error al agregar institución: ' + data.error);
-                btn.disabled = false;
-                btn.textContent = 'Agregar';
+                alert('Error al agregar: ' + data.error);
             }
         })
         .catch(err => {
-            console.error(err);
-            alert('Error de red. Por favor, inténtelo de nuevo.');
-            btn.disabled = false;
-            btn.textContent = 'Agregar';
+            console.error('Add institution failed:', err);
+            alert('Error de red.');
         });
     }
+
+    // Remove institution
+    listContainer?.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-institution')) {
+            const btn = e.target;
+            const id = e.target.dataset.institutionId;
+
+            if (!confirm('¿Está seguro de eliminar esta institución? Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            // Show loading state
+            btn.disabled = true;
+            btn.textContent = 'Eliminando...';
+
+            const formData = new FormData();
+            formData.append('institution_id', id);
+            formData.append('proposal_id', document.querySelector('[name="proposal_id"]').value);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('{% url "proposals:remove_institution_from_proposal" %}', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove UI elements
+                    e.target.closest('.d-flex').remove();
+
+                    const commitSection = commitmentContainer.querySelector(
+                        `.commitment-doc-section[data-institution-id="${id}"]`
+                    );
+                    if (commitSection) commitSection.remove();
+                } else {
+                    alert('Error al eliminar: ' + (data.error || 'Desconocido'));
+                }
+            })
+            .catch(err => {
+                console.error("Remove institution failed:", err);
+                alert("Error de red. No se pudo eliminar la institución.");
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = 'Eliminar';
+            });
+        }
+    });
+
 
     // ============================
     // SPECIFIC OBJECTIVES
@@ -798,14 +904,68 @@ document.addEventListener('DOMContentLoaded', function() {
     // ============================
     // PRODUCTS
     // ============================
+    const thematicAxisSelect = document.querySelector('select[name="thematic_axis_override"]');
     const addProductBtn = document.getElementById('add-proposal-product-btn');
     const productsContainer = document.getElementById('proposal-products-container');
     let productCount = parseInt(productsContainer.dataset.initialCount || '0', 10);
 
+    // Load strategic effects as JSON (from template)
+    const strategicEffectsScript = document.getElementById('strategic-effects-data');
+    const strategicEffectsData = strategicEffectsScript ? JSON.parse(strategicEffectsScript.textContent) : [];
+
+
+    // Update all product strategic effects dropdowns based on selected axis
+    function updateProductStrategicEffects() {
+        const selectedAxisId = thematicAxisSelect ? thematicAxisSelect.value : null;
+        const productDropdowns = document.querySelectorAll('.product-strategic-effects');
+
+        productDropdowns.forEach(dropdown => {
+            // Save current selections
+            const selectedValues = Array.from(dropdown.selectedOptions).map(opt => opt.value);
+
+            // Clear dropdown
+            dropdown.innerHTML = '';
+
+            if (!selectedAxisId) {
+                dropdown.innerHTML = '<option value="">-- Seleccionar Eje Temático primero --</option>';
+                return;
+            }
+
+            // Filter effects by axis
+            const filteredEffects = strategicEffectsData.filter(effect =>
+                effect.thematic_axis_id == selectedAxisId
+            );
+
+            if (filteredEffects.length > 0) {
+                filteredEffects.forEach(effect => {
+                    const option = document.createElement('option');
+                    option.value = effect.id;
+                    option.textContent = effect.name;
+                    if (selectedValues.includes(String(effect.id))) {
+                        option.selected = true;
+                    }
+                    dropdown.appendChild(option);
+                });
+            } else {
+                dropdown.innerHTML = '<option value="">No hay efectos para este eje</option>';
+            }
+        });
+    }
+
+    // Initialize if axis is pre-selected
+    if (thematicAxisSelect && thematicAxisSelect.value) {
+        updateProductStrategicEffects();
+    }
+
+    // Rebind on axis change
+    if (thematicAxisSelect) {
+        thematicAxisSelect.addEventListener('change', updateProductStrategicEffects);
+    }
+
     if (addProductBtn) {
         addProductBtn.addEventListener('click', () => {
             const entry = createProductEntry(productCount);
-            productsContainer.appendChild(entry);
+            //productsContainer.appendChild(entry);
             entry.querySelector('.remove-product').addEventListener('click', () => {
                 entry.remove();
                 productCount--;
@@ -820,7 +980,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const entry = e.target.closest('.product-entry');
             if (entry) {
                 entry.remove();
-                renumberProducts(); // Critical: renumber after removal
+                renumberProducts();
             }
         }
     });
@@ -834,6 +994,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
         });
+        updateProductStrategicEffects();
     }
 
     function createProductEntry(index) {
@@ -875,6 +1036,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 </select>
             </div>
         `;
+        productsContainer.appendChild(div);
+        updateProductStrategicEffects();
         return div;
     }
 
