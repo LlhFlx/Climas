@@ -22,7 +22,7 @@ from expressions.models import Expression, ExpressionDocument
 from expressions.forms import ExpressionDocumentForm
 from proposals.models import Proposal, ProposalDocument, ProposalSpecificObjective
 from accounts.models import CustomUser
-from products.models import Product
+from products.models import ExpressionProduct
 from django.forms import modelformset_factory
 from django import forms
 from django.contrib.contenttypes.models import ContentType
@@ -1298,12 +1298,12 @@ def apply_call(request, call_pk):
             else:  # Only if no break
                 # Products
                 #print('Products', request.POST)
-                Product.objects.filter(expression=expression).delete()
+                ExpressionProduct.objects.filter(expression=expression).delete()
                 product_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('product_title_'))
                 for index in product_indices:
                     title = request.POST.get(f'product_title_{index}', '').strip()
                     if title:
-                        product = Product.objects.create(
+                        product = ExpressionProduct.objects.create(
                             expression=expression,
                             title=title,
                             description=request.POST.get(f'product_description_{index}', ''),
@@ -1474,7 +1474,7 @@ def apply_call(request, call_pk):
                         messages.error(request, "El título del proyecto no puede tener más de 15 palabras.")
                         has_errors = True
 
-                # === 2. CATEGORY: All Product Descriptions Combined (max 600 words) ===
+                # === 2. CATEGORY: All ExpressionProduct Descriptions Combined (max 600 words) ===
                 product_desc_words = 0
                 product_indices_set = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('product_description_'))
                 for index in product_indices_set:
@@ -1568,7 +1568,7 @@ def apply_call(request, call_pk):
                             }
                             for effect in strategic_effects
                         ], cls=DjangoJSONEncoder),
-                        'existing_products': Product.objects.filter(expression=expression).prefetch_related('strategic_effects'),
+                        'existing_products': ExpressionProduct.objects.filter(expression=expression).prefetch_related('strategic_effects'),
                         'existing_team_members': ExpressionTeamMember.objects.filter(
                             expression=expression
                         ).select_related('person', 'institution').prefetch_related('expression_thematic_antecedents'),
@@ -1661,7 +1661,7 @@ def apply_call(request, call_pk):
             }
             for effect in strategic_effects
         ], cls=DjangoJSONEncoder),
-        'existing_products': Product.objects.filter(expression=expression).prefetch_related('strategic_effects'),
+        'existing_products': ExpressionProduct.objects.filter(expression=expression).prefetch_related('strategic_effects'),
         'existing_team_members': ExpressionTeamMember.objects.filter(expression=expression).select_related('person', 'institution').prefetch_related('expression_thematic_antecedents'),
         'statuses': Status.objects.all().order_by('name'),
         'institutions': institutions_list,

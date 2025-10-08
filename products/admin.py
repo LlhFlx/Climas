@@ -1,9 +1,9 @@
 from django.contrib import admin
-from .models import Product
+from .models import ExpressionProduct
 from core.admin import CreatedByAdminMixin
 
-@admin.register(Product)
-class ProductAdmin(CreatedByAdminMixin, admin.ModelAdmin):
+@admin.register(ExpressionProduct)
+class ExpressionProductAdmin(CreatedByAdminMixin, admin.ModelAdmin):
     list_display = (
         'title', 'expression', 'status', 'start_date', 'end_date', 'created_at'
     )
