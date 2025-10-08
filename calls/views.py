@@ -1358,14 +1358,19 @@ def apply_call(request, call_pk):
                         axis_ids = request.POST.getlist(f'team_member_antecedent_axis_{index}')
                         descriptions = request.POST.getlist(f'team_member_antecedent_description_{index}')
                         urls = request.POST.getlist(f'team_member_antecedent_url_{index}')
-                        for i, axis_id in enumerate(axis_ids):
-                            if i < len(descriptions) and descriptions[i].strip():
-                                ExpressionInvestigatorThematicAntecedent.objects.create(
-                                    team_member=member,
-                                    thematic_axis_id=axis_id,
-                                    description=descriptions[i].strip(),
-                                    evidence_url=urls[i].strip() if i < len(urls) else ''
-                                )
+                        print(axis_ids)
+                        print(descriptions)
+                        print(urls)
+                        for i, description in enumerate(descriptions):
+                            description = description.strip()
+                            if not description:
+                                continue
+                            ExpressionInvestigatorThematicAntecedent.objects.create(
+                                team_member=member,
+                                thematic_axis_id=axis_ids[i] if i < len(axis_ids) and axis_ids[i] else None,
+                                description=description,
+                                evidence_url=urls[i].strip() if i < len(urls) else ''
+                            )
 
                 # Budget Items
                 #print('Budget', request.POST)
@@ -1483,18 +1488,24 @@ def apply_call(request, call_pk):
                     has_errors = True
 
                 # === 3. CATEGORY: All Team Member Roles + Antecedents (max 500 words) ===
-                team_member_words = 900
+                team_member_words = 0
                 team_indices_set = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('team_member_role_'))
+                print("==== DEBUG TEAM MEMBER WORD COUNT ====")
+                print("POST KEYS:", [k for k in request.POST.keys() if k.startswith('team_member')])
+                print("team_indices_set:", team_indices_set)
                 for index in team_indices_set:
                     role = request.POST.get(f'team_member_role_{index}', '').strip()
                     antecedent_descriptions = request.POST.getlist(f'team_member_antecedent_description_{index}')
+                    print(f"Index {index}:")
+                    print(f"  role = {repr(role)}")
+                    print(f"  antecedent_descriptions = {antecedent_descriptions}")
                     if role:
                         team_member_words += len([w for w in role.split() if w])
                     for desc in antecedent_descriptions:
                         if desc.strip():
                             team_member_words += len([w for w in desc.split() if w])
 
-                if team_member_words > 500:
+                if team_member_words > 900:
                     messages.error(request, f"Los roles y antecedentes de colaboradores no deben exceder 500 palabras ({team_member_words}).")
                     has_errors = True
 

@@ -366,7 +366,7 @@
                                         <h6 class="fs-6 mb-2">Antecedente {{ forloop.counter }}</h6>
                                         <button type="button" class="btn btn-sm btn-outline-danger remove-antecedent">Remove</button>
                                     </div>
-                                    <div class="mb-2">
+                                    <!--<div class="mb-2">
                                         <label class="form-label">Eje Temático</label>
                                         <select name="team_member_antecedent_axis_{{ forloop.parentloop.counter0 }}" class="form-select">
                                             <option value="">-- Seleccionar Eje Temático --</option>
@@ -376,7 +376,7 @@
                                                 </option>
                                             {% endfor %}
                                         </select>
-                                    </div>
+                                    </div> -->
                                     <div class="mb-2">
                                         <label class="form-label">Descripción *</label>
                                         <textarea name="team_member_antecedent_description_{{ forloop.parentloop.counter0 }}" class="form-control" rows="2" required>{{ antecedent.description }}</textarea>
@@ -1227,7 +1227,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <h6 class="fs-6 mb-0">Antecedente</h6>
                         <button type="button" class="btn btn-sm btn-outline-danger remove-antecedent">Remove</button>
                     </div>
-                    <div class="mb-2">
+                    <!--<div class="mb-2">
                         <label class="form-label">Eje Temático</label>
                         <select name="team_member_antecedent_axis_${index}" class="form-select" required>
                             <option value="">-- Seleccionar Eje Temático --</option>
@@ -1235,7 +1235,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <option value="{{ axis.id }}">{{ axis.name }}</option>
                             {% endfor %}
                         </select>
-                    </div>
+                    </div>-->
                     <div class="mb-2">
                         <label class="form-label">Descripción *</label>
                         <textarea name="team_member_antecedent_description_${index}" class="form-control" rows="2" required></textarea>

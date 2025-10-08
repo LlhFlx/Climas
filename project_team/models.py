@@ -120,7 +120,9 @@ class ExpressionInvestigatorThematicAntecedent(BaseInvestigatorThematicAnteceden
     thematic_axis = models.ForeignKey(
         'thematic_axes.ThematicAxis',
         on_delete=models.PROTECT,
-        verbose_name="Eje Temático"
+        verbose_name="Eje Temático",
+        blank=True,
+        null=True
     )    
 
     class Meta:
