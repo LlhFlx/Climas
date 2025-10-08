@@ -326,7 +326,7 @@
                             >
                         </div>
                         <small class="form-text text-muted">Escriba para buscar.</small>
-                        <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=team_member_institution_{{ forloop.counter0 }}" 
+                        <a href="{% url 'calls:create_institution' %}?return_url={{ request.get_full_path }}&field_name=team_member_institution_{{ forloop.counter0 }}" 
                         target="_blank" 
                         class="btn btn-outline-primary mt-2">
                             + Crear
@@ -360,7 +360,7 @@
                     <div class="mb-3">
                         <label class="form-label">Antecedentes Temáticos</label>
                         <div class="antecedents-container">
-                            {% for antecedent in member.thematic_antecedents.all %}
+                            {% for antecedent in member.expression_thematic_antecedents.all %}
                                 <div class="antecedent-entry card mb-2 p-2">
                                     <div class="d-flex justify-content-between">
                                         <h6 class="fs-6 mb-2">Antecedente {{ forloop.counter }}</h6>

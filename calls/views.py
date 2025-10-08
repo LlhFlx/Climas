@@ -1558,7 +1558,9 @@ def apply_call(request, call_pk):
                             for effect in strategic_effects
                         ], cls=DjangoJSONEncoder),
                         'existing_products': Product.objects.filter(expression=expression).prefetch_related('strategic_effects'),
-                        'existing_team_members': ExpressionTeamMember.objects.filter(expression=expression).prefetch_related('thematic_antecedents'),
+                        'existing_team_members': ExpressionTeamMember.objects.filter(
+                            expression=expression
+                        ).select_related('person', 'institution').prefetch_related('expression_thematic_antecedents'),
                         'statuses': Status.objects.all().order_by('name'),
                         'institutions': list(Institution.objects.filter(is_active=True).order_by('name').values('id', 'name')),
                         'institution_types': institution_types,
@@ -1649,7 +1651,7 @@ def apply_call(request, call_pk):
             for effect in strategic_effects
         ], cls=DjangoJSONEncoder),
         'existing_products': Product.objects.filter(expression=expression).prefetch_related('strategic_effects'),
-        'existing_team_members': ExpressionTeamMember.objects.filter(expression=expression).prefetch_related('thematic_antecedents'),
+        'existing_team_members': ExpressionTeamMember.objects.filter(expression=expression).select_related('person', 'institution').prefetch_related('expression_thematic_antecedents'),
         'statuses': Status.objects.all().order_by('name'),
         'institutions': institutions_list,
         'institution_types': institution_types,

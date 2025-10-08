@@ -42,6 +42,33 @@
             </select>
         </div>
 
+        <!-- Dirección -->
+        <div class="mb-3">
+            <label class="form-label">Dirección Línea 1</label>
+            <input type="text" name="address_line1" class="form-control" placeholder="Calle, número, barrio">
+        </div>
+        <div class "mb-3">
+            <label class="form-label">Dirección Línea 2 (Opcional)</label>
+            <input type="text" name="address_line2" class="form-control" placeholder="Piso, oficina, referencias">
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Ciudad</label>
+                <input type="text" name="city" class="form-control">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Estado / Departamento</label>
+                <input type="text" name="state" class="form-control">
+            </div>
+        </div>
+
+        <!-- Teléfono -->
+        <div class="mb-3">
+            <label class="form-label">Teléfono</label>
+            <input type="tel" name="phone_number" class="form-control"
+                   placeholder="+57(601)1234567 o +1 555 123 4567">
+        </div>
+
         <div class="mb-3">
             <label class="form-label">Número de Registro Tributario *</label>
             <input type="text" name="tax_register_number" class="form-control" required>
