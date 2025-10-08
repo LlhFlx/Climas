@@ -31,6 +31,11 @@ class CBO(TimestampMixin, models.Model):
         verbose_name="Correo de Contacto"
     )
 
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Activa"
+    )
+
     class Meta:
         db_table = 'cbo'
         verbose_name = "Organización Comunitaria (CBO)"

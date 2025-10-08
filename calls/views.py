@@ -22,7 +22,7 @@ from expressions.models import Expression, ExpressionDocument
 from expressions.forms import ExpressionDocumentForm
 from proposals.models import Proposal, ProposalDocument, ProposalSpecificObjective
 from accounts.models import CustomUser
-from products.models import ExpressionProduct
+from products.models import ExpressionProduct, ProposalProduct
 from django.forms import modelformset_factory
 from django import forms
 from django.contrib.contenttypes.models import ContentType
@@ -1819,7 +1819,6 @@ def apply_proposal(request, expression_id):
             duration_months=12,
             summary='',
             context_problem_justification='',
-            specific_objectives='',
             methodology_analytical_plan_ethics='',
             equity_inclusion='',
             communication_strategy='',
@@ -1838,15 +1837,25 @@ def apply_proposal(request, expression_id):
         Institution.objects.filter(is_active=True)
         .order_by('name')
         .values('id', 'name')
-    )
+    )   
+
+    thematic_axes = ThematicAxis.objects.filter(is_active=True)
+    strategic_effects = StrategicEffect.objects.filter(is_active=True).order_by('name')
+    budget_categories = BudgetCategory.objects.filter(is_active=True).order_by('name')
+    budget_periods = BudgetPeriod.objects.all().order_by('order', 'name')
+    all_cbos = CBO.objects.filter(is_active=True).order_by('name')
+    cbo_role_choices =  CBORelevantRole.PREDEFINED_ROLE_CHOICES
+
+    # Load existing Proposal-specific related data: mirrored from apply_call structure
+    existing_products = ProposalProduct.objects.filter(proposal=proposal).prefetch_related('strategic_effects')
+    existing_team_members = ProposalTeamMember.objects.filter(proposal=proposal).select_related(
+        'person', 'institution'
+    ).prefetch_related('proposal_thematic_antecedents')
+    existing_budget_items = ProposalBudgetItem.objects.filter(proposal=proposal).select_related('category', 'period')
+
     commitment_docs = proposal.proposal_documents.filter(document_type='commitment')
     timeline_doc = proposal.timeline_document
     budget_doc = proposal.budget_document
-
-    # Load existing proposal-level data
-    existing_proposal_budget_items = ProposalBudgetItem.objects.filter(proposal=proposal)
-    existing_proposal_team_members = ProposalTeamMember.objects.filter(proposal=proposal)
-    existing_cbo_roles = CBORelevantRole.objects.filter(cbo__in=proposal.community_organizations.all())
 
     # Initialize post_data
     post_data = {}
@@ -1928,10 +1937,10 @@ def apply_proposal(request, expression_id):
         # Update Proposal fields
         proposal.principal_research_experience = post_data['principal_research_experience']
         proposal.community_description = post_data['community_description']
-        proposal.duration_months = int(post_data['duration_months']) if post_data['duration_months'] else None
+        proposal.duration_months = int(post_data['duration_months']) if post_data['duration_months'] else 12
         proposal.summary = post_data['summary']
         proposal.context_problem_justification = post_data['context_problem_justification']
-        proposal.specific_objectives = post_data['specific_objectives']
+        #proposal.specific_objectives = post_data['specific_objectives']
         proposal.methodology_analytical_plan_ethics = post_data['methodology_analytical_plan_ethics']
         proposal.equity_inclusion = post_data['equity_inclusion']
         proposal.communication_strategy = post_data['communication_strategy']
@@ -1939,6 +1948,16 @@ def apply_proposal(request, expression_id):
         proposal.research_team = post_data['research_team']
         proposal.principal_investigator_title = post_data['principal_investigator_title']
         proposal.principal_investigator_position = post_data['principal_investigator_position']
+
+        # # Update proposal fields
+        # for field in [
+        #     'principal_research_experience', 'community_description', 'summary',
+        #     'context_problem_justification', 'methodology_analytical_plan_ethics',
+        #     'equity_inclusion', 'communication_strategy', 'risk_analysis_mitigation', 'research_team',
+        #     'principal_investigator_title', 'principal_investigator_position'
+        # ]:
+        #     setattr(proposal, field, post_data[field])     
+
 
         # Country fields
         if post_data['community_country']:
@@ -1952,7 +1971,6 @@ def apply_proposal(request, expression_id):
             except Institution.DoesNotExist:
                 pass
 
-        # Handle optional title/axis override
         if post_data['project_title_override']:
             proposal.project_title_override = post_data['project_title_override']
         if post_data['thematic_axis_override']:
@@ -2043,6 +2061,25 @@ def apply_proposal(request, expression_id):
                     description=desc
                 )
 
+        # Products
+        ProposalProduct.objects.filter(proposal=proposal).delete()
+        product_indices = {k.split('_')[-1] for k in request.POST.keys() if k.startswith('proposal_product_title_')}
+        for idx in product_indices:
+            title = request.POST.get(f'proposal_product_title_{idx}', '').strip()
+            if title:
+                product = ProposalProduct.objects.create(
+                    proposal=proposal,
+                    title=title,
+                    description=request.POST.get(f'proposal_product_description_{idx}', '').strip(),
+                    outcome=request.POST.get(f'proposal_product_outcome_{idx}', '').strip(),
+                    start_date=request.POST.get(f'proposal_product_start_date_{idx}'),
+                    end_date=request.POST.get(f'proposal_product_end_date_{idx}'),
+                    status=draft_status,
+                )
+                effect_ids = request.POST.getlist(f'proposal_product_strategic_effects_{idx}')
+                if effect_ids:
+                    product.strategic_effects.set(StrategicEffect.objects.filter(id__in=effect_ids))
+
         # Budget Items (separate relation)
         ProposalBudgetItem.objects.filter(proposal=proposal).delete()
         budget_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('proposal_budget_category_'))
@@ -2085,35 +2122,90 @@ def apply_proposal(request, expression_id):
             role = request.POST.get(f'proposal_team_member_role_{idx}', '').strip()
             inst_id = request.POST.get(f'proposal_team_member_institution_{idx}')
 
-            if not person_id or not role:
-                continue
+            if person_id and person_id.strip() and role:
+                try:
+                    member = ProposalTeamMember.objects.create(
+                        proposal=proposal,
+                        person_id=int(person_id),
+                        role=role,
+                        institution_id=inst_id,
+                        status_id=request.POST.get(f'proposal_team_member_status_{idx}'),
+                        start_date=request.POST.get(f'proposal_team_member_start_date_{idx}'),
+                        end_date=request.POST.get(f'proposal_team_member_end_date_{idx}'),
+                    )
 
-            try:
-                member = ProposalTeamMember.objects.create(
-                    proposal=proposal,
-                    person_id=int(person_id),
-                    role=role,
-                    institution_id=inst_id,
-                    start_date=request.POST.get(f'proposal_team_member_start_date_{idx}'),
-                    end_date=request.POST.get(f'proposal_team_member_end_date_{idx}'),
-                    status_id=request.POST.get(f'proposal_team_member_status_{idx}'),
-                )
+                    # Save antecedents
+                    axis_ids = request.POST.getlist(f'proposal_team_member_antecedent_axis_{idx}')
+                    descriptions = request.POST.getlist(f'proposal_team_member_antecedent_description_{idx}')
+                    urls = request.POST.getlist(f'proposal_team_member_antecedent_url_{idx}')
 
-                # Save antecedents
-                axes = request.POST.getlist(f'proposal_team_member_antecedent_axis_{idx}')
-                descs = request.POST.getlist(f'proposal_team_member_antecedent_description_{idx}')
-                urls = request.POST.getlist(f'proposal_team_member_antecedent_url_{idx}')
-                for i, axis_id in enumerate(axes):
-                    if i < len(descs) and descs[i].strip():
-                        
+                    for i, description in enumerate(descriptions):
+                        description = description.strip()
+                        if not description:
+                            continue
+                            
                         ProposalInvestigatorThematicAntecedent.objects.create(
                             team_member=member,
-                            thematic_axis_id=int(axis_id),
-                            description=descs[i],
-                            evidence_url=urls[i] if i < len(urls) else ''
+                            thematic_axis_id=axis_ids[i] if i < len(axis_ids) and axis_ids[i] else None,
+                            description=description,
+                            evidence_url=urls[i].strip() if i < len(urls) else ''
                         )
+                except Exception as e:
+                    messages.warning(request, f"Error al guardar colaborador: {str(e)}")
+            else:
+                continue
+
+        # CBOs: Handle as dynamic form
+        # Clear existing
+        proposal.community_organizations.clear()
+        cbo_indices = {k.split('_')[-1] for k in request.POST.keys() if k.startswith('cbo_name_')}
+        for idx in cbo_indices:
+            name = request.POST.get(f'cbo_name_{idx}', '').strip()
+            if not name:
+                continue
+            description = request.POST.get(f'cbo_description_{idx}', '').strip()
+            members = request.POST.get(f'cbo_number_of_members_{idx}', '').strip()
+            if not members.isdigit():
+                messages.warning(request, f"CBO '{name}': número de miembros inválido.")
+                continue
+            try:
+                cbo, _ = CBO.objects.get_or_create(
+                    name=name,
+                    defaults={
+                        'description': description,
+                        'number_of_members': int(members),
+                        'is_active': True
+                    }
+                )
+                # Update if exists but changed
+                if cbo.description != description or cbo.number_of_members != int(members):
+                    cbo.description = description
+                    cbo.number_of_members = int(members)
+                    cbo.save()
+                proposal.community_organizations.add(cbo)
+
+                # Save roles for this CBO
+                role_indices = {k.split('_')[-1] for k in request.POST.keys() if k.startswith(f'cbo_role_person_name_{idx}_')}
+                CBORelevantRole.objects.filter(cbo=cbo).delete()
+                for r_idx in role_indices:
+                    person_name = request.POST.get(f'cbo_role_person_name_{idx}_{r_idx}', '').strip()
+                    if not person_name:
+                        continue
+                    predefined = request.POST.get(f'cbo_role_predefined_{idx}_{r_idx}')
+                    custom = request.POST.get(f'cbo_role_custom_{idx}_{r_idx}', '').strip()
+                    phone = request.POST.get(f'cbo_role_phone_{idx}_{r_idx}', '').strip()
+                    email = request.POST.get(f'cbo_role_email_{idx}_{r_idx}', '').strip()
+                    CBORelevantRole.objects.create(
+                        cbo=cbo,
+                        predefined_role=predefined if predefined else None,
+                        custom_role=custom,
+                        person_name=person_name,
+                        contact_phone=phone,
+                        contact_email=email
+                    )
+
             except Exception as e:
-                messages.warning(request, f"Error al guardar colaborador: {str(e)}")
+                messages.warning(request, f"Error al guardar CBO: {str(e)}")
 
         # -------------------------------
         # FINAL WORD COUNT VALIDATION BLOCK
@@ -2140,6 +2232,7 @@ def apply_proposal(request, expression_id):
         for field_name, max_words, label in field_limits:
             value = post_data.get(field_name, '')
             if not value:
+                print("No value")
                 continue
             word_count = count_words(value)
             if word_count > max_words:
@@ -2148,7 +2241,8 @@ def apply_proposal(request, expression_id):
                     f"{label}: Máximo {max_words} palabras. Tienes {word_count}."
                 )
                 has_word_errors = True
-
+                print(f"{label}: Máximo {max_words} palabras. Tienes {word_count}.")
+            f"{label}: Máximo {max_words} palabras. Tienes {word_count}."
         # If any word count fails, re-render with error messages
         if has_word_errors:
             # Re-fetch fresh proposal
@@ -2176,9 +2270,18 @@ def apply_proposal(request, expression_id):
                 'proposal': proposal,
                 'countries': countries,
                 'institutions': institutions,
+                'thematic_axes': thematic_axes,
+                'strategic_effects': strategic_effects,
+                'budget_categories': budget_categories,
+                'budget_periods': budget_periods,
+                'all_cbos': all_cbos,
+                'cbo_role_choices': cbo_role_choices,
                 'commitment_docs': commitment_docs,
                 'timeline_doc': timeline_doc,
                 'budget_doc': budget_doc,
+                'existing_proposal_products': existing_products,
+                'existing_proposal_team_members': existing_team_members,
+                'existing_proposal_budget_items': existing_budget_items,
                 'post_data': post_data,
                 'proposal_id': proposal.id,
             }
@@ -2222,12 +2325,18 @@ def apply_proposal(request, expression_id):
         'proposal': proposal,
         'countries': countries,
         'institutions': institutions,
+        'thematic_axes': thematic_axes,
+        'strategic_effects': strategic_effects,
+        'budget_categories': budget_categories,
+        'budget_periods': budget_periods,
+        'all_cbos': all_cbos,
+        'cbo_role_choices': cbo_role_choices,
         'commitment_docs': commitment_docs,
         'timeline_doc': timeline_doc,
         'budget_doc': budget_doc,
-        'existing_proposal_budget_items': ProposalBudgetItem.objects.filter(proposal=proposal),
-        'existing_proposal_team_members': ProposalTeamMember.objects.filter(proposal=proposal),
-        'all_cbos': CBO.objects.filter(is_active=True).order_by('name'), 
+        'existing_proposal_products': existing_products,
+        'existing_proposal_team_members': existing_team_members,
+        'existing_proposal_budget_items': existing_budget_items,
         'post_data': post_data,
         'proposal_id': proposal.id, 
     }

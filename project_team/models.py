@@ -141,7 +141,7 @@ class ProposalInvestigatorThematicAntecedent(BaseInvestigatorThematicAntecedent)
     team_member = models.ForeignKey(
         'project_team.ProposalTeamMember',
         on_delete=models.CASCADE,
-        related_name='thematic_antecedents',
+        related_name='proposal_thematic_antecedents',
         verbose_name="Miembro del Equipo (Propuesta)"
     )
     thematic_axis = models.ForeignKey(

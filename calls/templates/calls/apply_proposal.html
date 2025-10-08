@@ -72,7 +72,7 @@
 
         <!-- 0.2. Thematic Axis Override -->
         <div class="mb-3">
-            <label class="form-label">Eje Temático (Opcional)</label>
+            <label class="form-label">Eje Temático</label>
             <select name="thematic_axis_override" class="form-select">
                 <option value="">-- Mantener eje de expresión --</option>
                 {% for axis in thematic_axes %}
@@ -269,6 +269,213 @@
             <small class="form-text text-muted">Máximo 200 palabras por objetivo</small>
         </div>
 
+        <!-- 8.5. Products -->
+        <div class="mb-4">
+            <h5>Productos Esperados</h5>
+            <p class="text-muted">Defina los productos derivados de esta propuesta.</p>
+            <div id="proposal-products-container"
+                data-initial-count="{{ existing_proposal_products|length }}">
+                {% for prod in existing_proposal_products %}
+                    <div class="card mb-3 p-3 product-entry">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Producto {{ forloop.counter }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-product">Eliminar</button>
+                        </div>
+                        <div class="mb-3">
+                            <label>Título *</label>
+                            <input type="text" name="proposal_product_title_{{ forloop.counter0 }}" class="form-control" value="{{ prod.title }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Descripción</label>
+                            <textarea name="proposal_product_description_{{ forloop.counter0 }}" class="form-control" rows="2">{{ prod.description }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label>Resultado o Impacto</label>
+                            <textarea name="proposal_product_outcome_{{ forloop.counter0 }}" class="form-control" rows="2">{{ prod.outcome }}</textarea>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>Fecha de Inicio</label>
+                                <input type="date" name="proposal_product_start_date_{{ forloop.counter0 }}" class="form-control" value="{{ prod.start_date|date:'Y-m-d' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label>Fecha de Finalización</label>
+                                <input type="date" name="proposal_product_end_date_{{ forloop.counter0 }}" class="form-control" value="{{ prod.end_date|date:'Y-m-d' }}">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label>Efectos Estratégicos</label>
+                            <select name="proposal_product_strategic_effects_{{ forloop.counter0 }}" class="form-select" multiple>
+                                {% for effect in strategic_effects %}
+                                    <option value="{{ effect.id }}" {% if effect in prod.strategic_effects.all %}selected{% endif %}>
+                                        {{ effect.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="alert alert-info">No hay productos definidos.</div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-proposal-product-btn" class="btn btn-outline-primary">+ Agregar Producto</button>
+        </div>
+
+        <!-- 8.6. Team Members -->
+        <div class="mb-4">
+            <h5>Equipo de Investigación Detallado</h5>
+            <p class="text-muted">Agregue colaboradores con sus antecedentes temáticos.</p>
+            <div id="proposal-team-members-container">
+                {% for member in existing_proposal_team_members %}
+                    <div class="card mb-4 p-3 team-member-entry">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">Colaborador {{ forloop.counter }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-team-member">Eliminar</button>
+                        </div>
+                        <!-- Person -->
+                        <div class="mb-3">
+                            <label>Persona *</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control person-search" placeholder="Buscar..." value="{% if member.person %}{{ member.person.first_name }} {{ member.person.first_last_name }}{% endif %}" disabled>
+                                <input type="hidden" name="proposal_team_member_person_id_{{ forloop.counter0 }}" value="{{ member.person_id }}">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label>Rol *</label>
+                            <input type="text" name="proposal_team_member_role_{{ forloop.counter0 }}" class="form-control" value="{{ member.role }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Institución</label>
+                            <select name="proposal_team_member_institution_{{ forloop.counter0 }}" class="form-select">
+                                <option value="">-- Ninguna --</option>
+                                {% for inst in institutions %}
+                                    <option value="{{ inst.id }}" {% if member.institution_id == inst.id %}selected{% endif %}>{{ inst.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>Fecha de Inicio</label>
+                                <input type="date" name="proposal_team_member_start_date_{{ forloop.counter0 }}" class="form-control" value="{{ member.start_date|date:'Y-m-d' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label>Fecha de Finalización</label>
+                                <input type="date" name="proposal_team_member_end_date_{{ forloop.counter0 }}" class="form-control" value="{{ member.end_date|date:'Y-m-d' }}">
+                            </div>
+                        </div>
+                        <!-- Antecedents -->
+                        <div class="mb-3">
+                            <label>Antecedentes Temáticos</label>
+                            <div class="antecedents-container">
+                                {% for antecedent in member.thematic_antecedents.all %}
+                                    <div class="antecedent-entry card mb-2 p-2">
+                                        <div class="d-flex justify-content-between">
+                                            <h6 class="fs-6 mb-2">Antecedente {{ forloop.counter }}</h6>
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-antecedent">Eliminar</button>
+                                        </div>
+                                        <!-- <div class="mb-2">
+                                            <label>Eje Temático</label>
+                                            <select name="proposal_team_member_antecedent_axis_{{ forloop.parentloop.counter0 }}" class="form-select">
+                                                {% for axis in thematic_axes %}
+                                                    <option value="{{ axis.id }}" {% if antecedent.thematic_axis_id == axis.id %}selected{% endif %}>{{ axis.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div> -->
+                                        <div class="mb-2">
+                                            <label>Descripción *</label>
+                                            <textarea name="proposal_team_member_antecedent_description_{{ forloop.parentloop.counter0 }}" class="form-control" rows="2" required>{{ antecedent.description }}</textarea>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label>URL de Evidencia</label>
+                                            <input type="url" name="proposal_team_member_antecedent_url_{{ forloop.parentloop.counter0 }}" class="form-control" value="{{ antecedent.evidence_url }}">
+                                        </div>
+                                    </div>
+                                {% empty %}
+                                    <p class="text-muted">No hay antecedentes.</p>
+                                {% endfor %}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary add-antecedent">+ Agregar Antecedente</button>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="alert alert-info">No hay colaboradores definidos.</div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-proposal-team-member-btn" class="btn btn-outline-primary">+ Agregar Colaborador</button>
+        </div>
+
+        <!-- COMMUNITY-BASED ORGANIZATIONS -->
+        <div class="mb-4">
+            <h5>Organizaciones Comunitarias (CBOs)</h5>
+            <p class="text-muted">Agregue organizaciones con sus roles y antecedentes.</p>
+            <div id="cbo-container">
+                {% for cbo in proposal.community_organizations.all %}
+                    <div class="card mb-4 p-3 cbo-entry">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">CBO {{ forloop.counter }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-cbo">Eliminar</button>
+                        </div>
+                        <div class="mb-3">
+                            <label>Nombre *</label>
+                            <input type="text" name="cbo_name_{{ forloop.counter0 }}" class="form-control" value="{{ cbo.name }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Descripción (trabajo previo, reconocimiento, etc.) *</label>
+                            <textarea name="cbo_description_{{ forloop.counter0 }}" class="form-control" rows="3" required>{{ cbo.description }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label>Número de Miembros *</label>
+                            <input type="number" name="cbo_number_of_members_{{ forloop.counter0 }}" class="form-control" value="{{ cbo.number_of_members }}" min="1" required>
+                        </div>
+                        <!-- Roles -->
+                        <div class="mb-3">
+                            <label>Roles Relevantes</label>
+                            <div class="roles-container">
+                                {% for role in cbo.roles.all %}
+                                    <div class="role-entry card mb-2 p-2">
+                                        <div class="d-flex justify-content-between">
+                                            <h6 class="fs-6 mb-2">Rol {{ forloop.counter }}</h6>
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-role">Eliminar</button>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label>Nombre de la Persona *</label>
+                                            <input type="text" name="cbo_role_person_name_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}" class="form-control" value="{{ role.person_name }}" required>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label>Rol</label>
+                                            <select name="cbo_role_predefined_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}" class="form-select">
+                                                <option value="">-- Rol personalizado --</option>
+                                                {% for key, val in role.PREDEFINED_ROLE_CHOICES %}
+                                                    <option value="{{ key }}" {% if role.predefined_role == key %}selected{% endif %}>{{ val }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <input type="text" name="cbo_role_custom_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}" class="form-control mt-1" placeholder="O ingrese un rol personalizado" value="{{ role.custom_role }}">
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label>Teléfono</label>
+                                                <input type="text" name="cbo_role_phone_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}" class="form-control" value="{{ role.contact_phone }}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label>Correo</label>
+                                                <input type="email" name="cbo_role_email_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}" class="form-control" value="{{ role.contact_email }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% empty %}
+                                    <p class="text-muted">No hay roles definidos.</p>
+                                {% endfor %}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary add-role">+ Agregar Rol</button>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="alert alert-info">No hay CBOs definidas.</div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-cbo-btn" class="btn btn-outline-primary">+ Agregar CBO</button>
+        </div>
+
         <!-- 9. Methodology, Analytical Plan & Ethics -->
         <div class="mb-3">
             <label class="form-label">Metodología, planeamiento analítico y aspectos éticos *</label>
@@ -396,20 +603,6 @@
             <button type="button" id="add-proposal-budget-btn" class="btn btn-outline-primary">+ Agregar Ítem</button>
         </div>
 
-        <!-- COMMUNITY-BASED ORGANIZATIONS -->
-        <div class="mb-3">
-            <label class="form-label">Organizaciones Comunitarias (CBO)</label>
-            <p class="text-muted">Seleccione las organizaciones que participan en este proyecto.</p>
-            <select name="cbo_ids" class="form-select" multiple>
-                {% for cbo in all_cbos %}
-                    <option value="{{ cbo.id }}" {% if cbo in proposal.community_organizations.all %}selected{% endif %}>
-                        {{ cbo.name }} ({{ cbo.number_of_members }} miembros)
-                    </option>
-                {% endfor %}
-            </select>
-            <small class="form-text text-muted">Puede seleccionar múltiples organizaciones.</small>
-        </div>
-
         <!-- Submit Buttons -->
         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
             <a href="{% url 'calls:researcher_dashboard' %}" class="btn btn-secondary me-md-2">Cancelar</a>
@@ -534,6 +727,496 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.textContent = 'Agregar';
         });
     }
+
+    // ============================
+    // SPECIFIC OBJECTIVES
+    // ============================
+    const addObjectiveBtn = document.getElementById('add-objective-btn');
+    const objectivesContainer = document.getElementById('specific-objectives-container');
+    let objectiveCount = {{ proposal.specific_objectives.count }};
+
+    if (addObjectiveBtn) {
+        addObjectiveBtn.addEventListener('click', () => {
+            const entry = createObjectiveEntry(objectiveCount);
+            objectivesContainer.appendChild(entry);
+            entry.querySelector('.remove-objective').addEventListener('click', () => {
+                entry.remove();
+                objectiveCount--;
+            });
+            objectiveCount++;
+        });
+    }
+
+    // Handle removal AND renumbering
+    objectivesContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-objective')) {
+            const entry = e.target.closest('.objective-entry');
+            if (entry) {
+                entry.remove();
+                renumberObjectives(); // Critical: renumber after removal
+            }
+        }
+    });
+
+    function renumberObjectives() {
+        const entries = document.querySelectorAll('.objective-entry');
+        entries.forEach((entry, newIndex) => {
+            // Update heading
+            const heading = entry.querySelector('h6');
+            if (heading) heading.textContent = `Objetivo ${newIndex + 1}`;
+            
+            // Update all name attributes to use newIndex
+            const inputs = entry.querySelectorAll('[name]');
+            inputs.forEach(input => {
+                input.name = input.name.replace(/objective_(title|description)_\d+/, 
+                    `objective_$1_${newIndex}`);
+            });
+        });
+    }
+
+
+    function createObjectiveEntry(index) {
+        const div = document.createElement('div');
+        div.className = 'card mb-3 p-3 objective-entry';
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">Objetivo ${index + 1}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-objective">Eliminar</button>
+            </div>
+            <div class="mb-3">
+                <label>Título *</label>
+                <input type="text" name="objective_title_${index}" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label>Descripción</label>
+                <textarea name="objective_description_${index}" class="form-control" rows="3"></textarea>
+            </div>
+        `;
+        return div;
+    }
+
+    // ============================
+    // PRODUCTS
+    // ============================
+    const addProductBtn = document.getElementById('add-proposal-product-btn');
+    const productsContainer = document.getElementById('proposal-products-container');
+    let productCount = parseInt(productsContainer.dataset.initialCount || '0', 10);
+
+    if (addProductBtn) {
+        addProductBtn.addEventListener('click', () => {
+            const entry = createProductEntry(productCount);
+            productsContainer.appendChild(entry);
+            entry.querySelector('.remove-product').addEventListener('click', () => {
+                entry.remove();
+                productCount--;
+            });
+            productCount++;
+        });
+    }
+
+    // Handle removal AND renumbering
+    productsContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-product')) {
+            const entry = e.target.closest('.product-entry');
+            if (entry) {
+                entry.remove();
+                renumberProducts(); // Critical: renumber after removal
+            }
+        }
+    });
+
+    function renumberProducts() {
+        document.querySelectorAll('.product-entry').forEach((entry, i) => {
+            entry.querySelector('h6').textContent = `Producto ${i + 1}`;
+            entry.querySelectorAll('[name]').forEach(input => {
+                input.name = input.name.replace(/proposal_product_\w+_\d+/, match => {
+                    return match.replace(/\d+$/, i);
+                });
+            });
+        });
+    }
+
+    function createProductEntry(index) {
+        const div = document.createElement('div');
+        div.className = 'card mb-3 p-3 product-entry';
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">Producto ${index + 1}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-product">Eliminar</button>
+            </div>
+            <div class="mb-3">
+                <label>Título *</label>
+                <input type="text" name="proposal_product_title_${index}" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label>Descripción</label>
+                <textarea name="proposal_product_description_${index}" class="form-control" rows="2"></textarea>
+            </div>
+            <div class="mb-3">
+                <label>Resultado o Impacto</label>
+                <textarea name="proposal_product_outcome_${index}" class="form-control" rows="2"></textarea>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label>Fecha de Inicio</label>
+                    <input type="date" name="proposal_product_start_date_${index}" class="form-control">
+                </div>
+                <div class="col-md-6">
+                    <label>Fecha de Finalización</label>
+                    <input type="date" name="proposal_product_end_date_${index}" class="form-control">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label>Efectos Estratégicos</label>
+                <select name="proposal_product_strategic_effects_${index}" class="form-select" multiple>
+                    {% for effect in strategic_effects %}
+                        <option value="{{ effect.id }}">{{ effect.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        `;
+        return div;
+    }
+
+    // ============================
+    // TEAM MEMBERS
+    // ============================
+    const addTeamBtn = document.getElementById('add-proposal-team-member-btn');
+    const teamContainer = document.getElementById('proposal-team-members-container');
+    let teamCount = {{ existing_proposal_team_members|length }};
+
+    if (addTeamBtn) {
+        addTeamBtn.addEventListener('click', () => {
+            const entry = createTeamMemberEntry(teamCount);
+            teamContainer.appendChild(entry);
+            entry.querySelector('.remove-team-member').addEventListener('click', () => {
+                entry.remove();
+                teamCount--;
+            });
+            teamCount++;
+        });
+    }
+
+    // Handle removal AND renumbering
+    teamContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-team-member')) {
+            const entry = e.target.closest('.team-member-entry');
+            if (entry) {
+                entry.remove();
+                renumberTeamMembers(); // Critical: renumber after removal
+            }
+        }
+    });
+
+    function renumberTeamMembers() {
+        document.querySelectorAll('.team-member-entry').forEach((entry, i) => {
+            entry.querySelector('h6').textContent = `Colaborador ${i + 1}`;
+            entry.querySelectorAll('[name]').forEach(input => {
+                input.name = input.name.replace(/proposal_team_member_\w+_\d+/, match => {
+                    return match.replace(/\d+$/, i);
+                });
+            });
+            // Also update antecedent names inside this member
+            entry.querySelectorAll('.antecedent-entry [name]').forEach(input => {
+                input.name = input.name.replace(/proposal_team_member_antecedent_\w+_\d+/, match => {
+                    return match.replace(/\d+$/, i);
+                });
+            });
+        });
+    }
+
+    function createTeamMemberEntry(index) {
+        const div = document.createElement('div');
+        div.className = 'card mb-4 p-3 team-member-entry';
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">Colaborador ${index + 1}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-team-member">Eliminar</button>
+            </div>
+            <div class="mb-3">
+                <label>Persona *</label>
+                <div class="input-group">
+                    <input type="text" class="form-control person-search" placeholder="Buscar persona..." required>
+                    <input type="hidden" name="proposal_team_member_person_id_${index}">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label>Rol *</label>
+                <input type="text" name="proposal_team_member_role_${index}" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label>Institución</label>
+                <select name="proposal_team_member_institution_${index}" class="form-select">
+                    <option value="">-- Ninguna --</option>
+                    {% for inst in institutions %}
+                        <option value="{{ inst.id }}">{{ inst.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label>Fecha de Inicio</label>
+                    <input type="date" name="proposal_team_member_start_date_${index}" class="form-control">
+                </div>
+                <div class="col-md-6">
+                    <label>Fecha de Finalización</label>
+                    <input type="date" name="proposal_team_member_end_date_${index}" class="form-control">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label>Antecedentes Temáticos</label>
+                <div class="antecedents-container"></div>
+                <button type="button" class="btn btn-sm btn-outline-secondary add-antecedent">+ Agregar Antecedente</button>
+            </div>
+        `;
+        return div;
+    }
+
+    teamContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('add-antecedent')) {
+            const container = e.target.closest('.team-member-entry').querySelector('.antecedents-container');
+            const idx = teamCount - 1;
+            const antecedentDiv = document.createElement('div');
+            antecedentDiv.className = 'antecedent-entry card mb-2 p-2';
+            antecedentDiv.innerHTML = `
+                <div class="d-flex justify-content-between">
+                    <h6 class="fs-6 mb-2">Antecedente</h6>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-antecedent">Eliminar</button>
+                </div>
+                <div class="mb-2">
+                    <label>Eje Temático</label>
+                    <select name="proposal_team_member_antecedent_axis_${idx}" class="form-select">
+                        {% for axis in thematic_axes %}
+                            <option value="{{ axis.id }}">{{ axis.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label>Descripción *</label>
+                    <textarea name="proposal_team_member_antecedent_description_${idx}" class="form-control" rows="2" required></textarea>
+                </div>
+                <div class="mb-2">
+                    <label>URL de Evidencia</label>
+                    <input type="url" name="proposal_team_member_antecedent_url_${idx}" class="form-control">
+                </div>
+            `;
+            container.appendChild(antecedentDiv);
+        } else if (e.target.classList.contains('remove-antecedent')) {
+            e.target.closest('.antecedent-entry').remove();
+        }
+    });
+
+    // ============================
+    // BUDGET ITEMS
+    // ============================
+    const addBudgetBtn = document.getElementById('add-proposal-budget-btn');
+    const budgetContainer = document.getElementById('proposal-budget-container');
+    let budgetCount = {{ existing_proposal_budget_items|length }};
+
+    if (addBudgetBtn) {
+        addBudgetBtn.addEventListener('click', () => {
+            const entry = createBudgetItemEntry(budgetCount);
+            budgetContainer.appendChild(entry);
+            entry.querySelector('.remove-budget-item').addEventListener('click', () => {
+                entry.remove();
+                budgetCount--;
+            });
+            budgetCount++;
+        });
+    }
+
+    // Handle removal AND renumbering
+    budgetContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-budget-item')) {
+            const entry = e.target.closest('.budget-item');
+            if (entry) {
+                entry.remove();
+                renumberBudgetItems(); // Critical: renumber after removal
+            }
+        }
+    });
+
+    function renumberBudgetItems() {
+        document.querySelectorAll('.budget-item').forEach((entry, i) => {
+            entry.querySelector('h6').textContent = `Ítem ${i + 1}`;
+            entry.querySelectorAll('[name]').forEach(input => {
+                input.name = input.name.replace(/proposal_budget_\w+_\d+/, match => {
+                    return match.replace(/\d+$/, i);
+                });
+            });
+        });
+    }
+
+    function createBudgetItemEntry(index) {
+        const div = document.createElement('div');
+        div.className = 'card mb-3 p-3 budget-item';
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fs-6 mb-0">Ítem ${index + 1}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-budget-item">Eliminar</button>
+            </div>
+            <div class="row mb-2">
+                <div class="col-md-4">
+                    <label>Categoría</label>
+                    <select name="proposal_budget_category_${index}" class="form-select" required>
+                        {% for cat in budget_categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label>Periodo</label>
+                    <select name="proposal_budget_period_${index}" class="form-select" required>
+                        {% for period in budget_periods %}
+                            <option value="{{ period.id }}">{{ period.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label>Monto (COP)</label>
+                    <input type="number"
+                        name="proposal_budget_amount_${index}"
+                        class="form-control"
+                        step="0.01"
+                        min="0"
+                        required>
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="button" class="btn btn-outline-danger w-100 remove-budget-item">✕</button>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label>Notas</label>
+                <textarea name="proposal_budget_notes_${index}" class="form-control" rows="1"></textarea>
+            </div>
+        `;
+        return div;
+    }
+
+    // ============================
+    // CBOs
+    // ============================
+    const addCboBtn = document.getElementById('add-cbo-btn');
+    const cboContainer = document.getElementById('cbo-container');
+    let cboCount = {{ proposal.community_organizations.count }};
+
+    if (addCboBtn) {
+        addCboBtn.addEventListener('click', () => {
+            const entry = createCboEntry(cboCount);
+            cboContainer.appendChild(entry);
+            entry.querySelector('.remove-cbo').addEventListener('click', () => {
+                entry.remove();
+                cboCount--;
+            });
+            cboCount++;
+        });
+    }
+
+    // Handle removal AND renumbering
+    cboContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-cbo')) {
+            const entry = e.target.closest('.cbo-entry');
+            if (entry) {
+                entry.remove();
+                renumberCBOs(); // Critical: renumber after removal
+            }
+        }
+    });
+
+    function renumberCBOs() {
+        document.querySelectorAll('.cbo-entry').forEach((entry, i) => {
+            entry.querySelector('h6').textContent = `CBO ${i + 1}`;
+            entry.querySelectorAll('[name]').forEach(input => {
+                // Replace top-level CBO fields
+                if (input.name.startsWith('cbo_') && !input.name.includes('role')) {
+                    input.name = input.name.replace(/cbo_\w+_\d+/, match => {
+                        return match.replace(/\d+$/, i);
+                    });
+                }
+            });
+            // Renumber roles inside this CBO
+            entry.querySelectorAll('.role-entry').forEach((roleEntry, j) => {
+                roleEntry.querySelectorAll('[name]').forEach(input => {
+                    if (input.name.includes('role')) {
+                        input.name = input.name.replace(/cbo_role_\w+_\d+_\d+/, 
+                            `cbo_role_${input.name.split('_')[2]}_${i}_${j}`);
+                    }
+                });
+            });
+        });
+    }
+
+    function createCboEntry(index) {
+        const div = document.createElement('div');
+        div.className = 'card mb-4 p-3 cbo-entry';
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">CBO ${index + 1}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-cbo">Eliminar</button>
+            </div>
+            <div class="mb-3">
+                <label>Nombre *</label>
+                <input type="text" name="cbo_name_${index}" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label>Descripción (trabajo previo, reconocimiento, etc.) *</label>
+                <textarea name="cbo_description_${index}" class="form-control" rows="3" required></textarea>
+            </div>
+            <div class="mb-3">
+                <label>Número de Miembros *</label>
+                <input type="number" name="cbo_number_of_members_${index}" class="form-control" min="1" required>
+            </div>
+            <div class="mb-3">
+                <label>Roles Relevantes</label>
+                <div class="roles-container"></div>
+                <button type="button" class="btn btn-sm btn-outline-secondary add-role">+ Agregar Rol</button>
+            </div>
+        `;
+        return div;
+    }
+
+    cboContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('add-role')) {
+            const container = e.target.closest('.cbo-entry').querySelector('.roles-container');
+            const cboIdx = cboCount - 1;
+            const roleIdx = container.children.length;
+            const roleDiv = document.createElement('div');
+            roleDiv.className = 'role-entry card mb-2 p-2';
+            roleDiv.innerHTML = `
+                <div class="d-flex justify-content-between">
+                    <h6 class="fs-6 mb-2">Rol</h6>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-role">Eliminar</button>
+                </div>
+                <div class="mb-2">
+                    <label>Nombre de la Persona *</label>
+                    <input type="text" name="cbo_role_person_name_${cboIdx}_${roleIdx}" class="form-control" required>
+                </div>
+                <div class="mb-2">
+                    <label>Rol</label>
+                    <select name="cbo_role_predefined_${cboIdx}_${roleIdx}" class="form-select">
+                        <option value="">-- Rol personalizado --</option>
+                        {% for key, val in cbo_role_choices %}
+                            <option value="{{ key }}">{{ val }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="cbo_role_custom_${cboIdx}_${roleIdx}" class="form-control mt-1" placeholder="O ingrese un rol personalizado">
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label>Teléfono</label>
+                        <input type="text" name="cbo_role_phone_${cboIdx}_${roleIdx}" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label>Correo</label>
+                        <input type="email" name="cbo_role_email_${cboIdx}_${roleIdx}" class="form-control">
+                    </div>
+                </div>
+            `;
+            container.appendChild(roleDiv);
+        } else if (e.target.classList.contains('remove-role')) {
+            e.target.closest('.role-entry').remove();
+        }
+    });
 
     // -------------------------------
     // COMMITMENT DOCUMENTS
