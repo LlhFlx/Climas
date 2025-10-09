@@ -282,7 +282,8 @@
             <h5>Productos Esperados</h5>
             <p class="text-muted">Defina los productos derivados de esta propuesta.</p>
             <div id="proposal-products-container"
-                data-initial-count="{{ existing_proposal_products|length }}">
+                data-initial-count="{{ existing_proposal_products|length }}"
+                data-strategic-effects='{{ strategic_effects_json|safe }}'>
                 {% for prod in existing_proposal_products %}
                     <div class="card mb-3 p-3 product-entry">
                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -313,7 +314,9 @@
                         </div>
                         <div class="mb-3">
                             <label>Efectos Estratégicos</label>
-                            <select name="proposal_product_strategic_effects_{{ forloop.counter0 }}" class="form-select" multiple>
+                            <select name="proposal_product_strategic_effects_{{ forloop.counter0 }}" 
+                                class="form-select product-strategic-effects"    
+                                multiple>
                                 {% for effect in strategic_effects %}
                                     <option value="{{ effect.id }}" {% if effect in prod.strategic_effects.all %}selected{% endif %}>
                                         {{ effect.name }}
@@ -913,140 +916,160 @@ document.addEventListener('DOMContentLoaded', function() {
     // PRODUCTS
     // ============================
     const thematicAxisSelect = document.querySelector('select[name="thematic_axis_override"]');
-    const addProductBtn = document.getElementById('add-proposal-product-btn');
     const productsContainer = document.getElementById('proposal-products-container');
-    let productCount = parseInt(productsContainer.dataset.initialCount || '0', 10);
+    const addProductBtn = document.getElementById('add-proposal-product-btn');
 
-    // Load strategic effects as JSON (from template)
-    const strategicEffectsScript = document.getElementById('strategic-effects-data');
-    const strategicEffectsData = strategicEffectsScript ? JSON.parse(strategicEffectsScript.textContent) : [];
+    if (thematicAxisSelect && productsContainer && addProductBtn) {
+        // Get strategic effects data
+        let allStrategicEffects = [];
+        try {
+            const data = productsContainer.getAttribute('data-strategic-effects') || '[]';
+            allStrategicEffects = JSON.parse(data);
+            console.log("Strategic Effects loaded:", allStrategicEffects);
+        } catch (e) {
+            console.error('Failed to parse strategic effects:', e);
+        }
 
+        // Update Product Strategic Effects dropdowns based on selected Thematic Axis
+        function updateProductStrategicEffects() {
+            console.log("updateProductStrategicEffects() called");
+            const selectedAxisId = thematicAxisSelect.value;
+            const productDropdowns = document.querySelectorAll('.product-strategic-effects');
+            console.log(productDropdowns)
+            productDropdowns.forEach(dropdown => {
+                // Save current selections before clearing
+                const selectedValues = Array.from(dropdown.selectedOptions).map(opt => opt.value);
 
-    // Update all product strategic effects dropdowns based on selected axis
-    function updateProductStrategicEffects() {
-        const selectedAxisId = thematicAxisSelect ? thematicAxisSelect.value : null;
-        const productDropdowns = document.querySelectorAll('.product-strategic-effects');
+                // Clear dropdown
+                dropdown.innerHTML = '';
+                
+                if (!selectedAxisId) {
+                    dropdown.innerHTML = '<option value="">-- Seleccionar Eje Temático primero --</option>';
+                    return;
+                }
 
-        productDropdowns.forEach(dropdown => {
-            // Save current selections
-            const selectedValues = Array.from(dropdown.selectedOptions).map(opt => opt.value);
+                console.log("Selected Axis ID:", selectedAxisId);
+                console.log("All Strategic Effects:");
 
-            // Clear dropdown
-            dropdown.innerHTML = '';
-
-            if (!selectedAxisId) {
-                dropdown.innerHTML = '<option value="">-- Seleccionar Eje Temático primero --</option>';
-                return;
-            }
-
-            // Filter effects by axis
-            const filteredEffects = strategicEffectsData.filter(effect =>
-                effect.thematic_axis_id == selectedAxisId
-            );
-
-            if (filteredEffects.length > 0) {
-                filteredEffects.forEach(effect => {
-                    const option = document.createElement('option');
-                    option.value = effect.id;
-                    option.textContent = effect.name;
-                    if (selectedValues.includes(String(effect.id))) {
-                        option.selected = true;
-                    }
-                    dropdown.appendChild(option);
+                allStrategicEffects.forEach((effect, index) => {
+                    console.log(`Effect #${index + 1}:`, effect);
+                    console.log("  - effect.thematic_axis_id:", effect.thematic_axis_id);
+                    console.log("  - Matches selectedAxisId?", parseInt(effect.thematic_axis_id, 10) === parseInt(selectedAxisId, 10));
                 });
-            } else {
-                dropdown.innerHTML = '<option value="">No hay efectos para este eje</option>';
-            }
-        });
-    }
+                                
+                const filteredEffects = allStrategicEffects.filter(effect => 
+                    parseInt(effect.thematic_axis_id, 10) === parseInt(selectedAxisId, 10)
+                );
 
-    // Initialize if axis is pre-selected
-    if (thematicAxisSelect && thematicAxisSelect.value) {
-        updateProductStrategicEffects();
-    }
+                if (filteredEffects.length > 0) {
+                    filteredEffects.forEach(effect => {
+                        const option = document.createElement('option');
+                        option.value = effect.id;
+                        option.textContent = effect.name;
+                        if (selectedValues.includes(String(effect.id))) {
+                            option.selected = true;
+                        }
+                        dropdown.appendChild(option);
+                    });
+                } else {
+                    dropdown.innerHTML = '<option value="">No hay efectos para este eje</option>';
+                }
+            });
+        }
 
-    // Rebind on axis change
-    if (thematicAxisSelect) {
+        // Initialize on page load
+        if (thematicAxisSelect.value) {
+            updateProductStrategicEffects();
+        }
+
+        // Rebind on change
         thematicAxisSelect.addEventListener('change', updateProductStrategicEffects);
-    }
 
-    if (addProductBtn) {
+        // Product Management
+        let productCount = parseInt(productsContainer.getAttribute('data-initial-count'), 10) || 0;
+
+        function createProductEntry(index) {
+            const div = document.createElement('div');
+            div.className = 'card mb-3 p-3 product-entry';
+            div.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Producto ${index + 1}</h6>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-product">Eliminar</button>
+                </div>
+                <input type="hidden" name="proposal_product_index_${index}" value="${index}">
+                <div class="mb-3">
+                    <label class="form-label">Título *</label>
+                    <input type="text" name="proposal_product_title_${index}" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Descripción</label>
+                    <textarea name="proposal_product_description_${index}" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Resultado o Impacto</label>
+                    <textarea name="proposal_product_outcome_${index}" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Fecha de Inicio</label>
+                        <input type="date" name="proposal_product_start_date_${index}" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Fecha de Finalización</label>
+                        <input type="date" name="proposal_product_end_date_${index}" class="form-control">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Efectos Estratégicos</label>
+                    <select name="proposal_product_strategic_effects_${index}" class="form-select product-strategic-effects" multiple></select>
+                    <small class="text-muted">Mantenga presionado Ctrl (o Cmd en Mac) para seleccionar múltiples.</small>
+                </div>
+            `;
+            productsContainer.appendChild(div);
+            updateProductStrategicEffects(); // Populate dropdown immediately
+            return div;
+        }
+
+        // Add new product
         addProductBtn.addEventListener('click', () => {
             const entry = createProductEntry(productCount);
-            //productsContainer.appendChild(entry);
+            productCount++;
             entry.querySelector('.remove-product').addEventListener('click', () => {
                 entry.remove();
-                productCount--;
-            });
-            productCount++;
-        });
-    }
-
-    // Handle removal AND renumbering
-    productsContainer?.addEventListener('click', (e) => {
-        if (e.target.classList.contains('remove-product')) {
-            const entry = e.target.closest('.product-entry');
-            if (entry) {
-                entry.remove();
                 renumberProducts();
-            }
-        }
-    });
+            });
+        });
 
-    function renumberProducts() {
-        document.querySelectorAll('.product-entry').forEach((entry, i) => {
-            entry.querySelector('h6').textContent = `Producto ${i + 1}`;
-            entry.querySelectorAll('[name]').forEach(input => {
-                input.name = input.name.replace(/proposal_product_\w+_\d+/, match => {
-                    return match.replace(/\d+$/, i);
+        // Handle removal via event delegation
+        productsContainer?.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-product')) {
+                const entry = e.target.closest('.product-entry');
+                if (entry) {
+                    entry.remove();
+                    renumberProducts();
+                }
+            }
+        });
+
+        // Renumber products after removal
+        function renumberProducts() {
+            document.querySelectorAll('.product-entry').forEach((entry, i) => {
+                // Update heading
+                const heading = entry.querySelector('h6');
+                if (heading) heading.textContent = `Producto ${i + 1}`;
+
+                // Update all name attributes
+                entry.querySelectorAll('[name]').forEach(input => {
+                    input.name = input.name.replace(/proposal_product_\w+_\d+/, match => {
+                        return match.replace(/\d+$/, i);
+                    });
                 });
             });
-        });
-        updateProductStrategicEffects();
-    }
+            // After renumbering, re-update strategic effects dropdowns
+            updateProductStrategicEffects();
+        }
 
-    function createProductEntry(index) {
-        const div = document.createElement('div');
-        div.className = 'card mb-3 p-3 product-entry';
-        div.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6 class="mb-0">Producto ${index + 1}</h6>
-                <button type="button" class="btn btn-sm btn-outline-danger remove-product">Eliminar</button>
-            </div>
-            <div class="mb-3">
-                <label>Título *</label>
-                <input type="text" name="proposal_product_title_${index}" class="form-control" required>
-            </div>
-            <div class="mb-3">
-                <label>Descripción</label>
-                <textarea name="proposal_product_description_${index}" class="form-control" rows="2"></textarea>
-            </div>
-            <div class="mb-3">
-                <label>Resultado o Impacto</label>
-                <textarea name="proposal_product_outcome_${index}" class="form-control" rows="2"></textarea>
-            </div>
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <label>Fecha de Inicio</label>
-                    <input type="date" name="proposal_product_start_date_${index}" class="form-control">
-                </div>
-                <div class="col-md-6">
-                    <label>Fecha de Finalización</label>
-                    <input type="date" name="proposal_product_end_date_${index}" class="form-control">
-                </div>
-            </div>
-            <div class="mb-3">
-                <label>Efectos Estratégicos</label>
-                <select name="proposal_product_strategic_effects_${index}" class="form-select" multiple>
-                    {% for effect in strategic_effects %}
-                        <option value="{{ effect.id }}">{{ effect.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-        `;
-        productsContainer.appendChild(div);
-        updateProductStrategicEffects();
-        return div;
+        console.log("Products initialized.");
     }
 
     // ============================
