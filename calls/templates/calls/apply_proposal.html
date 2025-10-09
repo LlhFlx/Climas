@@ -143,6 +143,10 @@
                 >
                 <button type="button" class="btn btn-outline-primary add-institution" disabled>Agregar</button>
             </div>
+            <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=primary_institution_id"
+            target="_blank"
+            class="btn btn-outline-primary mt-2">+ Crear</a>
+            <small class="form-text text-muted">Seleccione o cree una nueva.</small>
 
             <!-- Selected Institutions List -->
             <div id="partner-institutions-list" class="mb-3">
