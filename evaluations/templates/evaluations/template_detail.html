@@ -592,7 +592,7 @@ document.getElementById('itemForm').addEventListener('submit', function(e) {
 });
 
 // ============================
-// 8. EDIT ITEM FUNCTION (UNCHANGED — THIS IS THE CORE!)
+// 8. EDIT ITEM FUNCTION (UNCHANGED - THIS IS THE CORE!)
 // ============================
 function editItem(itemId, question) {
     const url = `{% url "evaluations:get_template_item" 0 %}`.replace('0', itemId);

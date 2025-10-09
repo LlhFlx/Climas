@@ -27,7 +27,7 @@
                             <td>{{ e.target.user.person|default:e.target.user.username }}</td>
                             <td>{{ e.evaluator.person|default:e.evaluator.user.username }}</td>
                             <td>{{ e.template.name }}</td>
-                            <td>{{ e.total_score|default:"—" }}</td>
+                            <td>{{ e.total_score|default:"-" }}</td>
                             <!-- ✅ STATUS COLUMN: Use 'e', not 'evaluation' -->
                             <td>
                                 {% if e.is_validated %}

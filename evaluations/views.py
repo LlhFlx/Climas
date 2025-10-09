@@ -943,7 +943,7 @@ def evaluation_detail_json(request, evaluation_id):
         return JsonResponse({'success': False, 'error': 'Acceso denegado.'}, status=403)
 
     # Resolve target (Expression or Proposal)
-    target = evaluation.target  # Uses GenericForeignKey — safe
+    target = evaluation.target  # Uses GenericForeignKey - safe
 
     # Safety fallbacks for missing related objects
     def safe_str(obj, field):
@@ -973,7 +973,7 @@ def evaluation_detail_json(request, evaluation_id):
 
         'submission_datetime': (
             evaluation.submission_datetime.strftime('%d/%m/%Y %H:%M')
-            if evaluation.submission_datetime else '—'
+            if evaluation.submission_datetime else '-'
         ),
 
         'target_type': evaluation.target_content_type.model,

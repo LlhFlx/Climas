@@ -13,8 +13,8 @@ from django.http import HttpResponse
 
 
 # def register_view(request):
-#     print("\n\nDEBUG: MINIMAL VIEW IS WORKING — URL AND SERVER ARE FINE")
-#     return HttpResponse("HELLO FROM REGISTER VIEW — URL ROUTING IS WORKING!")
+#     print("\n\nDEBUG: MINIMAL VIEW IS WORKING - URL AND SERVER ARE FINE")
+#     return HttpResponse("HELLO FROM REGISTER VIEW - URL ROUTING IS WORKING!")
 
 
 def register_view(request):

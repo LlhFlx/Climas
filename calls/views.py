@@ -1855,11 +1855,15 @@ def apply_proposal(request, expression_id):
     existing_budget_items = ProposalBudgetItem.objects.filter(proposal=proposal).select_related('category', 'period')
 
     commitment_docs = proposal.proposal_documents.filter(document_type='commitment')
+    print("commitment_docs is", commitment_docs)
+    for doc in commitment_docs:
+        print(doc, doc.linked_institution)
     partner_institutions = proposal.partner_institutions.all()
     docs_by_institution = defaultdict(list)
     for doc in commitment_docs:
         if doc.linked_institution:
             docs_by_institution[doc.linked_institution].append(doc)
+    docs_by_institution = dict(docs_by_institution)
 
     timeline_doc = proposal.timeline_document
     budget_doc = proposal.budget_document
@@ -2423,8 +2427,7 @@ def upload_commitment_document(request):
                 'success': False,
                 'error': 'Institución no asignada a esta propuesta.'
             })
-
-        # Create the document — linked ONLY to the proposal
+        # Create the document - linked ONLY to the proposal
         doc = ProposalDocument.objects.create(
             proposal=proposal,
             file=file,

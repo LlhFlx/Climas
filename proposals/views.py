@@ -13,6 +13,7 @@ def download_proposal_document(request, doc_id):
     """
     Securely serve proposal documents only to authorized users.
     """
+    print("Got id", doc_id)
     try:
         doc = ProposalDocument.objects.select_related('proposal', 'uploaded_by').get(
             id=doc_id,

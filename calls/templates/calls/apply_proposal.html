@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load widget_tweaks %}
+{% load dict_extras %}
 {% block title %}Enviar Propuesta Formal - {{ call.title }} - Climas{% endblock %}
 {% block content %}
 <div class="container" style="max-width: 800px; margin: 3rem auto;">
@@ -153,7 +154,7 @@
                 {% endfor %}
             </div>
 
-            <!-- Commitment Letters Section — dynamically populated per institution -->
+            <!-- Commitment Letters Section -->
             <div id="commitment-documents-container">
                 {% for inst in proposal.partner_institutions.all %}
                     <div class="card mb-3 p-3 commitment-doc-section" data-institution-id="{{ inst.id }}">
@@ -162,44 +163,26 @@
                             <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-section" data-institution-id="{{ inst.id }}">Eliminar</button>
                         </div>
 
-                        <!-- Show ALL commitment documents linked to THIS proposal AND associated with THIS institution -->
-                        {% for doc in proposal.partner_institution_commitments.all %}
-                            {% if doc.document_type == 'commitment' %}
-                                <!-- Only show if this doc's proposal has this institution -->
-                                {% if inst in doc.proposal.partner_institutions.all %}
-                                    <div class="d-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded">
-                                        <span class="flex-grow-1">{{ doc.name }}</span>
-                                        <a href="{% url 'proposals:download_proposal_document' doc.id %}" target="_blank" class="btn btn-sm btn-outline-secondary me-2">Ver</a>
-                                        <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-doc" data-doc-id="{{ doc.id }}">Borrar</button>
-                                    </div>
+                        <!-- Show ONLY docs linked to this institution -->
+                        {% if docs_by_institution %}
+                            {% with docs=docs_by_institution|get_item:inst %}
+                                {% if docs %}
+                                    {% for doc in docs %}
+                                        <div class="d-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded">
+                                            <span class="flex-grow-1">{{ doc.name }}</span>
+                                            <a href="{% url 'proposals:download_proposal_document' doc.id %}"
+                                            target="_blank"
+                                            class="btn btn-sm btn-outline-secondary me-2">Ver</a>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger remove-commitment-doc"
+                                                    data-doc-id="{{ doc.id }}">Borrar</button>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-muted small">No hay cartas cargadas.</p>
                                 {% endif %}
-                            {% endif %}
-                        {% endfor %}
-
-                        {% for inst, docs in docs_by_institution.items %}
-                            <h4 class="mt-4">{{ inst.name }}</h4>
-                            {% if docs %}
-                                {% for doc in docs %}
-                                    <div class="d-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded">
-                                        <span class="flex-grow-1">{{ doc.name }}</span>
-                                        <a href="{% url 'proposals:download_proposal_document' doc.id %}"
-                                        target="_blank"
-                                        class="btn btn-sm btn-outline-secondary me-2">
-                                            Ver
-                                        </a>
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-danger remove-commitment-doc"
-                                                data-doc-id="{{ doc.id }}">
-                                            Borrar
-                                        </button>
-                                    </div>
-                                {% endfor %}
-                            {% else %}
-                                <p class="text-muted small">No hay documentos de compromiso asociados a esta institución.</p>
-                            {% endif %}
-                        {% endfor %}
-
-
+                            {% endwith %}
+                        {% endif %}
 
                         <!-- Upload form for this institution -->
                         <div class="input-group mb-2">
@@ -1580,7 +1563,7 @@ document.addEventListener('DOMContentLoaded', function() {
         formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
 
         try {
-            const response = await fetch('', { method: 'POST', body: formData });
+            const response = await fetch('{% url "calls:upload_commitment_document" %}', { method: 'POST', body: formData });
             const data = await response.json();
 
             if (data.success) {
