@@ -347,7 +347,7 @@
                         <div class="mb-3">
                             <label>Persona *</label>
                             <div class="input-group">
-                                <input type="text" class="form-control person-search" placeholder="Buscar..." value="{% if member.person %}{{ member.person.first_name }} {{ member.person.first_last_name }}{% endif %}" disabled>
+                                <input type="text" class="form-control person-search" placeholder="Buscar..." value="{% if member.person %}{{ member.person.first_name }} {{ member.person.first_last_name }}{% endif %}">
                                 <input type="hidden" name="proposal_team_member_person_id_{{ forloop.counter0 }}" value="{{ member.person_id }}">
                             </div>
                         </div>
@@ -625,6 +625,7 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ people_json|json_script:"people-json" }}
 {{ institutions|json_script:"institutions-json" }}
 {{ strategic_effects_json|json_script:"strategic-effects-data" }}
 <script>
@@ -1200,6 +1201,89 @@ document.addEventListener('DOMContentLoaded', function() {
             container.appendChild(antecedentDiv);
         } else if (e.target.classList.contains('remove-antecedent')) {
             e.target.closest('.antecedent-entry').remove();
+        }
+    });
+    // ============================
+    // PERSON SEARCH AUTOCOMPLETE
+    // ============================
+
+    const peopleScript = document.getElementById('people-json');
+    const peopleList = JSON.parse(peopleScript.textContent);
+
+    function setupPersonSearch(input) {
+        const container = input.closest('.mb-3') || input.parentElement;
+        let hiddenInput = container.querySelector('input[type="hidden"]');
+
+        if (!hiddenInput) {
+            console.warn("No hidden ID input found for:", input);
+            return;
+        }
+
+        // Clear old suggestions on focus
+        input.addEventListener('focus', function () {
+            const existing = container.querySelector('.suggestions-list');
+            if (existing) existing.remove();
+        });
+
+        input.addEventListener('input', function () {
+            const query = this.value.trim().toLowerCase();
+            if (!query || query.length < 1) return;
+
+            const results = peopleList.filter(p =>
+                `${p.first_name} ${p.first_last_name}`
+                    .toLowerCase()
+                    .includes(query)
+            );
+
+            // Remove previous suggestions
+            let suggestions = container.querySelector('.suggestions-list');
+            if (suggestions) suggestions.remove();
+
+            suggestions = document.createElement('ul');
+            suggestions.className = 'suggestions-list list-group position-absolute w-100 mt-1 shadow-sm';
+            suggestions.style.zIndex = '1000';
+            suggestions.style.maxHeight = '200px';
+            suggestions.style.overflowY = 'auto';
+
+            results.forEach(person => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item cursor-pointer';
+                li.dataset.id = person.id;
+                li.textContent = `${person.first_name} ${person.first_last_name}`;
+                li.addEventListener('click', () => {
+                    input.value = li.textContent;
+                    hiddenInput.value = person.id;
+                    suggestions.remove();
+                });
+                suggestions.appendChild(li);
+            });
+
+            container.appendChild(suggestions);
+        });
+
+        // Hide on blur
+        input.addEventListener('blur', () => {
+            setTimeout(() => {
+                const suggestions = container.querySelector('.suggestions-list');
+                if (suggestions) suggestions.remove();
+            }, 200);
+        });
+
+        // Clear if invalid
+        input.addEventListener('change', () => {
+            if (input.value && !hiddenInput.value) {
+                input.value = '';
+            }
+        });
+    }
+
+    // Attach to existing elements
+    document.querySelectorAll('.person-search').forEach(setupPersonSearch);
+
+    // Delegate to future inputs
+    document.getElementById('proposal-team-members-container')?.addEventListener('focusin', function(e) {
+        if (e.target.classList.contains('person-search')) {
+            setupPersonSearch(e.target);
         }
     });
 

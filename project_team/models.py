@@ -34,8 +34,8 @@ class BaseProjectTeamMember(TimestampMixin, models.Model):
         null=True,  # Allow null until selected/created
         blank=True,
     )
-    start_date = models.DateField(verbose_name="Fecha de Inicio")
-    end_date = models.DateField(verbose_name="Fecha de Finalización")
+    start_date = models.DateField(verbose_name="Fecha de Inicio", blank=True, null=True)
+    end_date = models.DateField(verbose_name="Fecha de Finalización", blank=True, null=True)
 
     class Meta:
         abstract = True
@@ -147,7 +147,9 @@ class ProposalInvestigatorThematicAntecedent(BaseInvestigatorThematicAntecedent)
     thematic_axis = models.ForeignKey(
         'thematic_axes.ThematicAxis',
         on_delete=models.PROTECT,
-        verbose_name="Eje Temático"
+        verbose_name="Eje Temático",
+        null=True,
+        blank=True
     )
 
     class Meta:

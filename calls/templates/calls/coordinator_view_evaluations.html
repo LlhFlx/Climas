@@ -28,16 +28,16 @@
                             <td>{{ e.evaluator.person|default:e.evaluator.user.username }}</td>
                             <td>{{ e.template.name }}</td>
                             <td>{{ e.total_score|default:"-" }}</td>
-                            <!-- ✅ STATUS COLUMN: Use 'e', not 'evaluation' -->
+                            <!--  STATUS COLUMN: Use 'e', not 'evaluation' -->
                             <td>
                                 {% if e.is_validated %}
                                     {% if e.coordinator_notes %}
                                         <span class="badge bg-primary">Validada</span>
                                     {% else %}
-                                        <span class="badge bg-success">✅ Validada</span>
+                                        <span class="badge bg-success"> Validada</span>
                                     {% endif %}
                                 {% elif e.target.status.name == 'Aprobada' or e.target.status.name == 'Aprobada para Financiamiento' %}
-                                    <span class="badge bg-info">✅ Aprobada</span>
+                                    <span class="badge bg-info"> Aprobada</span>
                                 {% else %}
                                     {% comment %} Check if auto-approved: 3 evaluations, all positive {% endcomment %}
                                     {% with target_evaluations=e.target.evaluation_set.all %}
@@ -45,7 +45,7 @@
                                             <span class="badge bg-warning">🔁 Autoaprobada</span>
                                         {% else %}
                                             {% if e.is_positive %}
-                                                <span class="badge bg-success">✅ Positiva</span>
+                                                <span class="badge bg-success"> Positiva</span>
                                             {% else %}
                                                 <span class="badge bg-danger">❌ Negativa</span>
                                             {% endif %}

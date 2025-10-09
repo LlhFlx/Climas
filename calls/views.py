@@ -1839,6 +1839,7 @@ def apply_proposal(request, expression_id):
         .order_by('name')
         .values('id', 'name')
     )   
+    people = Person.objects.filter(created_by__isnull=False).order_by('first_name', 'first_last_name')
 
     thematic_axes = ThematicAxis.objects.filter(is_active=True)
     strategic_effects = StrategicEffect.objects.filter(is_active=True).order_by('name')
@@ -2142,8 +2143,8 @@ def apply_proposal(request, expression_id):
                         role=role,
                         institution_id=inst_id,
                         status_id=request.POST.get(f'proposal_team_member_status_{idx}'),
-                        start_date=request.POST.get(f'proposal_team_member_start_date_{idx}'),
-                        end_date=request.POST.get(f'proposal_team_member_end_date_{idx}'),
+                        # start_date=request.POST.get(f'proposal_team_member_start_date_{idx}'),
+                        # end_date=request.POST.get(f'proposal_team_member_end_date_{idx}'),
                     )
 
                     # Save antecedents
@@ -2156,12 +2157,13 @@ def apply_proposal(request, expression_id):
                         if not description:
                             continue
                             
-                        ProposalInvestigatorThematicAntecedent.objects.create(
+                        antecedent = ProposalInvestigatorThematicAntecedent.objects.create(
                             team_member=member,
                             thematic_axis_id=axis_ids[i] if i < len(axis_ids) and axis_ids[i] else None,
                             description=description,
                             evidence_url=urls[i].strip() if i < len(urls) else ''
                         )
+                        print(antecedent.team_member)
                 except Exception as e:
                     messages.warning(request, f"Error al guardar colaborador: {str(e)}")
             else:
@@ -2292,6 +2294,14 @@ def apply_proposal(request, expression_id):
                     }
                     for effect in strategic_effects
                 ], cls=DjangoJSONEncoder),
+                'people_json': [
+                            {
+                                'id': person.id,
+                                'first_name': person.first_name,
+                                'first_last_name': person.first_last_name
+                            }
+                            for person in people
+                        ],
                 'budget_categories': budget_categories,
                 'budget_periods': budget_periods,
                 'all_cbos': all_cbos,
@@ -2357,6 +2367,14 @@ def apply_proposal(request, expression_id):
                     }
                     for effect in strategic_effects
                 ], cls=DjangoJSONEncoder),
+        'people_json': [
+                            {
+                                'id': person.id,
+                                'first_name': person.first_name,
+                                'first_last_name': person.first_last_name
+                            }
+                            for person in people
+                        ],
         'budget_categories': budget_categories,
         'budget_periods': budget_periods,
         'all_cbos': all_cbos,
