@@ -83,9 +83,8 @@ def coordinator_dashboard(request):
         status__name='Enviada'
     ).select_related('user', 'call', 'scale', 'status').order_by('-submission_datetime')
 
-    
-    proposals = Proposal.objects.filter(
-        status__name='Aprobada'
+    submitted_proposals = Proposal.objects.filter(
+        proposal_status__name='Enviada'
     ).select_related(
         'expression_ptr__user',
         'expression_ptr__call',
@@ -111,7 +110,7 @@ def coordinator_dashboard(request):
         'calls': calls,
         'shared_questions': shared_questions,
         'submitted_expressions': submitted_expressions,
-        'proposals': proposals,
+        'submitted_proposals': submitted_proposals,
         'evaluations': completed_evaluations,
         'evaluators': evaluators,
         'institutions': institutions,
