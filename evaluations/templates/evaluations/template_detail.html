@@ -225,36 +225,37 @@
 
     <!-- Add/Edit Subcategory Modal -->
     <div class="modal fade" id="addSubcategoryModal" tabindex="-1">
-    <div class="modal-dialog">
-        <form method="post" id="subcategoryForm">
-        {% csrf_token %}
-        <input type="hidden" name="id" id="subcategory-id">
-        <input type="hidden" name="category_id" id="subcategory-category-id">
-        <div class="modal-content">
-            <div class="modal-header">
-            <h5 class="modal-title" id="subcategoryModalLabel">Nueva Subcategoría</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-dialog">
+            <form method="post" id="subcategoryForm">
+            {% csrf_token %}
+            <input type="hidden" name="id" id="subcategory-id">
+            <input type="hidden" name="category_id" id="subcategory-category-id">
+            <div class="modal-content">
+                <div class="modal-header">
+                <h5 class="modal-title" id="subcategoryModalLabel">Nueva Subcategoría</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                <div class="mb-3">
+                    <label>Nombre *</label>
+                    <input type="text" name="name" class="form-control" required id="subcategory-name">
+                </div>
+                <div class="mb-3">
+                    <label>Orden</label>
+                    <input type="number" name="order" class="form-control" value="0" min="0" id="subcategory-order">
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" name="is_active" id="subcategory-is-active" checked>
+                    <label class="form-check-label">Activa</label>
+                </div>
+                </div>
+                <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
             </div>
-            <div class="modal-body">
-            <div class="mb-3">
-                <label>Nombre *</label>
-                <input type="text" name="name" class="form-control" required id="subcategory-name">
-            </div>
-            <div class="mb-3">
-                <label>Orden</label>
-                <input type="number" name="order" class="form-control" value="0" min="0" id="subcategory-order">
-            </div>
-            <div class="form-check">
-                <input type="checkbox" name="is_active" id="subcategory-is-active" checked>
-                <label class="form-check-label">Activa</label>
-            </div>
-            </div>
-            <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-            <button type="submit" class="btn btn-primary">Guardar</button>
-            </div>
+            </form>
         </div>
-        </form>
     </div>
 
     <!-- Add/Edit Item Modal -->
@@ -347,20 +348,30 @@ function showMessage(type, text) {
     }, 5000);
 }
 
-let currentCategoryId = null;
-
 function openAddItemModal(subcategoryId, subcategoryName) {
-    currentCategoryId = subcategoryId; // reused var
     const form = document.getElementById('itemForm');
+    if (!form) {
+        console.error("Item form not found!");
+        return;
+    }
     form.reset();
     form.action = '{% url "evaluations:create_template_item" %}';
-    document.getElementById('item-category-id').name = 'subcategory_id';
-    document.getElementById('item-category-id').value = subcategoryId;
+    const categoryInput = document.getElementById('item-category-id');
+    if (categoryInput) {
+        categoryInput.name = 'subcategory_id';
+        categoryInput.value = subcategoryId;
+    }
     document.getElementById('addItemModalLabel').textContent = `Nuevo Ítem: ${subcategoryName}`;
     document.getElementById('item-id').value = '';
     itemOptions = [];
     renderOptions();
-    new bootstrap.Modal(document.getElementById('addItemModal')).show();
+    
+    const modalEl = document.getElementById('addItemModal');
+    let modal = bootstrap.Modal.getInstance(modalEl);
+    if (!modal) {
+        modal = new bootstrap.Modal(modalEl);
+    }
+    modal.show();
 }
 
 
@@ -389,13 +400,13 @@ document.getElementById('addCategoryModal').querySelector('form').addEventListen
             div.innerHTML = `
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <strong>${data.name}</strong>
-                    <span class="text-muted">Orden: ${data.order}</span>
+                    <span class="text-muted ms-3">Orden: ${data.order}</span>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted">No hay ítems aún.</p>
+                    <p class="text-muted">No hay subcategorías.</p>
                     <button type="button" class="btn btn-sm btn-outline-success"
-                            onclick="openAddItemModal(${data.id}, '${data.name.replace(/'/g, "\\'")}')">
-                        + Añadir Ítem
+                            onclick="openAddSubcategoryModal(${data.id}, '${data.name.replace(/'/g, "\\'")}')">
+                        + Subcategoría
                     </button>
                 </div>
             `;
@@ -737,7 +748,7 @@ document.getElementById('itemForm').addEventListener('submit', function(e) {
 
     const form = this;
     const formData = new FormData(form);
-    document.getElementById('itemForm').querySelector('input[name="options"]')?.remove();
+    //document.getElementById('itemForm').querySelector('input[name="options"]')?.remove();
     const optInput = document.getElementById('itemOptionsInput')
     optInput.type = 'hidden';
     optInput.name = 'options';
@@ -754,11 +765,11 @@ document.getElementById('itemForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            let itemList = document.querySelector(`#items-list-${data.category_id}`);
+            let itemList = document.querySelector(`#items-list-${data.subcategory_id}`);
             const isNew = !document.getElementById(`item-${data.id}`);
 
             if (!itemList) {
-                const cardBody = document.querySelector(`#category-${data.category_id} .card-body`);
+                const cardBody = document.querySelector(`#subcategory-${data.subcategory_id} .card-body`);
                 const ulDiv = document.createElement('div');
                 ulDiv.className = 'mb-3';
                 ulDiv.innerHTML = `
