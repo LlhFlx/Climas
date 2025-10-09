@@ -23,9 +23,9 @@
         <ul class="list-group">
 
             <!-- BASIC FIELDS (Shared by Expression & Proposal) -->
-            <li class="list-group-item"><strong>Título:</strong> {{ evaluation.target.project_title }}</li>
+            <li class="list-group-item"><strong>Título:</strong> {{ evaluation.target.project_title_override|default:evaluation.target.project_title }}</li>
             <li class="list-group-item"><strong>Investigador Principal:</strong> {{ evaluation.target.user.person|default:evaluation.target.user.user.username }}</li>
-            <li class="list-group-item"><strong>País:</strong> {{ evaluation.target.implementation_country.name }}</li>
+            <li class="list-group-item"><strong>País:</strong> {{ evaluation.target.project_location.name }}</li>
             <li class="list-group-item"><strong>Problema:</strong> {{ evaluation.target.problem|truncatewords:50 }}</li>
             <li class="list-group-item"><strong>Objetivo General:</strong> {{ evaluation.target.general_objective|truncatewords:50 }}</li>
             <li class="list-group-item"><strong>Metodología:</strong> {{ evaluation.target.methodology|truncatewords:50 }}</li>
