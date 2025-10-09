@@ -919,6 +919,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const productsContainer = document.getElementById('proposal-products-container');
     const addProductBtn = document.getElementById('add-proposal-product-btn');
 
+    // Get fallback from template context
+    const fallbackAxisId = "{{ expression.thematic_axis.id }}";
+
     if (thematicAxisSelect && productsContainer && addProductBtn) {
         // Get strategic effects data
         let allStrategicEffects = [];
@@ -933,7 +936,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Update Product Strategic Effects dropdowns based on selected Thematic Axis
         function updateProductStrategicEffects() {
             console.log("updateProductStrategicEffects() called");
-            const selectedAxisId = thematicAxisSelect.value;
+            const selectedAxisId = thematicAxisSelect.value || fallbackAxisId;;
             const productDropdowns = document.querySelectorAll('.product-strategic-effects');
             console.log(productDropdowns)
             productDropdowns.forEach(dropdown => {
@@ -978,9 +981,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Initialize on page load
-        if (thematicAxisSelect.value) {
-            updateProductStrategicEffects();
-        }
+        // if (thematicAxisSelect.value) {
+        updateProductStrategicEffects();
+        // }
 
         // Rebind on change
         thematicAxisSelect.addEventListener('change', updateProductStrategicEffects);
