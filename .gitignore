@@ -209,3 +209,5 @@ __marimo__/
 
 # PDF Files
 *.pdf
+*.doc
+*.docx

@@ -1855,9 +1855,6 @@ def apply_proposal(request, expression_id):
     existing_budget_items = ProposalBudgetItem.objects.filter(proposal=proposal).select_related('category', 'period')
 
     commitment_docs = proposal.proposal_documents.filter(document_type='commitment')
-    print("commitment_docs is", commitment_docs)
-    for doc in commitment_docs:
-        print(doc, doc.linked_institution)
     partner_institutions = proposal.partner_institutions.all()
     docs_by_institution = defaultdict(list)
     for doc in commitment_docs:
@@ -1948,6 +1945,8 @@ def apply_proposal(request, expression_id):
         }
 
         # Update Proposal fields
+        proposal.project_title_override = post_data['project_title_override']
+        print(proposal.project_title_override)
         proposal.principal_research_experience = post_data['principal_research_experience']
         proposal.community_description = post_data['community_description']
         proposal.duration_months = int(post_data['duration_months']) if post_data['duration_months'] else 12
@@ -2245,7 +2244,7 @@ def apply_proposal(request, expression_id):
         for field_name, max_words, label in field_limits:
             value = post_data.get(field_name, '')
             if not value:
-                print("No value")
+                print(f"{field_name} -- {label}: No value")
                 continue
             word_count = count_words(value)
             if word_count > max_words:
