@@ -344,6 +344,18 @@ class ProposalDocument(TimestampMixin, models.Model):
         null=True,
         verbose_name="Cargado por"
     )
+
+    # Track which institution this document is for
+    linked_institution = models.ForeignKey(
+        'institutions.Institution',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Institución Asociada",
+        help_text="Solo si el documento es específico para una institución (ej: carta de compromiso)"
+    )
+
+
     document_type = models.CharField(
         max_length=50,
         choices=[
@@ -1408,8 +1420,8 @@ class BaseProjectTeamMember(TimestampMixin, models.Model):
         null=True,  # Allow null until selected/created
         blank=True,
     )
-    start_date = models.DateField(verbose_name="Fecha de Inicio")
-    end_date = models.DateField(verbose_name="Fecha de Finalización")
+    start_date = models.DateField(verbose_name="Fecha de Inicio", blank=True, null=True)
+    end_date = models.DateField(verbose_name="Fecha de Finalización", blank=True, null=True)
 
     class Meta:
         abstract = True
@@ -1521,7 +1533,9 @@ class ProposalInvestigatorThematicAntecedent(BaseInvestigatorThematicAntecedent)
     thematic_axis = models.ForeignKey(
         'thematic_axes.ThematicAxis',
         on_delete=models.PROTECT,
-        verbose_name="Eje Temático"
+        verbose_name="Eje Temático",
+        null=True,
+        blank=True
     )
 
     class Meta:

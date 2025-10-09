@@ -5,7 +5,9 @@ from geo.models import Country
 from accounts.models import Role
 from budgets.models import BudgetCategory, BudgetPeriod
 from common.models import Scale
-
+from common.models import Status
+from institutions.models import InstitutionType
+from geo.models import DocumentType
 
 class Command(BaseCommand):
     help = "Populates base tables: Country, Role, BudgetCategory, BudgetPeriod"
@@ -204,4 +206,73 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS("All base data loaded successfully.")
+        )
+
+        # -------------------------
+        # 6. Load Status
+        # -------------------------
+        status_data = [
+            {'name': 'Draft', 'description': None},
+            {'name': 'Abierta', 'description': None},
+            {'name': 'Borrador', 'description': None},
+            {'name': 'Enviada', 'description': None},
+            {'name': 'Aprobada', 'description': None},
+            {'name': 'Pendiente', 'description': 'Evaluación pendiente de revisión'},
+        ]
+        
+        created_statuses = 0
+        for data in status_data:
+            obj, created = Status.objects.get_or_create(
+                name=data['name'],
+                defaults={
+                    'description': data['description'],
+                    'is_active': True,
+                    'color': ''
+                }
+            )
+            if created:
+                created_statuses += 1
+
+        self.stdout.write(
+            self.style.SUCCESS(f"Created {created_statuses} statuses.")
+        )
+
+        # -------------------------
+        # 7. Load Institution Types
+        # -------------------------
+        institution_type_names = [
+            'Universidad',
+            'Institución Académica',
+            'Centro de Investigación'
+        ]
+        
+        created_institution_types = 0
+        for name in institution_type_names:
+            obj, created = InstitutionType.objects.get_or_create(
+                name=name,
+                defaults={'is_active': True}
+            )
+            if created:
+                created_institution_types += 1
+
+        self.stdout.write(
+            self.style.SUCCESS(f"Created {created_institution_types} institution types.")
+        )
+
+        # -------------------------
+        # 8. Load Document Types ("Documento de identificación") per Country
+        # -------------------------
+        doc_type_name = "Documento de identificación"
+        created_doc_types = 0
+        
+        for country in Country.objects.all():
+            obj, created = DocumentType.objects.get_or_create(
+                country=country,
+                name=doc_type_name
+            )
+            if created:
+                created_doc_types += 1
+
+        self.stdout.write(
+            self.style.SUCCESS(f"Created {created_doc_types} document types ('{doc_type_name}') across all countries.")
         )
