@@ -23,11 +23,25 @@ def download_proposal_document(request, doc_id):
     except ProposalDocument.DoesNotExist:
         raise Http404("Documento no encontrado o acceso denegado.")
 
-    response = FileResponse(
-        doc.file.open(),
-        content_type='application/octet-stream'
-    )
-    response['Content-Disposition'] = f'attachment; filename="{doc.name}"'
+    # Guess file type (e.g., application/pdf, image/png)
+    import mimetypes
+    mime_type, _ = mimetypes.guess_type(doc.file.name)
+    if not mime_type:
+        mime_type = 'application/octet-stream'
+
+    # Open the file
+    file_handle = doc.file.open()
+
+    # Decide between inline or attachment
+    response = FileResponse(file_handle, content_type=mime_type)
+    print(mime_type)
+    if mime_type in ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg']:
+        # Browser can render these → show inline
+        response['Content-Disposition'] = f'inline; filename="{doc.name}"'
+    else:
+        # Force download for other file types
+        response['Content-Disposition'] = f'attachment; filename="{doc.name}"'
+
     return response
 
 @login_required
