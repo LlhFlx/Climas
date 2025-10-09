@@ -9,7 +9,7 @@ from django.http import HttpResponseForbidden, JsonResponse, FileResponse, Http4
 from django.core.serializers import serialize
 from .models import (
     EvaluationTemplate, TemplateCategory, TemplateSubcategory,
-    TemplateItem, TemplateItemOption
+    TemplateItem, TemplateItemOption, Evaluation, EvaluationResponse
 )
 from expressions.models import Expression
 from proposals.models import Proposal
@@ -328,7 +328,7 @@ def create_template_item(request):
             max_score = float(request.POST.get('max_score', 5.0))
             source_model = request.POST.get('source_model') or None
             options_json = request.POST.get('options')  # JSON string of [{display_text, score}]
-
+            print(options_json)
             subcategory = get_object_or_404(TemplateSubcategory, id=subcategory_id)
 
             with transaction.atomic():
@@ -725,8 +725,10 @@ def evaluate_expression(request, evaluation_id):
         return redirect('calls:evaluator_dashboard')
 
     items = TemplateItem.objects.filter(
-        category__template=template
-    ).select_related('category').order_by('category__order', 'order')
+        subcategory__category__template=template
+    ).select_related('subcategory__category').order_by(
+        'subcategory__category__order', 'subcategory__order', 'order'
+    )
 
     # Determine target type and get proposal-specific data if needed
     target = evaluation.target
@@ -763,6 +765,11 @@ def evaluate_expression(request, evaluation_id):
     # Extract related objects using correct _set syntax
     try:
         # Products
+        print("DEBUG")
+        for attr in dir(target):
+            print(attr)
+        print("END DEBUG")
+
         if hasattr(target, 'product_set') and target.product_set.exists():
             products = list(
                 target.product_set.prefetch_related('strategic_effects').all()
@@ -779,7 +786,7 @@ def evaluate_expression(request, evaluation_id):
             #     else:
             #         print("   No strategic effects linked.")
         else:
-            print("Error loading products:", e)
+            print("Error loading products:")
             products = []
 
         # # Team Members
@@ -847,6 +854,7 @@ def evaluate_expression(request, evaluation_id):
                     field_name = f"item_{item.id}"
                     score_str = request.POST.get(field_name)
                     comment = request.POST.get(f"comment_{item.id}", "")
+                    print(item)
 
                     if not score_str:
                         raise ValueError(f"Debe asignar una puntuación para: {item.question}")
@@ -914,7 +922,7 @@ def evaluate_expression(request, evaluation_id):
                 'proposal_fields': proposal_fields,
                 'products': products,
                 'team_members': team_members,
-                'existing_budget_items': existing_budget_items,
+                #'existing_budget_items': existing_budget_items,
                 'responses': responses,
             })
         except Exception as e:

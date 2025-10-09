@@ -116,10 +116,11 @@ class Command(BaseCommand):
         # 3. Load Budget Categories
         # -------------------------
         category_data = [
-            {'name': 'Personal', 'description': 'Salarios, honorarios, contrataciones'},
-            {'name': 'Equipos e Infraestructura', 'description': 'Computadores, laboratorios, herramientas'},
-            {'name': 'Viajes y Logística', 'description': 'Transporte, alojamiento, viáticos'},
-            {'name': 'Actividades Comunitarias', 'description': 'Talleres, capacitaciones, participación ciudadana'}
+            {'name': 'Salarios del equipo de trabajo', 'description': 'Honorarios y salarios profesionales claramente justificados relacionados directamente con la ejecución del proyecto (Anexo 1)'},
+            {'name': 'Costos indirectos', 'description': 'Costos indirectos'},
+            {'name': 'Auditoría externa', 'description': 'Auditoría externa'},
+            {'name': 'Equipamiento, servicios especializados y gestión de datos', 'description': 'Equipamiento, servicios especializados y gestión de datos'},
+            {'name': 'Actividades de campo, procesos de participación y formación', 'description': 'Actividades de campo, procesos de participación y formación'}
         ]
 
         created_categories = 0

@@ -244,8 +244,8 @@
                                 <label for="item_{{ item.id }}">Seleccione una opción</label>
                                 <select name="item_{{ item.id }}" id="item_{{ item.id }}" class="form-select" required>
                                     <option value="">-- Seleccione --</option>
-                                    {% for option in item.options %}
-                                        <option value="{{ option }}">{{ option }}</option>
+                                    {% for option in item.options.all %}
+                                        <option value="{{ option.display_text }}">{{ option.display_text }}</option>
                                     {% endfor %}
                                 </select>
 

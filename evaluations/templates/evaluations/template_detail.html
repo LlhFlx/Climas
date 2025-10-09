@@ -747,12 +747,13 @@ document.getElementById('itemForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
     const form = this;
-    const formData = new FormData(form);
+    
     //document.getElementById('itemForm').querySelector('input[name="options"]')?.remove();
     const optInput = document.getElementById('itemOptionsInput')
     optInput.type = 'hidden';
     optInput.name = 'options';
     optInput.value = JSON.stringify(itemOptions);
+    const formData = new FormData(form);
     this.appendChild(optInput);
 
     fetch(form.action, {

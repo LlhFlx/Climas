@@ -190,7 +190,7 @@
 
                         <!-- Upload form for this institution -->
                         <div class="input-group mb-2">
-                            <input type="file" name="commitment_document" class="form-control" accept=".pdf,.docx">
+                            <input type="file" name="commitment_document" class="form-control" accept=".xlsx, .pdf,.docx">
                             <button type="button" class="btn btn-outline-primary upload-commitment" data-institution-id="{{ inst.id }}">Cargar</button>
                         </div>
                     </div>
@@ -509,7 +509,7 @@
         <div class="mb-3">
             <label class="form-label">Cronograma *</label>
             <div class="input-group">
-                <input type="file" name="timeline_document" class="form-control" accept=".pdf,.docx">
+                <input type="file" name="timeline_document" class="form-control" accept=".xlsx, .pdf,.docx">
                 {% if proposal.timeline_document %}
                     <a href="{% url 'proposals:download_proposal_document' proposal.timeline_document.id %}" 
                        target="_blank" 
@@ -547,7 +547,7 @@
         <div class="mb-3">
             <label class="form-label">Presupuesto *</label>
             <div class="input-group">
-                <input type="file" name="budget_document" class="form-control" accept=".pdf,.docx">
+                <input type="file" name="budget_document" class="form-control" accept=".xlsx, .pdf,.docx">
                 {% if proposal.budget_document %}
                     <a href="{% url 'proposals:download_proposal_document' proposal.budget_document.id %}" 
                        target="_blank" 
@@ -1520,7 +1520,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-section" data-institution-id="${institutionId}">Eliminar</button>
             </div>
             <div class="input-group mb-2">
-                <input type="file" name="commitment_document" class="form-control" accept=".pdf,.docx">
+                <input type="file" name="commitment_document" class="form-control" accept=".xlsx, .pdf,.docx">
                 <button type="button" class="btn btn-outline-primary upload-commitment" data-institution-id="${institutionId}">Cargar</button>
             </div>
         `;
