@@ -37,6 +37,22 @@ urlpatterns = [
         views.delete_template_category, 
         name='delete_template_category'),
 
+    path('template/subcategory/create/',
+        views.create_template_subcategory,
+        name='create_template_subcategory'),
+
+    path('template/subcategory/<int:subcategory_id>/edit/',
+        views.edit_template_subcategory,
+        name='edit_template_subcategory'),
+
+    path('template/subcategory/<int:subcategory_id>/delete/',
+        views.delete_template_subcategory,
+        name='delete_template_subcategory'),
+
+    path('template/item/load-dynamic-options/',
+        views.load_dynamic_options,
+        name='load_dynamic_options'),
+
     path('template/item/create/',
         views.create_template_item, 
         name='create_template_item'),

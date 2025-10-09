@@ -55,7 +55,7 @@ class EvaluationTemplate(TimestampMixin, CreatedByMixin, models.Model):
     def get_total_max_score(self):
         """Calculate the sum of max_score from all items."""
         return self.categories.aggregate(
-            total=models.Sum('items__max_score')
+            total=models.Sum('subcategories__items__max_score')
         )['total'] or 0
 
     def save(self, *args, **kwargs):
@@ -145,6 +145,25 @@ class TemplateCategory(TimestampMixin, models.Model):
 
     def __str__(self):
         return self.name
+
+class TemplateSubcategory(TimestampMixin, models.Model):
+    category = models.ForeignKey(
+        TemplateCategory, 
+        on_delete=models.CASCADE, 
+        related_name='subcategories', 
+        verbose_name="Categoría"
+    )
+    name = models.CharField(max_length=100, verbose_name="Nombre")
+    order = models.PositiveIntegerField(default=0, verbose_name="Orden")
+    is_active = models.BooleanField(default=True, verbose_name='Activa')
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = "Subcategoría de Plantilla"
+        verbose_name_plural = "Subcategorías de Plantilla"
+
+    def __str__(self):
+        return f"{self.category.name}: {self.name}"
     
 class TemplateItem(TimestampMixin, models.Model):
     """
@@ -152,58 +171,30 @@ class TemplateItem(TimestampMixin, models.Model):
     Define el tipo de entrada esperado.
     """
 
-    # FIELD_TYPE_CHOICES = [
-    #     ('text', 'Texto largo'),
-    #     ('short_text', 'Texto corto'),
-    #     ('number', 'Número'),
-    #     ('boolean', 'Sí/No'),
-    #     ('dropdown', 'Desplegable'),
-    #     ('radio', 'Opción múltiple'),
-    # ]
-
-    # SOURCE_MODEL_CHOICES = [
-    #     ('geo.Country', 'Pais'),
-    #     ('common.Status', 'Estado'),
-    #     ('thematic_axes.ThematicAxis', 'Eje Tematico')
-    # ]
-
-    category = models.ForeignKey(
-        TemplateCategory,
-        on_delete=models.CASCADE,
-        related_name='items',
-        verbose_name="Categoría"
+    subcategory = models.ForeignKey(
+        TemplateSubcategory, 
+        on_delete=models.CASCADE, 
+        related_name='items', 
+        verbose_name="Subcategoría"
     )
-
     question = models.TextField(verbose_name="Pregunta")
-
     field_type = models.CharField(
-        max_length=20,
-        choices=FIELD_TYPE_CHOICES,
-        default='text',
+        max_length=20, 
+        choices=FIELD_TYPE_CHOICES, 
+        default='text', 
         verbose_name="Tipo de Campo"
     )
-    # Static Options
-    options = models.JSONField(
-        blank=True,
-        null=True,
-        help_text="Opciones para dropdown o radio (ej: ['Sí', 'No', 'Parcialmente'])",
-        verbose_name="Opciones Estaticas"
-    )
-
-    # Dynamic model reference
     source_model = models.CharField(
-        max_length=100,
-        choices=SOURCE_MODEL_CHOICES,
-        blank=True,
-        null=True,
-        help_text="Si se selecciona, carga opciones desde este modelo. (Ignorar para 'Opciones Estaticas')",
+        max_length=100, 
+        choices=SOURCE_MODEL_CHOICES, 
+        blank=True, 
+        null=True, 
         verbose_name="Modelo de Origen"
     )
-
     max_score = models.DecimalField(
-        max_digits=3,
-        decimal_places=1,
-        default=5.0,
+        max_digits=3, 
+        decimal_places=1, 
+        default=5.0, 
         verbose_name="Puntuación Máxima"
     )
     order = models.PositiveIntegerField(default=0, verbose_name="Orden")
@@ -214,7 +205,21 @@ class TemplateItem(TimestampMixin, models.Model):
         verbose_name_plural = "Ítems de Plantilla"
 
     def __str__(self):
-        return f"{self.category.name}: {self.question}"
+        return f"{self.subcategory}: {self.question}"
+
+    def get_dynamic_options(self):
+        """Fetch display values from source_model (for UI prefill)."""
+        if self.field_type == 'dynamic_dropdown' and self.source_model:
+            try:
+                app_label, model_name = self.source_model.split('.')
+                model = apps.get_model(app_label, model_name)
+                for field in ['name', 'title', 'code', 'label', 'description']:
+                    if hasattr(model, field):
+                        return list(model.objects.values_list('id', field))
+                return [(obj.pk, str(obj)) for obj in model.objects.all()[:50]]
+            except Exception:
+                return []
+        return []
     
     # def get_options(self):
     #     """
@@ -263,6 +268,36 @@ class TemplateItem(TimestampMixin, models.Model):
             return self.options
         return []
 
+class TemplateItemOption(TimestampMixin, models.Model):
+    item = models.ForeignKey(
+        TemplateItem, 
+        on_delete=models.CASCADE, 
+        related_name='options', 
+        verbose_name="Ítem"
+    )
+    display_text = models.CharField(
+        max_length=200, 
+        verbose_name="Texto a mostrar"
+    )
+    score = models.DecimalField(
+        max_digits=3, 
+        decimal_places=1, 
+        default=0.0, 
+        verbose_name="Puntuación asociada"
+    )
+    source_object_id = models.PositiveIntegerField(
+        null=True, 
+        blank=True, 
+        help_text="ID del objeto si proviene de source_model"
+    )
+
+    class Meta:
+        verbose_name = "Opción de Ítem"
+        verbose_name_plural = "Opciones de Ítem"
+        ordering = ['item', 'id']
+
+    def __str__(self):
+        return f"{self.display_text}: {self.score}"
 
 class Evaluation(TimestampMixin, CreatedByMixin, models.Model):
     """

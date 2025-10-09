@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from django.apps import apps
 import json
 from django.urls import reverse 
@@ -8,7 +7,10 @@ from django.contrib import messages
 from django.utils import timezone
 from django.http import HttpResponseForbidden, JsonResponse, FileResponse, Http404
 from django.core.serializers import serialize
-from evaluations.models import Evaluation, EvaluationResponse, EvaluationTemplate, TemplateCategory, TemplateItem
+from .models import (
+    EvaluationTemplate, TemplateCategory, TemplateSubcategory,
+    TemplateItem, TemplateItemOption
+)
 from expressions.models import Expression
 from proposals.models import Proposal
 from people.models import Person
@@ -145,7 +147,10 @@ def evaluation_template_detail(request, template_id):
         return redirect('home')
     
     template = get_object_or_404(EvaluationTemplate, id=template_id)
-    categories = TemplateCategory.objects.filter(template=template).prefetch_related('items').order_by('order')
+    categories = TemplateCategory.objects.filter(template=template).prefetch_related(
+        'subcategories',
+        'subcategories__items'
+    ).order_by('order')
 
     # Get all calls for linking
     all_calls = Call.objects.all().order_by('title')
@@ -184,6 +189,7 @@ def create_template_category(request):
             return JsonResponse({'success': False, 'error': str(e)})
 
     return JsonResponse({'success': False, 'error': 'Invalid request method.'})
+
 @login_required
 def edit_template_category(request, category_id):
     if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
@@ -227,8 +233,10 @@ def delete_template_category(request, category_id):
 
     if request.method == 'DELETE':
         try:
-            # Delete all items under this category first
-            TemplateItem.objects.filter(category=category).delete()
+            # Delete all items under subcategories of this category
+            TemplateItem.objects.filter(subcategory__category=category).delete()
+            # Delete all subcategories
+            TemplateSubcategory.objects.filter(category=category).delete()
             # Then delete the category
             category.delete()
             return JsonResponse({'success': True})
@@ -238,38 +246,110 @@ def delete_template_category(request, category_id):
     return JsonResponse({'success': False, 'error': 'Invalid request method.'}, status=405)
 
 @login_required
-def create_template_item(request):
+def create_template_subcategory(request):
     if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
         return JsonResponse({'success': False, 'error': 'Access denied.'})
-
     if request.method == 'POST':
         try:
             category_id = request.POST.get('category_id')
+            name = request.POST.get('name')
+            order = int(request.POST.get('order', 0))
+            category = get_object_or_404(TemplateCategory, id=category_id)
+            subcategory = TemplateSubcategory.objects.create(
+                category=category,
+                name=name,
+                order=order
+            )
+            return JsonResponse({
+                'success': True,
+                'id': subcategory.id,
+                'name': subcategory.name,
+                'order': subcategory.order,
+                'category_id': category.id
+            })
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': 'Invalid request method.'})
+
+
+@login_required
+def edit_template_subcategory(request, subcategory_id):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
+        return JsonResponse({'success': False, 'error': 'Access denied.'})
+    subcategory = get_object_or_404(TemplateSubcategory, id=subcategory_id)
+    if request.method == 'POST':
+        try:
+            name = request.POST.get('name')
+            order = int(request.POST.get('order', 0))
+            is_active = request.POST.get('is_active') == 'on'
+            if not name:
+                return JsonResponse({'success': False, 'error': 'Name is required.'})
+            subcategory.name = name
+            subcategory.order = order
+            subcategory.is_active = is_active
+            subcategory.save()
+            return JsonResponse({
+                'success': True,
+                'id': subcategory.id,
+                'name': subcategory.name,
+                'order': subcategory.order,
+                'is_active': subcategory.is_active
+            })
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': 'Invalid request method.'})
+
+
+@login_required
+def delete_template_subcategory(request, subcategory_id):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
+        return JsonResponse({'success': False, 'error': 'Access denied.'})
+    subcategory = get_object_or_404(TemplateSubcategory, id=subcategory_id)
+    if request.method == 'DELETE':
+        try:
+            # Delete items and their options
+            TemplateItem.objects.filter(subcategory=subcategory).delete()
+            subcategory.delete()
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': 'Invalid request method.'})
+
+
+@login_required
+def create_template_item(request):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
+        return JsonResponse({'success': False, 'error': 'Access denied.'})
+    if request.method == 'POST':
+        try:
+            subcategory_id = request.POST.get('subcategory_id')
             question = request.POST.get('question')
             field_type = request.POST.get('field_type', 'text')
             max_score = float(request.POST.get('max_score', 5.0))
-            options_str = request.POST.get('options')
-            source_model = request.POST.get('source_model')
+            source_model = request.POST.get('source_model') or None
+            options_json = request.POST.get('options')  # JSON string of [{display_text, score}]
 
-            category = get_object_or_404(TemplateCategory, id=category_id)
+            subcategory = get_object_or_404(TemplateSubcategory, id=subcategory_id)
 
-            # Handle JSON options
-            options = None
-            if options_str:
-                try:
-                    options = json.loads(options_str)
-                except json.JSONDecodeError:
-                    return JsonResponse({'success': False, 'error': 'Opciones no son un JSON válido.'})
+            with transaction.atomic():
+                item = TemplateItem.objects.create(
+                    subcategory=subcategory,
+                    question=question,
+                    field_type=field_type,
+                    max_score=max_score,
+                    source_model=source_model,
+                    order=subcategory.items.count() + 1
+                )
 
-            item = TemplateItem.objects.create(
-                category=category,
-                question=question,
-                field_type=field_type,
-                max_score=max_score,
-                options=options,
-                source_model=source_model,
-                order=category.items.count() + 1
-            )
+                # Save options
+                if options_json:
+                    options = json.loads(options_json)
+                    for opt in options:
+                        TemplateItemOption.objects.create(
+                            item=item,
+                            display_text=opt.get('display_text', ''),
+                            score=opt.get('score', 0)
+                        )
 
             return JsonResponse({
                 'success': True,
@@ -277,120 +357,92 @@ def create_template_item(request):
                 'question': item.question,
                 'field_type': item.field_type,
                 'max_score': float(item.max_score),
-                'category_id': category.id
+                'subcategory_id': subcategory.id
             })
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
-
     return JsonResponse({'success': False, 'error': 'Invalid request method.'})
 
 @login_required
 def get_template_item(request, item_id):
     if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
         return JsonResponse({'success': False, 'error': 'Access denied.'})
-
     try:
-        item = TemplateItem.objects.get(id=item_id)
+        item = TemplateItem.objects.prefetch_related('options').get(id=item_id)
+        options = [
+            {'display_text': opt.display_text, 'score': float(opt.score)}
+            for opt in item.options.all()
+        ]
         return JsonResponse({
             'success': True,
             'id': item.id,
             'question': item.question,
             'field_type': item.field_type,
             'max_score': float(item.max_score),
-            'options': item.options,
             'source_model': item.source_model,
-            'category_id': item.category.id,
+            'subcategory_id': item.subcategory.id,
+            'options': options
         })
     except TemplateItem.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Item not found.'})
     
 @login_required
+def get_template_item(request, item_id):
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
+        return JsonResponse({'success': False, 'error': 'Access denied.'})
+    try:
+        item = TemplateItem.objects.prefetch_related('options').get(id=item_id)
+        options = [
+            {'display_text': opt.display_text, 'score': float(opt.score)}
+            for opt in item.options.all()
+        ]
+        return JsonResponse({
+            'success': True,
+            'id': item.id,
+            'question': item.question,
+            'field_type': item.field_type,
+            'max_score': float(item.max_score),
+            'source_model': item.source_model,
+            'subcategory_id': item.subcategory.id,
+            'options': options
+        })
+    except TemplateItem.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Item not found.'})
+    
+
+login_required
 def edit_template_item(request, item_id):
     if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
         return JsonResponse({'success': False, 'error': 'Access denied.'})
-
+    item = get_object_or_404(TemplateItem, id=item_id)
     if request.method == 'POST':
         try:
-            category_id = request.POST.get('category_id')
             question = request.POST.get('question')
             field_type = request.POST.get('field_type', 'text')
             max_score = float(request.POST.get('max_score', 5.0))
-            options_str = request.POST.get('options')
-            source_model = request.POST.get('source_model')
-
-            category = get_object_or_404(TemplateCategory, id=category_id)
-
-            # Handle JSON options
-            options = None
-            if options_str:
-                try:
-                    options = json.loads(options_str)
-                except json.JSONDecodeError:
-                    return JsonResponse({'success': False, 'error': 'Opciones no son un JSON válido.'})
-
-            item = TemplateItem.objects.update(
-                category=category,
-                question=question,
-                field_type=field_type,
-                max_score=max_score,
-                options=options,
-                source_model=source_model,
-                order=category.items.count() + 1
-            )
-
-            return JsonResponse({
-                'success': True,
-                'id': item.id,
-                'question': item.question,
-                'field_type': item.field_type,
-                'max_score': float(item.max_score),
-                'category_id': category.id
-            })
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-
-    return JsonResponse({'success': False, 'error': 'Invalid request method.'})
-
-@login_required
-def edit_template_item(request, item_id):
-    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
-        return JsonResponse({'success': False, 'error': 'Access denied.'}, status=403)
-
-    item = get_object_or_404(TemplateItem, id=item_id)
-
-    if request.method == 'POST':
-        try:
-            question = request.POST.get('question')
-            field_type = request.POST.get('field_type', 'text')
-            max_score_str = request.POST.get('max_score', '5.0')
-            options_str = request.POST.get('options', '')
-            source_model = request.POST.get('source_model', '')
+            source_model = request.POST.get('source_model') or None
+            options_json = request.POST.get('options')
 
             if not question:
                 return JsonResponse({'success': False, 'error': 'Question is required.'})
 
-            try:
-                max_score = float(max_score_str)
-                if max_score <= 0:
-                    return JsonResponse({'success': False, 'error': 'Max score must be greater than 0.'})
-            except ValueError:
-                return JsonResponse({'success': False, 'error': 'Invalid max score value.'})
+            with transaction.atomic():
+                item.question = question
+                item.field_type = field_type
+                item.max_score = max_score
+                item.source_model = source_model
+                item.save()
 
-            # Parse JSON options if present
-            options = None
-            if options_str:
-                try:
-                    options = json.loads(options_str)
-                except json.JSONDecodeError:
-                    return JsonResponse({'success': False, 'error': 'Options must be valid JSON.'})
-
-            # Update the item
-            item.question = question
-            item.field_type = field_type
-            item.max_score = max_score
-            item.options = options
-            item.source_model = source_model if source_model else None
-            item.save()
+                # Replace all options
+                item.options.all().delete()
+                if options_json:
+                    options = json.loads(options_json)
+                    for opt in options:
+                        TemplateItemOption.objects.create(
+                            item=item,
+                            display_text=opt.get('display_text', ''),
+                            score=opt.get('score', 0)
+                        )
 
             return JsonResponse({
                 'success': True,
@@ -398,13 +450,45 @@ def edit_template_item(request, item_id):
                 'question': item.question,
                 'field_type': item.get_field_type_display(),
                 'max_score': float(item.max_score),
-                'category_id': item.category.id
+                'subcategory_id': item.subcategory.id
             })
         except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+            return JsonResponse({'success': False, 'error': str(e)})
+    return JsonResponse({'success': False, 'error': 'Invalid request method.'})
 
-    return JsonResponse({'success': False, 'error': 'Invalid request method.'}, status=405)
-
+@login_required
+def load_dynamic_options(request):
+    """AJAX endpoint to preload display_text from source_model (score = 0 by default)."""
+    if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':
+        return JsonResponse({'success': False, 'error': 'Access denied.'})
+    source_model = request.GET.get('source_model')
+    if not source_model:
+        return JsonResponse({'success': False, 'error': 'source_model required.'})
+    try:
+        app_label, model_name = source_model.split('.')
+        model = apps.get_model(app_label, model_name)
+        options = []
+        for field in ['name', 'title', 'code', 'label', 'description']:
+            if hasattr(model, field):
+                for obj in model.objects.values('id', field):
+                    options.append({
+                        'display_text': str(obj[field]),
+                        'score': 0.0,
+                        'source_object_id': obj['id']
+                    })
+                break
+        else:
+            # Fallback to __str__
+            for obj in model.objects.all()[:50]:
+                options.append({
+                    'display_text': str(obj),
+                    'score': 0.0,
+                    'source_object_id': obj.pk
+                })
+        return JsonResponse({'success': True, 'options': options})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
+    
 @login_required
 def delete_template_item(request, item_id):
     if not hasattr(request.user, 'customuser') or request.user.customuser.role.name != 'Coordinator':

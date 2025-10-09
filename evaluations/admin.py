@@ -2,20 +2,36 @@ from django.contrib import admin
 from .models import (
     EvaluationTemplate,
     TemplateCategory,
+    TemplateSubcategory,
     TemplateItem,
+    TemplateItemOption,
     Evaluation,
     EvaluationResponse,
 )
 from core.admin import CreatedByAdminMixin
 
 
+class TemplateItemOptionInline(admin.TabularInline):
+    model = TemplateItemOption
+    extra = 1
+    fields = ('display_text', 'score')
+    verbose_name = "Opción"
+    verbose_name_plural = "Opciones"
+
 # Inline: Items dentro de Categoría
 class TemplateItemInline(admin.TabularInline):
     model = TemplateItem
     extra = 1
-    fields = ('question', 'field_type', 'max_score', 'options', 'order')
+    fields = ('question', 'field_type', 'max_score', 'order')
     verbose_name = "Ítem"
     verbose_name_plural = "Ítems"
+
+class TemplateSubcategoryInline(admin.TabularInline):
+    model = TemplateSubcategory
+    extra = 1
+    fields = ('name', 'order')
+    verbose_name = "Subcategoría"
+    verbose_name_plural = "Subcategorías"
 
 
 # Inline: Categorías dentro de Plantilla
@@ -25,7 +41,6 @@ class TemplateCategoryInline(admin.TabularInline):
     fields = ('name', 'order')
     verbose_name = "Categoría"
     verbose_name_plural = "Categorías"
-    inlines = [TemplateItemInline]
 
 
 @admin.register(EvaluationTemplate)
@@ -40,8 +55,11 @@ class EvaluationTemplateAdmin(admin.ModelAdmin):
         (None, {
             'fields': ('name', 'description')
         }),
+        ('Aplicabilidad', {
+            'fields': ('applies_to_expression', 'applies_to_proposal', 'calls'),
+        }),
         ('Estado', {
-            'fields': ('is_active',)
+            'fields': ('is_active',),
         }),
         ('Auditoría', {
             'fields': ('created_at', 'updated_at'),
@@ -58,27 +76,30 @@ class TemplateCategoryAdmin(admin.ModelAdmin):
     list_filter = ('template',)
     search_fields = ('name',)
     autocomplete_fields = ('template',)
-    inlines = [TemplateItemInline]
+    inlines = [TemplateSubcategoryInline]
     ordering = ['template', 'order']
 
-    fieldsets = (
-        (None, {
-            'fields': ('template', 'name', 'order')
-        }),
-    )
+@admin.register(TemplateSubcategory)
+class TemplateSubcategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'category', 'order')
+    list_filter = ('category__template',)
+    search_fields = ('name',)
+    autocomplete_fields = ('category',)
+    inlines = [TemplateItemInline]
+    ordering = ['category', 'order']
 
 
 @admin.register(TemplateItem)
 class TemplateItemAdmin(admin.ModelAdmin):
-    list_display = ('question', 'category', 'field_type', 'source_model', 'max_score', 'order')
-    list_filter = ('field_type', 'category__template')
+    list_display = ('question', 'subcategory', 'field_type', 'source_model', 'max_score', 'order')
+    list_filter = ('field_type', 'subcategory__category__template')
     search_fields = ('question',)
-    autocomplete_fields = ('category',)
+    autocomplete_fields = ('subcategory',)
     readonly_fields = ('created_at', 'updated_at')
 
     def get_fieldsets(self, request, obj=None):
         # Start with basic fields
-        basic_fields = ('category', 'question', 'field_type', 'max_score', 'order')
+        basic_fields = ('subcategory', 'question', 'field_type', 'max_score', 'order')
         static_options_fields = ('options',)
         dynamic_options_fields = ('source_model',)
 
@@ -180,6 +201,9 @@ class EvaluationAdmin(CreatedByAdminMixin, admin.ModelAdmin):
         ('Resultados', {
             'fields': ('total_score', 'max_possible_score')
         }),
+        ('Control', {
+            'fields': ('is_positive', 'is_validated', 'coordinator_notes')
+        }),
         ('Envío', {
             'fields': ('submission_datetime',)
         }),
@@ -207,7 +231,7 @@ class EvaluationResponseAdmin(admin.ModelAdmin):
     list_filter = (
         'created_at',
         'evaluation__evaluator',
-        'item__category__template',
+        'item__subcategory__category__template',
         'item__field_type'
     )
     search_fields = (
@@ -234,11 +258,13 @@ class EvaluationResponseAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
-            'evaluation', 'item', 'item__category', 'evaluation__evaluator'
+            'evaluation',
+            'item',
+            'item__subcategory__category',
+            'evaluation__evaluator'
         )
 
     ordering = ['-created_at']
-
    
 
 # from django.contrib import admin
