@@ -135,7 +135,25 @@
                 <li class="list-group-item"><strong>Duración del Proyecto (meses):</strong> {{ proposal_fields.duration_months|default:"No especificada" }}</li>
                 <li class="list-group-item"><strong>Resumen:</strong> {{ proposal_fields.summary|default:"No proporcionado"|linebreaks }}</li>
                 <li class="list-group-item"><strong>Contexto, Problema y Justificación:</strong> {{ proposal_fields.context_problem_justification|default:"No proporcionado"|linebreaks }}</li>
-                <li class="list-group-item"><strong>Objetivos Específicos:</strong> {{ proposal_fields.specific_objectives|default:"No proporcionados"|linebreaks }}</li>
+                {% if target_type == 'proposal' %}
+                    <li class="list-group-item">
+                        <strong>Objetivos Específicos:</strong>
+                        {% if proposal_fields.specific_objectives.exists %}
+                            <ul>
+                                {% for obj in proposal_fields.specific_objectives %}
+                                    <li>
+                                        <strong>{{ obj.title }}</strong>
+                                        {% if obj.description %}
+                                            <br><small>{{ obj.description|linebreaks }}</small>
+                                        {% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <em>No proporcionados</em>
+                        {% endif %}
+                    </li>
+                {% endif %}
                 <li class="list-group-item"><strong>Metodología, Plan Analítico y Ética:</strong> {{ proposal_fields.methodology_analytical_plan_ethics|default:"No proporcionado"|linebreaks }}</li>
                 <li class="list-group-item"><strong>Equidad, Género, Interseccionalidad e Inclusión:</strong> {{ proposal_fields.equity_inclusion|default:"No proporcionado"|linebreaks }}</li>
                 <li class="list-group-item"><strong>Estrategia de Comunicación:</strong> {{ proposal_fields.communication_strategy|default:"No proporcionada"|linebreaks }}</li>

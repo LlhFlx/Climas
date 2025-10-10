@@ -750,7 +750,7 @@ def evaluate_expression(request, evaluation_id):
             'duration_months': target.duration_months,
             'summary': target.summary,
             'context_problem_justification': target.context_problem_justification,
-            'specific_objectives': target.specific_objectives,
+            'specific_objectives': target.specific_objectives.all(),
             'methodology_analytical_plan_ethics': target.methodology_analytical_plan_ethics,
             'equity_inclusion': target.equity_inclusion,
             'communication_strategy': target.communication_strategy,

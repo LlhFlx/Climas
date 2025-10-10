@@ -214,7 +214,7 @@ class Command(BaseCommand):
         # -------------------------
         status_data = [
             {'name': 'Draft', 'description': None},
-            {'name': 'Abierta', 'description': None},
+            {'name': 'Abierta', 'description': None}, # Y cerrada pillin?
             {'name': 'Borrador', 'description': None},
             {'name': 'Enviada', 'description': None},
             {'name': 'Aprobada', 'description': None},
@@ -244,8 +244,9 @@ class Command(BaseCommand):
         institution_type_names = [
             'Universidad',
             'Institución Académica',
-            'Centro de Investigación'
-        ]
+            'Centro de Investigación',
+            
+        ] # 'CBO'
         
         created_institution_types = 0
         for name in institution_type_names:
