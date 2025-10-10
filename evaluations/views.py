@@ -726,7 +726,9 @@ def evaluate_expression(request, evaluation_id):
 
     items = TemplateItem.objects.filter(
         subcategory__category__template=template
-    ).select_related('subcategory__category').order_by(
+    ).select_related('subcategory__category').prefetch_related(
+        'options'
+    ).order_by(
         'subcategory__category__order', 'subcategory__order', 'order'
     )
 
@@ -765,10 +767,10 @@ def evaluate_expression(request, evaluation_id):
     # Extract related objects using correct _set syntax
     try:
         # Products
-        print("DEBUG")
-        for attr in dir(target):
-            print(attr)
-        print("END DEBUG")
+        # print("DEBUG")
+        # for attr in dir(target):
+        #     print(attr)
+        # print("END DEBUG")
         if isinstance(target, Proposal):
             print("A: This is a Proposal instance")
             if hasattr(target, 'proposalproduct_set') and target.proposalproduct_set.exists():
@@ -835,7 +837,7 @@ def evaluate_expression(request, evaluation_id):
             print(item.id, item.category.name, item.period.name)
         
         # Dynamic Question Responses
-        print(target)
+        print(target, "EVALUATION QUESTIONS")
         responses = {}
         try:
             # Use correct related name
@@ -855,7 +857,7 @@ def evaluate_expression(request, evaluation_id):
                     responses[question_text] = r.value.strip() if r.value else "No respondido"
             except:
                 pass
-
+        print(len(responses))
     except Exception as e:
         print("Error loading extended fields:", e)
         products = []
@@ -869,19 +871,39 @@ def evaluate_expression(request, evaluation_id):
             with transaction.atomic():
                 for item in items:
                     field_name = f"item_{item.id}"
-                    score_str = request.POST.get(field_name)
+                    option_id = request.POST.get(field_name)
                     comment = request.POST.get(f"comment_{item.id}", "")
-                    print(item)
+                    #print("EVALUATION QUESTION:", dir(item))
 
-                    if not score_str:
+                    if not option_id:
                         raise ValueError(f"Debe asignar una puntuación para: {item.question}")
 
+                    # print("Opt id:", option_id)
+
                     try:
-                        score = float(score_str)
-                        if score < 0 or score > item.max_score:
-                            raise ValueError(f"Puntuación inválida para '{item.question}'. Debe estar entre 0 y {item.max_score}.")
-                    except ValueError as e:
-                        raise ValueError(str(e))
+                        # # The item already has its options prefetched
+                        # selected_option = next(
+                        #     (opt for opt in item.options.all() if str(opt.id) == option_id),
+                        #     None
+                        # )
+                        # # print(selected_option)
+                        # # for val in item.options.all():
+                        # #     print("Values:", val, type(val))
+                        # if not selected_option:
+                        #     raise TemplateItemOption.DoesNotExist
+                        # score = selected_option.score
+                        selected_option = TemplateItemOption.objects.get(id=option_id, item=item)
+                        score = selected_option.score
+                        print(f"Starting questions {item.question.strip()}: Score is {score}, option is: {selected_option}")
+                    except TemplateItemOption.DoesNotExist:
+                        raise ValueError(f"Opción inválida seleccionada para '{item.question}'.")
+
+                    # Validation
+                    if score < 0 or score > item.max_score:
+                        raise ValueError(
+                            f"Puntuación inválida para '{item.question}'. "
+                            f"Debe estar entre 0 y {item.max_score}."
+                        )
 
                     # Update or create response
                     EvaluationResponse.objects.update_or_create(
@@ -904,10 +926,10 @@ def evaluate_expression(request, evaluation_id):
                 total_score_decimal = Decimal(str(total_score))
                 evaluation.total_score = total_score_decimal
                 evaluation.max_possible_score = evaluation.template.get_total_max_score()
-
+                print("Total score and max_possible score are good")
                 # Then calculate is_positive
                 if evaluation.max_possible_score > 0:
-                    ratio = total_score / float(evaluation.max_possible_score)
+                    ratio = total_score / Decimal(evaluation.max_possible_score)
                     evaluation.is_positive = ratio >= 0.7
                 else:
                     evaluation.is_positive = False

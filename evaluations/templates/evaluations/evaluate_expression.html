@@ -245,7 +245,7 @@
                                 <select name="item_{{ item.id }}" id="item_{{ item.id }}" class="form-select" required>
                                     <option value="">-- Seleccione --</option>
                                     {% for option in item.options.all %}
-                                        <option value="{{ option.display_text }}">{{ option.display_text }}</option>
+                                        <option value="{{ option.id }}">{{ option.display_text }}</option>
                                     {% endfor %}
                                 </select>
 
