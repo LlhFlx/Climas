@@ -119,7 +119,7 @@ class TemplateCategory(TimestampMixin, models.Model):
     )
 
     name = models.CharField(
-        max_length=100, 
+        max_length=400, 
         verbose_name="Nombre"
     )
 
@@ -153,7 +153,7 @@ class TemplateSubcategory(TimestampMixin, models.Model):
         related_name='subcategories', 
         verbose_name="Categoría"
     )
-    name = models.CharField(max_length=100, verbose_name="Nombre")
+    name = models.CharField(max_length=400, verbose_name="Nombre")
     order = models.PositiveIntegerField(default=0, verbose_name="Orden")
     is_active = models.BooleanField(default=True, verbose_name='Activa')
 
@@ -234,16 +234,6 @@ class TemplateItem(TimestampMixin, models.Model):
             except Exception:
                 return []
         return []
-    
-    def save(self, *args, **kwargs):
-        # Only auto-update max_score if this item uses options (i.e., dropdown)
-        # Could also be possible to check: if self.field_type == 'dropdown'
-        computed_max = self.calculate_max_score_from_options()
-        if computed_max is not None:
-            # Override max_score with highest option score
-            self.max_score = computed_max
-        # Else: keep existing max_score (for number/text fields)
-        super().save(*args, **kwargs)
 
     def get_options(self):
         if self.field_type == 'dynamic_dropdown' and self.source_model:

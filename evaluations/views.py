@@ -328,26 +328,25 @@ def create_template_item(request):
             max_score = float(request.POST.get('max_score', 5.0))
             source_model = request.POST.get('source_model') or None
             options_json = request.POST.get('options')  # JSON string of [{display_text, score}]
-            print(options_json)
+            print("Options", options_json)
             subcategory = get_object_or_404(TemplateSubcategory, id=subcategory_id)
-
             with transaction.atomic():
                 item = TemplateItem.objects.create(
                     subcategory=subcategory,
-                    question=question,
+                    question=question.strip(),
                     field_type=field_type,
                     max_score=max_score,
                     source_model=source_model,
                     order=subcategory.items.count() + 1
                 )
-
+                
                 # Save options
                 if options_json:
                     options = json.loads(options_json)
                     for opt in options:
                         TemplateItemOption.objects.create(
                             item=item,
-                            display_text=opt.get('display_text', ''),
+                            display_text=opt.get('display_text', '').strip(),
                             score=opt.get('score', 0)
                         )
 
