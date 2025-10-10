@@ -2067,11 +2067,12 @@ def apply_proposal(request, expression_id):
             title = request.POST.get(f'objective_title_{idx}', '').strip()
             desc = request.POST.get(f'objective_description_{idx}', '').strip()
             if title:
-                ProposalSpecificObjective.objects.create(
+                objective = ProposalSpecificObjective.objects.create(
                     proposal=proposal,
                     title=title,
                     description=desc
                 )
+                print("Got objective:", objective)
 
         # Products
         ProposalProduct.objects.filter(proposal=proposal).delete()
@@ -2088,6 +2089,7 @@ def apply_proposal(request, expression_id):
                     end_date=request.POST.get(f'proposal_product_end_date_{idx}'),
                     status=draft_status,
                 )
+                print("Got Product:", product)
                 effect_ids = request.POST.getlist(f'proposal_product_strategic_effects_{idx}')
                 if effect_ids:
                     product.strategic_effects.set(StrategicEffect.objects.filter(id__in=effect_ids))

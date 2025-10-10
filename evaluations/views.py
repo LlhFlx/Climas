@@ -769,25 +769,42 @@ def evaluate_expression(request, evaluation_id):
         for attr in dir(target):
             print(attr)
         print("END DEBUG")
-
-        if hasattr(target, 'product_set') and target.product_set.exists():
-            products = list(
-                target.product_set.prefetch_related('strategic_effects').all()
-            )
-            # for product in products:
-            #     print(f"Product: {product.title}")
-            #     effects = product.strategic_effects.all()
-            #     for effect in effects:
-            #         print(f"  → Effect: {effect.name}")
-            #     print(f"\nProduct ID is: {product.id} - Title: {product.title}")
-            #     if effects:
-            #         for effect in effects:
-            #             print(f"    {effect.id} - {effect.name}")
-            #     else:
-            #         print("   No strategic effects linked.")
-        else:
-            print("Error loading products:")
-            products = []
+        if isinstance(target, Proposal):
+            print("A: This is a Proposal instance")
+            if hasattr(target, 'proposalproduct_set') and target.proposalproduct_set.exists():
+                products = list(
+                    target.proposalproduct_set.prefetch_related('strategic_effects').all()
+                )
+            print(products)
+        elif isinstance(target, Expression):
+            if hasattr(target, 'expressionproduct_set') and target.expressionproduct_set.exists():
+                products = list(
+                    target.expressionproduct_set.prefetch_related('strategic_effects').all()
+                )
+            print("B: This is NOT a Proposal (it's a", type(target).__name__, ")")
+        
+        # if hasattr(target, 'proposalproduct_set') and target.proposalproduct_set.exists():
+        #     products = list(
+        #         target.product_set.prefetch_related('strategic_effects').all()
+        #     )
+        # elif hasattr(target, 'expressionproduct_set') and target.expressionproduct_set.exists():
+        #     products = list(
+        #         target.expressionproduct_set.prefetch_related('strategic_effects').all()
+        #     )
+        #     # for product in products:
+        #     #     print(f"Product: {product.title}")
+        #     #     effects = product.strategic_effects.all()
+        #     #     for effect in effects:
+        #     #         print(f"  → Effect: {effect.name}")
+        #     #     print(f"\nProduct ID is: {product.id} - Title: {product.title}")
+        #     #     if effects:
+        #     #         for effect in effects:
+        #     #             print(f"    {effect.id} - {effect.name}")
+        #     #     else:
+        #     #         print("   No strategic effects linked.")
+        # else:
+        #     print("Error loading products:")
+        #     products = []
 
         # # Team Members
         # if hasattr(target, 'projectteammember_set') and target.teammember_set.exists():
