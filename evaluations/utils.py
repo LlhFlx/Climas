@@ -22,9 +22,11 @@ def approve_if_auto_approved(target_id, target_type):
     )
 
     if evaluations.count() < 2:
+        print("Not enough evaluations")
         return False  # Not enough evaluations
 
     if evaluations.filter(is_positive=True).count() < 2:
+        print("Not all positive")
         return False  # Not all positive
 
     # All 2 are positive: auto-approve

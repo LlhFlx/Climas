@@ -872,6 +872,10 @@ def evaluate_expression(request, evaluation_id):
                 for item in items:
                     field_name = f"item_{item.id}"
                     option_id = request.POST.get(field_name)
+                    try:
+                        option_id = int(option_id)
+                    except (TypeError, ValueError):
+                        raise ValueError(f"Opción inválida para '{item.question}'.")
                     comment = request.POST.get(f"comment_{item.id}", "")
                     #print("EVALUATION QUESTION:", dir(item))
 
@@ -894,7 +898,7 @@ def evaluate_expression(request, evaluation_id):
                         # score = selected_option.score
                         selected_option = TemplateItemOption.objects.get(id=option_id, item=item)
                         score = selected_option.score
-                        print(f"Starting questions {item.question.strip()}: Score is {score}, option is: {selected_option}")
+                        print(f"Starting questions {item.question.strip()}: Score is {score}")
                     except TemplateItemOption.DoesNotExist:
                         raise ValueError(f"Opción inválida seleccionada para '{item.question}'.")
 

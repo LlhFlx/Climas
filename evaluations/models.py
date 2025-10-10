@@ -206,6 +206,20 @@ class TemplateItem(TimestampMixin, models.Model):
 
     def __str__(self):
         return f"{self.subcategory}: {self.question}"
+    
+    def calculate_max_score_from_options(self):
+        """Return the highest score among this item's options, or None if no options."""
+        if self.options.exists():
+            result = self.options.aggregate(max_score=models.Max('score'))['max_score']
+            return result
+        return None
+    
+    def sync_max_score(self):
+        """Update max_score from options and save if changed."""
+        new_max = self.calculate_max_score_from_options()
+        if new_max is not None and self.max_score != new_max:
+            self.max_score = new_max
+            self.save(update_fields=['max_score'])
 
     def get_dynamic_options(self):
         """Fetch display values from source_model (for UI prefill)."""
@@ -221,33 +235,16 @@ class TemplateItem(TimestampMixin, models.Model):
                 return []
         return []
     
-    # def get_options(self):
-    #     """
-    #     Retorna una lista de opciones para este item.
-    #     Prioriza 'source_model' sobre 'opciones'.
-    #     """
-    #     if self.source_model:
-    #         try:
-    #             app_label, model_name = self.source_model.split('.')
-    #             model = apps.get_model(app_label, model_name)
-    #             return list(model.objects.values_list('name', flat=True))
-    #         except (LookupError, AttributeError) as e:
-    #             return [f"Error loading {self.source_model}: {e}"]
-    #     elif self.options:
-    #         return self.options
-    #     return []
-    
-    # def get_options(self):
-    #     if self.field_type == 'dynamic_dropdown' and self.source_model:
-    #         try:
-    #             app_label, model_name = self.source_model.split('.')
-    #             model = apps.get_model(app_label, model_name)
-    #             return list(model.objects.values_list('name', flat=True))
-    #         except (LookupError, AttributeError) as e:
-    #             return [f"Error loading {self.source_model}: {e}"]
-    #     elif self.options:
-    #         return self.options
-    #     return []
+    def save(self, *args, **kwargs):
+        # Only auto-update max_score if this item uses options (i.e., dropdown)
+        # Could also be possible to check: if self.field_type == 'dropdown'
+        computed_max = self.calculate_max_score_from_options()
+        if computed_max is not None:
+            # Override max_score with highest option score
+            self.max_score = computed_max
+        # Else: keep existing max_score (for number/text fields)
+        super().save(*args, **kwargs)
+
     def get_options(self):
         if self.field_type == 'dynamic_dropdown' and self.source_model:
             try:
