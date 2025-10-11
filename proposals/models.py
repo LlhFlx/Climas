@@ -40,6 +40,12 @@ class Proposal(Expression):
         verbose_name="Título del Proyecto"
     )
 
+    general_objective_override = models.TextField(
+        blank=True,
+        null = True,
+        help_text="Si se especifica, sobrescribe el objetivo general de la expresión.",
+    )
+
     thematic_axis_override = models.ForeignKey(
         'thematic_axes.ThematicAxis',
         on_delete=models.SET_NULL,

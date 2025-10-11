@@ -1814,6 +1814,7 @@ def apply_proposal(request, expression_id):
             expression_ptr=expression,
             **data,
             #created_by=expression.created_by,
+            general_objective_override='',
             principal_research_experience='',
             community_description='',
             duration_months=12,
@@ -1925,6 +1926,7 @@ def apply_proposal(request, expression_id):
         # Capture all POST data
         post_data = {
             'project_title_override': request.POST.get('project_title_override', '').strip(),
+            'general_objective_override': request.POST.get('general_objective_override', '').strip(),
             'thematic_axis_override': request.POST.get('thematic_axis_override'),
             'principal_research_experience': request.POST.get('principal_research_experience', '').strip(),
             'community_description': request.POST.get('community_description', '').strip(),
@@ -1946,6 +1948,7 @@ def apply_proposal(request, expression_id):
 
         # Update Proposal fields
         proposal.project_title_override = post_data['project_title_override']
+        proposal.general_objective_override = post_data['general_objective_override']
         print(proposal.project_title_override)
         proposal.principal_research_experience = post_data['principal_research_experience']
         proposal.community_description = post_data['community_description']

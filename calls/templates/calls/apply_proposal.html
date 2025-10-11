@@ -71,6 +71,17 @@
             <small class="form-text text-muted">Máximo 50 palabras</small>
         </div>
 
+        
+        <!-- 0.1. General Objective Override -->
+        <div class="mb-3">
+            <label class="form-label">Objetivo General del Proyecto (Opcional)</label>
+            <input type="text"
+                name="general_objective_override"
+                class="form-control"
+                value="{{ post_data.general_objective_override|default:proposal.general_objective_override|default:'' }}"
+                placeholder="Puede sobrescribir el objetivo general anterior">
+            <small class="form-text text-muted">Máximo 50 palabras</small>
+        </div>
         <!-- 0.2. Thematic Axis Override -->
         <div class="mb-3">
             <label class="form-label">Eje Temático</label>
