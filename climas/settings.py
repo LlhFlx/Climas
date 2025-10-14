@@ -79,7 +79,20 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'climas.middleware.AutoLogoutMiddleware'
 ]
+
+# Auto-logout after 15 minutes of inactivity
+AUTO_LOGOUT_DELAY = 900  # 900 seconds = 15 minutes
+
+# Expire session when browser closes
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+# Expire after 15 minutes of inactivity
+SESSION_COOKIE_AGE = 900  # same as AUTO_LOGOUT_DELAY
+
+# Save session on every request (so last_activity updates reliably)
+SESSION_SAVE_EVERY_REQUEST = True
 
 ROOT_URLCONF = 'climas.urls'
 
