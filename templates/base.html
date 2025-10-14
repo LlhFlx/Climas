@@ -247,16 +247,29 @@
     </header>
 
     <!-- Navbar (normal flow, not fixed) -->
+    {% if user.is_authenticated %}
+        {% if user.customuser.role and user.customuser.role.name == 'Coordinator' %}
+            {% url 'calls:coordinator_dashboard' as dashboard_url %}
+        {% elif user.customuser.role and user.customuser.role.name == 'Researcher' %}
+            {% url 'calls:researcher_dashboard' as dashboard_url %}
+        {% elif user.customuser.role and user.customuser.role.name == 'Evaluator' %}
+            {% url 'evaluations:evalautor_dashboard' as dashboard_url %}
+        {% else %}
+            {% url 'home' as dashboard_url %}
+        {% endif %}
+    {% else %}
+        {% url 'login' as dashboard_url %}
+    {% endif %}
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'calls:coordinator_dashboard' %}">Climas</a>
+            <a class="navbar-brand" href="{{ dashboard_url }}">Climas</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'calls:coordinator_dashboard' %}">Dashboard</a>
+                        <a class="nav-link" href="{{ dashboard_url }}">Dashboard</a>
                     </li>
                 </ul>
                 
