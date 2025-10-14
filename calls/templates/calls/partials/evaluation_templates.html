@@ -1,0 +1,345 @@
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5>Plantillas de Evaluación</h5>
+        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createTemplateModal">
+            + Nueva Plantilla
+        </button>
+    </div>
+    <div class="card-body">
+        {% if templates %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Descripción</th>
+                            <th>Estado</th>
+                            <th>Categorías</th>
+                            <th>Aplica a</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for template in templates %}
+                            <tr>
+                                <td><strong>{{ template.name }}</strong></td>
+                                <td>{{ template.description|truncatechars:60 }}</td>
+                                <td>
+                                    {% if template.is_active %}
+                                        <span class="badge bg-success">Activa</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inactiva</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ template.categories.count }}</td>
+                                <td>
+                                    {% if template.applies_to_expression and template.applies_to_proposal %}
+                                        <span class="badge bg-primary">Expresiones & Propuestas</span>
+                                    {% elif template.applies_to_expression %}
+                                        <span class="badge bg-info">Expresiones</span>
+                                    {% elif template.applies_to_proposal %}
+                                        <span class="badge bg-success">Propuestas</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Ninguno</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <a href="{% url 'evaluations:template_detail' template.id %}" class="btn btn-outline-info btn-sm">
+                                            Administrar Categorías e Ítems
+                                        </a>
+                                        <button type="button"
+                                                class="btn btn-outline-primary btn-sm"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editTemplateModal"
+                                                data-template-id="{{ template.id }}"
+                                                data-template-name="{{ template.name|escapejs }}"
+                                                data-template-description="{{ template.description|escapejs }}"
+                                                data-template-is-active="{{ template.is_active }}"
+                                                data-template-applies-to-expression="{{ template.applies_to_expression }}"
+                                                data-template-applies-to-proposal="{{ template.applies_to_proposal }}">
+                                            Editar
+                                        </button>
+                                        <button type="button"
+                                                class="btn btn-outline-danger btn-sm"
+                                                onclick="confirmDelete({{ template.id }}, '{{ template.name }}')">
+                                            Borrar
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="5">No hay plantillas aún.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info">No se han creado plantillas de evaluación.</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal: Create Template -->
+<div class="modal fade" id="createTemplateModal" tabindex="-1" aria-labelledby="createTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form method="post" id="templateForm" action="{% url 'evaluations:create_template' %}">
+            {% csrf_token %}
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createTemplateModalLabel">Crear Plantilla de Evaluación</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre *</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descripción</label>
+                        <textarea name="description" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="is_active" value="on" class="form-check-input" checked>
+                        <label class="form-check-label">Activa</label>
+                    </div>
+
+                    <!-- Applies to Expressions -->
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="applies_to_expression" value="on" class="form-check-input" checked>
+                        <label class="form-check-label">Aplica a Expresiones</label>
+                    </div>
+
+                    <!-- Applies to Proposals -->
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="applies_to_proposal" value="on" class="form-check-input" checked>
+                        <label class="form-check-label">Aplica a Propuestas</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Plantilla</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit Template -->
+<div class="modal fade" id="editTemplateModal" tabindex="-1" aria-labelledby="editTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form method="post" id="editTemplateForm" action="">
+            {% csrf_token %}
+            <input type="hidden" name="id" id="edit-template-id">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editTemplateModalLabel">Editar Plantilla de Evaluación</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre *</label>
+                        <input type="text" name="name" class="form-control" id="edit-template-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descripción</label>
+                        <textarea name="description" class="form-control" rows="3" id="edit-template-description"></textarea>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="is_active" value="on" class="form-check-input" id="edit-template-is-active">
+                        <label class="form-check-label">Activa</label>
+                    </div>
+
+                    <!-- Applies to Expressions -->
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="applies_to_expression" value="on" class="form-check-input" id="edit-template-applies-to-expression">
+                        <label class="form-check-label">Aplica a Expresiones</label>
+                    </div>
+
+                    <!-- Applies to Proposals -->
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="applies_to_proposal" value="on" class="form-check-input" id="edit-template-applies-to-proposal">
+                        <label class="form-check-label">Aplica a Propuestas</label>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<script>
+// Reusable function to show user feedback
+function showMessage(type, text) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.role = 'alert';
+    alert.innerHTML = `
+        ${text}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    const container = document.querySelector('.container');
+    if (container) {
+        container.insertBefore(alert, container.firstChild);
+    }
+    setTimeout(() => {
+        if (alert.parentNode) alert.remove();
+    }, 5000);
+}
+
+document.getElementById('templateForm').addEventListener('submit', function(e) {
+    e.preventDefault(); // Stop full page submit
+    const form = e.target;
+    const formData = new FormData(form);
+    // ONLY read from THIS form (not entire document)
+    formData.append('applies_to_expression', form.querySelector('input[name="applies_to_expression"]:checked') ? 'on' : '');
+    formData.append('applies_to_proposal', form.querySelector('input[name="applies_to_proposal"]:checked') ? 'on' : '');
+    const url = form.action;
+
+    fetch(url, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload(); // Reload to see new template
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while saving.');
+    });
+});
+
+function confirmDelete(templateId, name) {
+    if (confirm(`¿Estás seguro de que deseas eliminar la plantilla "${name}"?`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `{% url 'evaluations:delete_template' 0 %}`.replace('0', templateId);
+        form.innerHTML = `
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+        `;
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// ============================
+// HANDLE EDIT TEMPLATE BUTTON
+// ============================
+document.addEventListener('click', function(e) {
+    const editBtn = e.target.closest('button[data-template-id]');
+    if (!editBtn) return;
+
+    e.preventDefault();
+
+    const templateId = editBtn.getAttribute('data-template-id');
+    const templateName = editBtn.getAttribute('data-template-name');
+    const templateDescription = editBtn.getAttribute('data-template-description');
+    const templateIsActive = editBtn.getAttribute('data-template-is-active') === 'True';
+
+    const form = document.getElementById('editTemplateForm');
+    const modalTitle = document.getElementById('editTemplateModalLabel');
+
+    // Set form action
+    form.action = `{% url "evaluations:edit_template" 0 %}`.replace('0', templateId);
+
+    // Populate fields
+    document.getElementById('edit-template-id').value = templateId;
+    document.getElementById('edit-template-name').value = templateName;
+    document.getElementById('edit-template-description').value = templateDescription;
+    document.getElementById('edit-template-is-active').checked = templateIsActive === 'True';
+
+    // Populate applies_to_expression and applies_to_proposal
+    document.getElementById('edit-template-applies-to-expression').checked = templateAppliesToExpression === 'True';
+    document.getElementById('edit-template-applies-to-proposal').checked = templateAppliesToProposal === 'True';
+
+    // Show modal
+    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('editTemplateModal'));
+    if (modalInstance) {
+        modalInstance.show();
+    } else {
+        new bootstrap.Modal(document.getElementById('editTemplateModal')).show();
+    }
+});
+
+// ============================
+// HANDLE EDIT TEMPLATE FORM SUBMISSION
+// ============================
+document.getElementById('editTemplateForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const form = this;
+    const formData = new FormData(form);
+    // ONLY read from THIS form (not entire document)
+    formData.append('applies_to_expression', form.querySelector('input[name="applies_to_expression"]:checked') ? 'on' : '');
+    formData.append('applies_to_proposal', form.querySelector('input[name="applies_to_proposal"]:checked') ? 'on' : '');
+
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update the table row dynamically (optional)
+            const row = document.querySelector(`tr[data-template-id="${data.id}"]`);
+            if (row) {
+                row.querySelector('td strong').textContent = data.name;
+                row.querySelector('td:nth-child(2)').textContent = data.description;
+                //const badge = row.querySelector('.badge');
+                // Update "Estado" badge
+                const estadoBadge = row.querySelector('td:nth-child(3) .badge');
+                estadoBadge.textContent = data.is_active ? 'Activa' : 'Inactiva';
+                estadoBadge.className = `badge bg-${data.is_active ? 'success' : 'secondary'}`;
+                // Update "Aplica a" badge
+                const aplicaBadge = row.querySelector('td:nth-child(5) .badge');
+                if (data.applies_to_expression && data.applies_to_proposal) {
+                    aplicaBadge.textContent = 'Expresiones & Propuestas';
+                    aplicaBadge.className = 'badge bg-primary';
+                } else if (data.applies_to_expression) {
+                    aplicaBadge.textContent = 'Expresiones';
+                    aplicaBadge.className = 'badge bg-info';
+                } else if (data.applies_to_proposal) {
+                    aplicaBadge.textContent = 'Propuestas';
+                    aplicaBadge.className = 'badge bg-success';
+                } else {
+                    aplicaBadge.textContent = 'Ninguno';
+                    aplicaBadge.className = 'badge bg-danger';
+                }
+
+                badge.textContent = data.is_active ? 'Activa' : 'Inactiva';
+                badge.className = `badge bg-${data.is_active ? 'success' : 'secondary'}`;
+            }
+
+            //bootstrap.Modal.getInstance(document.getElementById('editTemplateModal')).hide();
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editTemplateModal'));
+            if (modal) {
+                modal.hide();
+            }
+            showMessage('success', `Plantilla "${data.name}" actualizada exitosamente.`);
+        } else {
+            alert('Error: ' + (data.error || 'Desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error al editar plantilla:', error);
+        alert('Hubo un problema al conectar con el servidor.');
+    });
+});
+
+</script>

@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% load evaluation_extras %}
+{% block title %}Todas las Evaluaciones - Coordinador{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Todas las Evaluaciones</h2>
+
+    {% if evaluations %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Proyecto</th>
+                        <th>Investigador</th>
+                        <th>Evaluador</th>
+                        <th>Plantilla</th>
+                        <th>Puntaje</th>
+                        <th>Estado</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in evaluations %}
+                        <tr>
+                            <td>{{ e.target.project_title|truncatewords:15 }}</td>
+                            <td>{{ e.target.user.person|default:e.target.user.username }}</td>
+                            <td>{{ e.evaluator.person|default:e.evaluator.user.username }}</td>
+                            <td>{{ e.template.name }}</td>
+                            <td>{{ e.total_score|default:"-" }}</td>
+                            <!--  STATUS COLUMN: Use 'e', not 'evaluation' -->
+                            <td>
+                                {% if e.is_validated %}
+                                    {% if e.coordinator_notes %}
+                                        <span class="badge bg-primary">Validada</span>
+                                    {% else %}
+                                        <span class="badge bg-success"> Validada</span>
+                                    {% endif %}
+                                {% elif e.target.status.name == 'Aprobada' or e.target.status.name == 'Aprobada para Financiamiento' %}
+                                    <span class="badge bg-info"> Aprobada</span>
+                                {% else %}
+                                    {% comment %} Check if auto-approved: 3 evaluations, all positive {% endcomment %}
+                                    {% with target_evaluations=e.target.evaluation_set.all %}
+                                        {% if target_evaluations.count >= 3 and target_evaluations.filter(is_positive=True).count == 3 %}
+                                            <span class="badge bg-warning">🔁 Autoaprobada</span>
+                                        {% else %}
+                                            {% if e.is_positive %}
+                                                <span class="badge bg-success"> Positiva</span>
+                                            {% else %}
+                                                <span class="badge bg-danger">❌ Negativa</span>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endif %}
+                            </td>
+                            <td>{{ e.submission_datetime|date:"d/m/Y H:i" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info">No hay evaluaciones realizadas aún.</div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{% url 'calls:coordinator_evaluations_dashboard' %}" class="btn btn-outline-secondary">← Volver al Dashboard de Evaluaciones</a>
+    </div>
+</div>
+{% endblock %}

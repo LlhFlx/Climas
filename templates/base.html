@@ -1,0 +1,485 @@
+{% load widget_tweaks %}
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="es" x-data="{ darkMode: false }" :class="{ 'dark': darkMode }">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Climas{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Alpine.js -->
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+    <style>
+        body.dark {
+            background-color: #1a1a1a;
+            color: #f8f9fa;
+        }
+
+        body.dark .navbar {
+            background-color: #212529 !important;
+            color: #f8f9fa;
+        }
+
+        body.dark .navbar-light .navbar-nav .nav-link,
+        body.dark .navbar-light .navbar-brand,
+        body.dark .navbar-light .navbar-text {
+            color: #f8f9fa !important;
+        }
+
+        body.dark .navbar-light .navbar-toggler-icon {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+        }
+
+        body.dark .dropdown-menu {
+            background-color: #343a40 !important;
+            color: #f8f9fa !important;
+        }
+
+        body.dark .dropdown-item {
+            color: #f8f9fa !important;
+        }
+
+        body.dark .dropdown-item:hover,
+        body.dark .dropdown-item:focus {
+            background-color: #495057 !important;
+            color: #ffffff !important;
+        }
+
+        body.dark .alert {
+            background-color: #343a40;
+            border-color: #495057;
+            color: #f8f9fa;
+        }
+
+        body.dark .form-control,
+        body.dark .form-select {
+            background-color: #343a40;
+            border-color: #495057;
+            color: #f8f9fa;
+        }
+
+        body.dark .form-control:focus,
+        body.dark .form-select:focus {
+            background-color: #343a40;
+            border-color: #6c757d;
+            color: #f8f9fa;
+        }
+
+        body.dark .btn-outline-primary {
+            color: #0d6efd;
+            border-color: #0d6efd;
+        }
+
+        body.dark .btn-outline-primary:hover {
+            background-color: #0d6efd;
+            color: #fff;
+        }
+
+        body.dark .list-group-item {
+            background-color: #212529;
+            border-color: #343a40;
+            color: #f8f9fa;
+        }
+
+        body.dark .badge {
+            color: #fff;
+        }
+
+        /* Header image scaling */
+        header img {
+            max-width: 800px;   /* limit width */
+            width: 100%;        /* responsive */
+            height: auto;
+        }
+
+        /* Footer styling */
+        footer {
+            margin-top: 2rem;
+            padding: 1rem 0;
+            background-color: #f8f9fa;
+        }
+
+        body.dark footer {
+            background-color: #212529;
+        }
+
+        footer img {
+            max-width: 800px;   /* same as header */
+            width: 50%;        /* responsive */
+            height: auto;       /* keep proportions */
+        }
+
+        .list-group-item.cursor-pointer {
+            cursor: pointer;
+        }
+
+        .list-group-item.cursor-pointer:hover {
+            background-color: #f8f9fa;
+        }
+
+        .bg-custom-blue {
+            background-color: #1e5a7d !important;
+        }
+
+        .bg-custom-blue .text-light,
+        .bg-custom-blue .badge,
+        .bg-custom-blue strong,
+        .bg-custom-blue span {
+            color: #fff !important;
+        }
+
+        /* Custom badge colors for bg-custom-blue */
+
+        /* .bg-custom-blue .badge-warning-custom {
+            background-color: #ff9800 !important;
+            color: #212529 !important;
+            font-weight: bold;
+        }
+
+        .bg-custom-blue .badge-danger-custom {
+            background-color: #ff6b6b !important;
+            color: #212529 !important;
+            font-weight: bold;
+        }
+
+        .bg-custom-blue .badge-success-custom {
+            background-color: #4caf50 !important;
+            color: #fff !important;
+            font-weight: bold;
+        } */
+
+        .bg-custom-blue .badge-success-custom,
+        .bg-custom-blue .badge-warning-custom,
+        .bg-custom-blue .badge-danger-custom {
+            background: linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%) !important;
+            border: 1px solid rgba(255, 255, 255, 0.4) !important;
+            color: #343a40 !important;
+            font-size: 0.8rem !important;
+            font-weight: 500 !important;
+            padding: 0.3rem 0.7rem !important;
+            border-radius: 12px !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05) !important;
+            text-shadow: 0 1px 1px rgba(255, 255, 255, 0.7) !important;
+            backdrop-filter: blur(2px) !important;
+            letter-spacing: -0.02em !important;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+
+        /* Hover effect - subtle lift + glow */
+        .bg-custom-blue .badge-success-custom:hover,
+        .bg-custom-blue .badge-warning-custom:hover,
+        .bg-custom-blue .badge-danger-custom:hover {
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+            border-color: rgba(255, 255, 255, 0.6) !important;
+        }
+
+        /* Color-specific tints (for visual hierarchy) */
+        .bg-custom-blue .badge-success-custom {
+            background: linear-gradient(145deg, #d4edda 0%, #e9ecef 100%) !important;
+            border-color: rgba(220, 237, 218, 0.5) !important;
+            color: #155724 !important;
+            text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6) !important;
+        }
+
+        .bg-custom-blue .badge-warning-custom {
+            background: linear-gradient(145deg, #fff3cd 0%, #fff8e6 100%) !important;
+            border-color: rgba(255, 243, 205, 0.5) !important;
+            color: #856404 !important;
+            text-shadow: 0 1px 1px rgba(255, 255, 255, 0.7) !important;
+        }
+
+        .bg-custom-blue .badge-danger-custom {
+            background: linear-gradient(145deg, #f8d7da 0%, #fde0e2 100%) !important;
+            border-color: rgba(248, 215, 218, 0.5) !important;
+            color: #721c24 !important;
+            text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6) !important;
+        }
+
+        /* People autocomplete */
+        .suggestions-list {
+            position: absolute !important;
+            z-index: 1050 !important;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 0.3rem;
+            background: white;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+            margin-top: 0.25rem;
+            padding: 0;
+            width: 100%;
+            min-width: 200px; /* Prevents narrow dropdown */
+        }
+
+        /* Force parent .card to allow overflow for suggestions */
+        .team-member-entry {
+            overflow: visible !important;
+        }
+
+        .suggestions-list .list-group-item {
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 0 !important;
+            border-bottom: 1px solid #eee;
+        }
+
+        .suggestions-list .list-group-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestions-list .list-group-item:hover {
+            background-color: #f8f9fa !important;
+        }
+    </style>
+</head>
+<body :class="{ 'dark': darkMode }" class="alpinejs">
+    <!-- Header Image -->
+    <header class="text-center py-2">
+        <img src="{% static 'images/CABEZOTE-CONVOCATORIAS.jpg' %}" alt="Header Image" class="img-fluid">
+    </header>
+
+    <!-- Navbar (normal flow, not fixed) -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'calls:coordinator_dashboard' %}">Climas</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'calls:coordinator_dashboard' %}">Dashboard</a>
+                    </li>
+                </ul>
+                
+                <!-- Dark Mode Toggle -->
+                <div class="form-check form-switch me-3">
+                    <input class="form-check-input" type="checkbox" role="switch" id="darkModeToggle" x-model="darkMode">
+                    <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
+                </div>
+
+                <!-- User Dropdown -->
+                {% if user.is_authenticated %}
+                    <div class="dropdown">
+                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
+                            {{ user.username }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+                            <li><a class="dropdown-item" href="{% url 'accounts:profile' %}">Profile</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="post" action="{% url 'accounts:logout' %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item">Logout</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                {% else %}
+                    <a class="btn btn-outline-primary" href="{% url 'accounts:login' %}">Login</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container mt-4">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center">
+        <img src="{% static 'images/LOGO-FINAL-CLIMAS-HUBDescriptivo.png' %}" alt="Footer Image" class="img-fluid">
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    {% block extra_js %}
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tab = urlParams.get('tab');
+
+        if (tab) {
+            // Find the button with data-bs-target="#{tab}"
+            const triggerEl = document.querySelector(`button[data-bs-target="#${tab}"]`);
+            
+            if (triggerEl) {
+                // Use Bootstrap's JS API to show the tab
+                const tabInstance = bootstrap.Tab.getInstance(triggerEl);
+                if (tabInstance) {
+                    tabInstance.show();
+                } else {
+                    new bootstrap.Tab(triggerEl).show();
+                }
+            }
+        }
+    });
+
+    // UNIVERSAL WORD COUNTER - GLOBAL SCOPE
+    document.addEventListener('DOMContentLoaded', function() {
+        /**
+         * Utility: Count words in text
+         */
+        function countWords(text) {
+            return text.trim() ? text.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
+        }
+
+        /**
+         * Single Textarea Counter
+         */
+        function initWordCounter(textarea) {
+            const maxWords = parseInt(textarea.getAttribute('data-word-limit'), 10);
+            if (!maxWords) return;
+
+            // Create or get counter element
+            let counterEl = document.getElementById(`counter-${textarea.id}`);
+            if (!counterEl) {
+                counterEl = document.createElement('small');
+                counterEl.id = `counter-${textarea.id}`;
+                counterEl.className = 'form-text d-block mt-1';
+                textarea.parentNode.insertBefore(counterEl, textarea.nextSibling);
+            }
+
+            function update() {
+                const value = textarea.value || '';
+                const wordCount = countWords(value);
+                const isOver = wordCount > maxWords;
+
+                counterEl.className = `form-text d-block mt-1 ${isOver ? 'text-danger' : 'text-muted'}`;
+                counterEl.textContent = `${wordCount} / ${maxWords} palabras`;
+
+                // Optional: Highlight input if over
+                if (textarea.classList.contains('form-control')) {
+                    textarea.classList.toggle('border-danger', isOver);
+                }
+            }
+
+            // Initial + live updates
+            update();
+            textarea.addEventListener('input', update);
+
+            return { validate: () => countWords(textarea.value) <= maxWords };
+        }
+
+        /**
+         * Container-Based Total Word Counter
+         */
+        function initContainerWordCounter(container) {
+            const totalLimit = parseInt(container.getAttribute('data-total-limit'), 10);
+            if (!totalLimit) return;
+
+            const selector = container.getAttribute('data-textarea-selector') || 'textarea[data-word-limit]';
+            const textareas = container.querySelectorAll(selector);
+
+            const outputId = container.getAttribute('data-output-id');
+            const counterEl = outputId ? document.getElementById(outputId) : null;
+
+            function update() {
+                let total = 0;
+                textareas.forEach(ta => {
+                    const value = ta.value || '';
+                    total += countWords(value);
+                });
+
+                const isOver = total > totalLimit;
+
+                if (counterEl) {
+                    counterEl.className = `form-text d-block mt-1 ${isOver ? 'text-danger fw-bold' : 'text-muted'}`;
+                    counterEl.innerHTML = `<strong>Total:</strong> ${total} / ${totalLimit} palabras`;
+                }
+
+                // Update individual borders
+                textareas.forEach(ta => {
+                    if (ta.classList.contains('form-control')) {
+                        ta.classList.remove('border-danger', 'border-success');
+                        if (isOver) ta.classList.add('border-danger');
+                    }
+                });
+            }
+
+            // Live update
+            container.addEventListener('input', update, true); // true = capture phase
+            update(); // initial
+
+            return { validate: () => {
+                update(); // always recalc
+                return !counterEl || countWords(counterEl.textContent.split(' ')[1]) <= totalLimit;
+            }};
+        }
+
+        /**
+         * Auto-initialize all marked elements on page load
+         */
+        function autoInitCounters() {
+            // Init single counters
+            document.querySelectorAll('textarea[data-word-limit]').forEach(initWordCounter);
+
+            // Init container counters
+            document.querySelectorAll('[data-total-limit]').forEach(initContainerWordCounter);
+        }
+
+        /**
+         * Expose globally so dynamic fields can use it
+         */
+        window.initWordCounter = initWordCounter;
+        window.initContainerWordCounter = initContainerWordCounter;
+        window.countWords = countWords;
+
+        // Run on load
+        autoInitCounters();
+
+        // Attach to all forms: prevent submit if over limit
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function(e) {
+                let valid = true;
+
+                // Check individual fields
+                form.querySelectorAll('textarea[data-word-limit]').forEach(ta => {
+                    const limit = parseInt(ta.getAttribute('data-word-limit'), 10);
+                    if (countWords(ta.value) > limit) {
+                        valid = false;
+                    }
+                });
+
+                // Check containers
+                form.querySelectorAll('[data-total-limit]').forEach(container => {
+                    const totalLimit = parseInt(container.getAttribute('data-total-limit'), 10);
+                    let totalWords = 0;
+                    const selector = container.getAttribute('data-textarea-selector') || 'textarea[data-word-limit]';
+                    container.querySelectorAll(selector).forEach(ta => {
+                        totalWords += countWords(ta.value);
+                    });
+                    if (totalWords > totalLimit) valid = false;
+                });
+
+                if (!valid) {
+                    e.preventDefault();
+                    alert("Uno o más campos exceden el límite de palabras. Revise y corrija.");
+                }
+            });
+        });
+    });
+
+    </script>
+{% endblock %}
+</body>
+</html>

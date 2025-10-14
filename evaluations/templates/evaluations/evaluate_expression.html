@@ -1,0 +1,316 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Evaluar: {{ evaluation.target.project_title }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px;">
+    <h3>Evaluando: "{{ evaluation.target.project_title }}"</h3>
+    <p><strong>Convocatoria:</strong> {{ evaluation.call.title }}</p>
+    <p><strong>Plantilla:</strong> {{ evaluation.template.name }}</p>
+    <p><strong>Tipo:</strong>
+        {% if target_type == 'expression' %}
+            <span class="badge bg-info">Expresión</span>
+        {% else %}
+            <span class="badge bg-success">Propuesta</span>
+        {% endif %}
+    </p>
+
+    <hr>
+
+    <!-- Read-only Project Info -->
+    <div class="mb-4">
+        <h5>Datos del Proyecto</h5>
+        <ul class="list-group">
+
+            <!-- BASIC FIELDS (Shared by Expression & Proposal) -->
+            <li class="list-group-item"><strong>Título:</strong> {{ evaluation.target.project_title_override|default:evaluation.target.project_title }}</li>
+            <li class="list-group-item"><strong>Investigador Principal:</strong> {{ evaluation.target.user.person|default:evaluation.target.user.user.username }}</li>
+            <li class="list-group-item"><strong>País:</strong> {{ evaluation.target.project_location.name }}</li>
+            <li class="list-group-item"><strong>Problema:</strong> {{ evaluation.target.problem|truncatewords:50 }}</li>
+            <li class="list-group-item"><strong>Objetivo General:</strong> {{ evaluation.target.general_objective|truncatewords:50 }}</li>
+            <li class="list-group-item"><strong>Metodología:</strong> {{ evaluation.target.methodology|truncatewords:50 }}</li>
+
+
+            <!-- PRODUCTS -->
+            {% if products %}
+                <li class="list-group-item">
+                    <strong>Productos del Proyecto:</strong>
+                    <ul class="mt-1">
+                        {% for product in products %}
+                            <li>
+                                <strong>{{ product.title }}</strong>:<br>
+                                <em>{{ product.description|default:"Sin descripción" }}</em><br>
+                                <small><strong>Efectos estratégicos:</strong></small>
+                                {% if product.strategic_effects.all %}
+                                    <ul class="list-unstyled ms-3 mb-2 text-muted" style="font-size: 0.95rem;">
+                                        {% for effect in product.strategic_effects.all %}
+                                            <li>• <span class="text-dark">{{ effect.name }}</span></li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <p class="ms-4 text-muted" style="font-size: 0.9rem;">No asignados</p>
+                                {% endif %}
+                                <small><strong>Fechas:</strong> {{ product.start_date|date:"Y-m-d" }} → {{ product.end_date|date:"Y-m-d" }}</small>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            {% endif %}
+
+            <!-- TEAM MEMBERS -->
+            {% if team_members %}
+                <li class="list-group-item">
+                    <strong>Colaboradores del Proyecto:</strong>
+                    <ul class="mt-1">
+                        {% for member in team_members %}
+                            <li>
+                                <strong>{{ member.person.first_name }} {{ member.person.first_last_name }}</strong> <br>
+                                Rol: {{ member.role }}<br>
+                                Institución: {{ member.institution.name }}<br>
+                                <small>({{ member.start_date|date:"Y-m-d" }} → {{ member.end_date|date:"Y-m-d" }})</small>
+                                
+                                {% if member.thematic_antecedents.exists %}
+                                    <ul class="mt-2">
+                                        {% for antecedent in member.thematic_antecedents.all %}
+                                            <li>
+                                                <em>Eje Temático:</em> {{ antecedent.thematic_axis.name }}<br>
+                                                <em>Descripción:</em> {{ antecedent.description }}<br>
+                                                {% if antecedent.evidence_url %}
+                                                    <em>Evidencia:</em>
+                                                    <a href="{{ antecedent.evidence_url }}" target="_blank">
+                                                        {{ antecedent.evidence_url }}
+                                                    </a><br>
+                                                {% endif %}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <p class="text-muted mb-0 mt-1">Sin antecedentes temáticos registrados.</p>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            {% endif %}
+
+            <!-- BUDGET ITEMS -->
+             <strong>Presupuesto</strong>
+            {% if existing_budget_items %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Categoría</th>
+                                <th>Periodo</th>
+                                <th>Monto (COP)</th>
+                                <th>Notas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in existing_budget_items %}
+                                <tr>
+                                    <td>
+                                        {% if item.category %}{{ item.category.name }}{% else %}<em>Sin categoría</em>{% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.period %}{{ item.period.name }}{% else %}<em>Sin periodo</em>{% endif %}
+                                    </td>
+                                    <td>{{ item.amount|intcomma }}</td>
+                                    <td>{{ item.notes|truncatechars:60|default:"–" }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info">No hay ítems de presupuesto.</div>
+            {% endif %}
+
+            <!-- PROPOSAL-SPECIFIC TEXT FIELDS -->
+            {% if target_type == 'proposal' %}
+                <li class="list-group-item"><strong>Experiencia en Investigación del Investigador Principal:</strong> {{ proposal_fields.principal_research_experience|default:"No proporcionado"|linebreaks }}</li>
+                <li class="list-group-item"><strong>País de la Comunidad:</strong> {{ proposal_fields.community_country.name|default:"No especificado" }}</li>
+                <li class="list-group-item"><strong>Descripción de la Comunidad:</strong> {{ proposal_fields.community_description|default:"No proporcionada"|linebreaks }}</li>
+                <li class="list-group-item"><strong>País de Implementación del Proyecto:</strong> {{ proposal_fields.project_location.name|default:"No especificado" }}</li>
+                <li class="list-group-item"><strong>Duración del Proyecto (meses):</strong> {{ proposal_fields.duration_months|default:"No especificada" }}</li>
+                <li class="list-group-item"><strong>Resumen:</strong> {{ proposal_fields.summary|default:"No proporcionado"|linebreaks }}</li>
+                <li class="list-group-item"><strong>Contexto, Problema y Justificación:</strong> {{ proposal_fields.context_problem_justification|default:"No proporcionado"|linebreaks }}</li>
+                {% if target_type == 'proposal' %}
+                    <li class="list-group-item">
+                        <strong>Objetivos Específicos:</strong>
+                        {% if proposal_fields.specific_objectives.exists %}
+                            <ul>
+                                {% for obj in proposal_fields.specific_objectives %}
+                                    <li>
+                                        <strong>{{ obj.title }}</strong>
+                                        {% if obj.description %}
+                                            <br><small>{{ obj.description|linebreaks }}</small>
+                                        {% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <em>No proporcionados</em>
+                        {% endif %}
+                    </li>
+                {% endif %}
+                <li class="list-group-item"><strong>Metodología, Plan Analítico y Ética:</strong> {{ proposal_fields.methodology_analytical_plan_ethics|default:"No proporcionado"|linebreaks }}</li>
+                <li class="list-group-item"><strong>Equidad, Género, Interseccionalidad e Inclusión:</strong> {{ proposal_fields.equity_inclusion|default:"No proporcionado"|linebreaks }}</li>
+                <li class="list-group-item"><strong>Estrategia de Comunicación:</strong> {{ proposal_fields.communication_strategy|default:"No proporcionada"|linebreaks }}</li>
+                <li class="list-group-item"><strong>Riesgos y Mitigación:</strong> {{ proposal_fields.risk_analysis_mitigation|default:"No proporcionado"|linebreaks }}</li>
+                <li class="list-group-item"><strong>Equipo de Investigación:</strong> {{ proposal_fields.research_team|default:"No proporcionado"|linebreaks }}</li>
+            {% endif %}
+
+            <!-- DYNAMIC QUESTIONS -->
+            {% if responses %}
+                <li class="list-group-item">
+                    <strong>Preguntas Adicionales:</strong>
+                    <ul class="mt-1">
+                        {% for question, answer in responses.items %}
+                            <li><strong>{{ question }}</strong>: <br>{{ answer }}</li>
+                        {% endfor %}
+                    </ul>
+                </li>
+            {% endif %}
+
+            <!-- DOCUMENTS -->
+            {% if target_type == 'proposal' %}
+                {% if proposal_fields.timeline_document %}
+                    <li class="list-group-item">
+                        <strong>Cronograma:</strong>
+                        <div class="mt-2">
+                            <embed
+                                src="{% url 'evaluations:serve_pdf' evaluation.id 'timeline' %}"
+                                type="application/pdf"
+                                width="100%"
+                                height="500px"
+                                class="border rounded"
+                            />
+                            <p class="mt-2 text-muted">
+                                <small>
+                                    <a href="{% url 'evaluations:serve_pdf' evaluation.id 'timeline' %}" target="_blank" class="text-decoration-none">
+                                        ↓ Ver en nueva pestaña
+                                    </a>
+                                </small>
+                            </p>
+                        </div>
+                    </li>
+                {% endif %}
+                {% if proposal_fields.budget_document %}
+                    <li class="list-group-item">
+                        <strong>Presupuesto:</strong>
+                        <div class="mt-2">
+                            <iframe
+                                src="https://docs.google.com/gview?url={% url 'evaluations:serve_pdf' evaluation.id 'budget' %}&embedded=true"
+                                width="100%"
+                                height="600px"
+                                style="border: none;"
+                                frameborder="0"
+                            ></iframe>
+                            <p class="mt-2 text-muted">
+                                <small>
+                                    <a href="{% url 'evaluations:serve_pdf' evaluation.id 'budget' %}" target="_blank" class="text-decoration-none">
+                                        ↓ Ver en nueva pestaña
+                                    </a>
+                                </small>
+                            </p>
+                        </div>
+                    </li>
+                {% endif %}
+            {% endif %}
+
+            <!-- PARTNER INSTITUTIONS & COMMITMENT LETTERS -->
+            {% if target_type == 'proposal' %}
+                {% if proposal_fields.partner_institutions %}
+                    <li class="list-group-item">
+                        <strong>Instituciones Aliadas:</strong>
+                        <ul class="mt-1">
+                            {% for inst in proposal_fields.partner_institutions %}
+                                <li>{{ inst.name }}</li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endif %}
+                {% if proposal_fields.partner_institution_commitments %}
+                    <li class="list-group-item">
+                        <strong>Cartas de Compromiso:</strong>
+                        <ul class="mt-1">
+                            {% for doc in proposal_fields.partner_institution_commitments %}
+                                <li>
+                                    <a href="{{ doc.file.url }}" target="_blank" class="text-decoration-none">{{ doc.name }}</a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% endif %}
+            {% endif %}
+        </ul>
+    </div>
+
+    <!-- EVALUATION FORM -->
+    <form method="post">
+        {% csrf_token %}
+        <h5>Preguntas de Evaluación</h5>
+        {% for item in items %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <p><strong>{{ item.question }}</strong> (Max: {{ item.max_score }})</p>
+                    <div class="row">
+                        <div class="col-md-6">
+
+                            {% if item.field_type == 'dropdown' and item.options %}
+                                <label for="item_{{ item.id }}">Seleccione una opción</label>
+                                <select name="item_{{ item.id }}" id="item_{{ item.id }}" class="form-select" required>
+                                    <option value="">-- Seleccione --</option>
+                                    {% for option in item.options.all %}
+                                        <option value="{{ option.id }}">{{ option.display_text }}</option>
+                                    {% endfor %}
+                                </select>
+
+                            {% elif item.field_type == 'number' %}
+                                <label for="item_{{ item.id }}">Puntaje (0 - {{ item.max_score }})</label>
+                                <input type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max="{{ item.max_score }}"
+                                    name="item_{{ item.id }}"
+                                    id="item_{{ item.id }}"
+                                    class="form-control"
+                                    required>
+
+                            {% elif item.field_type == 'text' %}
+                                <label for="item_{{ item.id }}">Respuesta</label>
+                                <textarea name="item_{{ item.id }}" id="item_{{ item.id }}" class="form-control" rows="2" required></textarea>
+
+                            {% else %}
+                                <!-- Fallback to number input -->
+                                <label for="item_{{ item.id }}">Puntaje (0 - {{ item.max_score }})</label>
+                                <input type="number"
+                                    step="0.1"
+                                    min="0"
+                                    max="{{ item.max_score }}"
+                                    name="item_{{ item.id }}"
+                                    id="item_{{ item.id }}"
+                                    class="form-control"
+                                    required>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="comment_{{ item.id }}">Comentario</label>
+                            <textarea name="comment_{{ item.id }}" id="comment_{{ item.id }}" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <p>No hay ítems en esta plantilla.</p>
+        {% endfor %}
+
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+            <a href="{% url 'evaluations:evaluator_dashboard' %}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Enviar Evaluación</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

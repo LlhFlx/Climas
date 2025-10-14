@@ -1,0 +1,35 @@
+[
+  {
+    "model": "accounts.role",
+    "fields": {
+      "name": "Admin",
+      "description": "System administrator with full access",
+      "is_active": true
+    }
+  },
+  {
+    "model": "accounts.role",
+    "fields": {
+      "name": "Coordinator",
+      "description": "Manages activities and users",
+      "is_active": true
+    }
+  },
+  {
+    "model": "accounts.role",
+    "fields": {
+      "name": "Final User",
+      "description": "End-user of the system",
+      "is_active": true
+    }
+  },
+  {
+    "model": "accounts.role",
+    "fields": {
+      "name": "External Collaborator",
+      "description": "Partner or collaborator with limited access",
+      "is_active": true
+    }
+  }
+]
+

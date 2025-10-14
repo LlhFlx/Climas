@@ -1,0 +1,1316 @@
+{% extends 'base.html' %}
+{% load widget_tweaks dict_extras %}
+{% load widget_tweaks %}
+{% block title %}Aplicar a Convocatoria {{ call.title }} - Climas{% endblock %}
+{% block content %}
+<div class="container" style="max-width: 800px; margin: 3rem auto;">
+    <h3 class="mb-4">Aplicar a Convocatoria: {{ call.title }}</h3>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <!-- Project Title -->
+        <div class="mb-3">
+            <label class="form-label">Título del Proyecto *</label>
+            <input type="text" name="project_title" class="form-control" value="{{ expression.project_title }}" required>
+            <small class="form-text text-muted">Máximo 15 palabras</small>
+        </div>
+        <!-- Thematic Axis -->
+        <div class="mb-3">
+            <label class="form-label">Eje Temático *</label>
+            <select name="thematic_axis" class="form-select" required>
+                <option value="">-- Seleccionar Eje Temático --</option>
+                {% for axis in thematic_axes %}
+                    <option value="{{ axis.id }}" {% if expression.thematic_axis_id == axis.id %}selected{% endif %}>
+                        {{ axis.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <!-- Implementation Country -->
+        <div class="mb-3">
+            <label class="form-label">País de Implementación *</label>
+            <select name="implementation_country" class="form-select" required>
+                <option value="">-- Seleccionar País --</option>
+                {% for country in countries %}
+                    <option value="{{ country.id }}" {% if expression.implementation_country_id == country.id %}selected{% endif %}>
+                        {{ country.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <!-- Primary Institution -->
+        <div class="mb-3">
+            <label class="form-label">Institución Principal *</label>
+            <div class="input-group">
+                <input type="text"
+                    name="primary_institution"
+                    class="form-control institution-search"
+                    placeholder="Buscar institución..."
+                    aria-label="Institución Principal"
+                    value="{% if expression.primary_institution %}{{ expression.primary_institution.name }}{% endif %}"
+                    required
+                >
+                <input type="hidden"
+                    name="primary_institution_id"
+                    value="{% if expression.primary_institution %}{{ expression.primary_institution.id }}{% endif %}"
+                >
+            </div>
+            <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=primary_institution_id" 
+            target="_blank" 
+            class="btn btn-outline-primary mt-2">
+                Crear
+            </a>
+            <small class="form-text text-muted">Escriba para buscar, o haga clic en “Crear” para agregar una nueva.</small>
+        </div>
+        <!-- Problem -->
+        <div class="mb-3">
+            <label class="form-label">Descripción del Problema*</label>
+            <textarea name="problem" class="form-control" rows="4" required>{{ expression.problem }}</textarea>
+        </div>
+        <!-- General Objective -->
+        <div class="mb-3">
+            <label class="form-label">Objetivo General *</label>
+            <textarea name="general_objective" class="form-control" rows="4" required>{{ expression.general_objective }}</textarea>
+        </div>
+        <!-- Methodology -->
+        <div class="mb-3">
+            <label class="form-label">Metodología *</label>
+            <textarea name="methodology" class="form-control" rows="4" required>{{ expression.methodology }}</textarea>
+        </div>
+        <hr>
+        <!-- Funding Eligibility Acceptance -->
+        <div class="mb-3">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" 
+                    name="funding_eligibility_acceptance" 
+                    id="funding_eligibility_acceptance"
+                    {% if post_data.funding_eligibility_acceptance %}checked{% endif %}
+                    {% if not post_data.funding_eligibility_acceptance and expression.funding_eligibility_acceptance %}checked{% endif %}
+                >
+                <label class="form-check-label" for="funding_eligibility_acceptance">
+                    Confirmo que he leído y acepto los requisitos de elegibilidad para la financiación.
+                    <span class="text-danger">*</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Document Upload Section -->
+        <h4 class="mb-3">Soporte documental</h4>
+        <p class="text-muted">Suba un documento justificativo (PDF, DOCX, DOC). Máx. 10 MB.</p>
+        <div class="mb-4">
+            {% if documents %}
+                <div class="alert alert-info">
+                    <strong>Documento actual:</strong> 
+                    <a href="{% url 'calls:download_expression_document' documents.first.id %}" target="_blank">
+                        {{ documents.first.name }}
+                    </a>
+                    <small class="d-block mt-1">Puede cargar un nuevo archivo para sustituirlo o borrarlo abajo.</small>
+                </div>
+            {% endif %}
+            {{ document_form.file.label_tag }}
+            {{ document_form.file }}
+            {% if document_form.file.errors %}
+                {% for error in document_form.file.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
+            <!-- <button type="submit" name="document_upload" class="btn btn-outline-primary mt-2">Upload Document</button> -->
+        </div>
+
+        <!-- List Uploaded Documents -->
+        {% if documents %}
+            <div class="card mb-4">
+                <div class="card-header">Documento cargado</div>
+                <ul class="list-group list-group-flush">
+                    {% for doc in documents %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span class="text-truncate" title="{{ doc.name }}">{{ doc.name }}</span>
+                            <!--<a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-eye"></i> View
+                            </a> -->
+                            <a href="{% url 'calls:download_expression_document' doc.id %}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                Descargar
+                            </a>
+                            
+                                {% csrf_token %}
+                                <button type="button" 
+                                    class="btn btn-sm btn-outline-danger remove-document" 
+                                    data-doc-id="{{ doc.id }}">
+                                    ✕ Borrar
+                                </button>
+                            
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% else %}
+            <div class="alert alert-info">No se ha cargado un documento.</div>
+        {% endif %}
+        <hr>
+        <!-- Dynamic Questions -->
+        <h4 class="mb-3">Preguntas Adicionales</h4>
+        {% for fq in form_questions %}
+            <div class="mb-3">
+                <label class="form-label">
+                    {{ fq.shared_question.question }}
+                    {% if fq.shared_question.is_required %}*{% endif %}
+                </label>
+                {% if fq.shared_question.field_type == 'text' %}
+                    <textarea name="question_{{ fq.shared_question.id }}" class="form-control" rows="3">{{ existing_responses|get_item:fq.shared_question.id }}</textarea>
+                {% elif fq.shared_question.field_type == 'short_text' %}
+                    <input type="text" name="question_{{ fq.shared_question.id }}" class="form-control" value="{{ existing_responses|get_item:fq.shared_question.id }}">
+                {% elif fq.shared_question.field_type == 'number' %}
+                    <input type="number" name="question_{{ fq.shared_question.id }}" class="form-control" value="{{ existing_responses|get_item:fq.shared_question.id }}">
+                {% elif fq.shared_question.field_type == 'boolean' %}
+                    <select name="question_{{ fq.shared_question.id }}" class="form-select">
+                        <option value="">-- Seleccionar --</option>
+                        <option value="true" {% if existing_responses|get_item:fq.shared_question.id == 'true' %}selected{% endif %}>Yes</option>
+                        <option value="false" {% if existing_responses|get_item:fq.shared_question.id == 'false' %}selected{% endif %}>No</option>
+                    </select>
+                {% elif fq.shared_question.field_type == 'dropdown' %}
+                    <select name="question_{{ fq.shared_question.id }}" class="form-select">
+                        <option value="">-- Seleccionar --</option>
+                        {% for option in fq.shared_question.options %}
+                            <option value="{{ option }}" {% if existing_responses|get_item:fq.shared_question.id == option %}selected{% endif %}>
+                                {{ option }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                {% elif fq.shared_question.field_type == 'dynamic_dropdown' %}
+                    <select name="question_{{ fq.shared_question.id }}" class="form-select">
+                        <option value="">-- Seleccionar --</option>
+                        {% for option in fq.shared_question.get_options %}
+                            <option value="{{ option }}" {% if existing_responses|get_item:fq.shared_question.id == option %}selected{% endif %}>
+                                {{ option }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                {% elif fq.shared_question.field_type == 'radio' %}
+                    {% for option in fq.shared_question.options %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="question_{{ fq.shared_question.id }}" id="radio_{{ fq.shared_question.id }}_{{ forloop.counter }}" value="{{ option }}" {% if existing_responses|get_item:fq.shared_question.id == option %}checked{% endif %}>
+                            <label class="form-check-label" for="radio_{{ fq.shared_question.id }}_{{ forloop.counter }}">
+                                {{ option }}
+                            </label>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        {% endfor %}
+        <hr>
+        <!-- Products Section -->
+        <h4 class="mb-3">Productos del Proyecto</h4>
+        <p class="text-muted">Definir los entregables y su relación con los efectos esratégicos.</p>
+        <div 
+            id="products-container" 
+            data-product-count="{{ existing_products|length|default:0 }}" 
+            data-strategic-effects='{{ strategic_effects_json|safe }}'
+        >
+            {% for product in existing_products %}
+                <div class="product-entry card mb-3 p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Producto {{ forloop.counter }}</h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-product">Remove</button>
+                    </div>
+                    <input type="hidden" name="product_index_{{ forloop.counter0 }}" value="{{ forloop.counter0 }}">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre del Producto*</label>
+                        <input type="text" name="product_title_{{ forloop.counter0 }}" class="form-control" value="{{ product.title }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descripción</label>
+                        <textarea name="product_description_{{ forloop.counter0 }}" class="form-control" rows="3">{{ product.description }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Relación con el efecto estratégico</label>
+                        <textarea name="product_outcome_{{ forloop.counter0 }}" class="form-control" rows="3">{{ product.outcome }}</textarea>
+                    </div>
+                    <!--<div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Fecha de Inicio</label>
+                            <input type="date" name="product_start_date_{{ forloop.counter0 }}" class="form-control" value="{{ product.start_date|date:'Y-m-d' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Fecha de Finalización</label>
+                            <input type="date" name="product_end_date_{{ forloop.counter0 }}" class="form-control" value="{{ product.end_date|date:'Y-m-d' }}">
+                        </div>
+                    </div>-->
+                    <div class="mb-3">
+                        <label class="form-label">Efectos Estratégicos</label>
+                        <!-- Add the class 'product-strategic-effects' for JS targeting -->
+                        <select name="product_strategic_effects_{{ forloop.counter0 }}" class="form-select product-strategic-effects" multiple>
+                            {% for effect in strategic_effects %}
+                                <option value="{{ effect.id }}" {% if effect in product.strategic_effects.all %}selected{% endif %}>
+                                    {{ effect.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Mantenga presionado Shift o Ctrl (o Cmd en Mac) para seleccionar múltiples efectos.</small>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="alert alert-info">
+                    Aún no se definen productos.
+                </div>
+            {% endfor %}
+        </div>
+        <div class="mb-3">
+            <button type="button" id="add-product-btn" class="btn btn-outline-primary">+ Agregar Otro Producto</button>
+        </div>
+        <hr>
+        <hr>
+        <!-- Project Team Members Section -->
+        <h4 class="mb-3">Colaboradores del proyecto</h4>
+        <p class="text-muted">Añada a los colaboradores del proyecto..</p>
+        <div 
+            id="team-members-container" 
+            data-team-member-count="{{ existing_team_members|length|default:0 }}"
+        >
+            {% for member in existing_team_members %}
+                <div class="team-member-entry card mb-4 p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0">Colaborador {{ forloop.counter }}</h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-team-member">Remove</button>
+                    </div>
+                    <input type="hidden" name="team_member_index_{{ forloop.counter0 }}" value="{{ forloop.counter0 }}">
+                    <!-- Person -->
+                    <div class="mb-3">
+                        <label class="form-label">Persona *</label>
+                        <div class="input-group">
+                            <input type="text"
+                                name="team_member_person"
+                                class="form-control person-search"
+                                placeholder="Buscar persona por nombre..."
+                                aria-label="Persona"
+                                value="{% if member.person %}{{ member.person.first_name }} {{ member.person.first_last_name }}{% endif %}"
+                                required
+                            >
+                            <input type="hidden"
+                                name="team_member_person_id_{{ forloop.counter0 }}"
+                                value="{% if member.person %}{{ member.person.id }}{% endif %}"
+                            >
+                        </div>
+                        <a href="{% url 'calls:create_person_page' %}?return_url={{ request.get_full_path }}&field_name=team_member_person_id_{{ forloop.counter0 }}" 
+                        target="_blank" 
+                        class="btn btn-outline-primary mt-2">
+                            + Crear
+                        </a>
+                        <small class="form-text text-muted">Escriba para buscar, o haga clic en “Crear” para agregar una nueva.</small>
+                    </div>
+                    <!-- Role -->
+                    <div class="mb-3">
+                        <label class="form-label">Rol *</label>
+                        <input type="text" name="team_member_role_{{ forloop.counter0 }}" class="form-control" value="{{ member.role }}" required>
+                    </div>
+                    <!-- Institution -->
+                    <div class="mb-3">
+                        <label class="form-label">Institución *</label>
+                        <div class="input-group">
+                            <input type="text"
+                                class="form-control institution-search"
+                                placeholder="Buscar institución..."
+                                aria-label="Institución"
+                                value="{% if member.institution %}{{ member.institution.name }}{% endif %}"
+                            >
+                            <input type="hidden"
+                                name="team_member_institution_{{ forloop.counter0 }}"
+                                class="institution-id"
+                                value="{% if member.institution %}{{ member.institution.id }}{% endif %}"
+                            >
+                        </div>
+                        <small class="form-text text-muted">Escriba para buscar.</small>
+                        <a href="{% url 'calls:create_institution' %}?return_url={{ request.get_full_path }}&field_name=team_member_institution_{{ forloop.counter0 }}" 
+                        target="_blank" 
+                        class="btn btn-outline-primary mt-2">
+                            + Crear
+                        </a>
+                    </div>
+                    <!-- Dates -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Fecha de Inicio</label>
+                            <input type="date" name="team_member_start_date_{{ forloop.counter0 }}" class="form-control" value="{{ member.start_date|date:'Y-m-d' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Fecha de Finalización</label>
+                            <input type="date" name="team_member_end_date_{{ forloop.counter0 }}" class="form-control" value="{{ member.end_date|date:'Y-m-d' }}">
+                        </div>
+                    </div>
+                    <!-- Conditions -->
+                    <!--<div class="mb-3">
+                        <label class="form-label">Conditions</label>
+                        <div class="conditions-container">
+                            {% for condition in member.conditions.all %}
+                                <div class="input-group mb-2">
+                                    <input type="text" name="team_member_condition_text_{{ forloop.parentloop.counter0 }}" class="form-control" value="{{ condition.condition_text }}" placeholder="Condition">
+                                    <button type="button" class="btn btn-outline-danger remove-condition">Remove</button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary add-condition">+ Agregar Condición</button>
+                    </div>-->
+                    <!-- Thematic Antecedents -->
+                    <div class="mb-3">
+                        <label class="form-label">Antecedentes Temáticos</label>
+                        <div class="antecedents-container">
+                            {% for antecedent in member.expression_thematic_antecedents.all %}
+                                <div class="antecedent-entry card mb-2 p-2">
+                                    <div class="d-flex justify-content-between">
+                                        <h6 class="fs-6 mb-2">Antecedente {{ forloop.counter }}</h6>
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-antecedent">Remove</button>
+                                    </div>
+                                    <!--<div class="mb-2">
+                                        <label class="form-label">Eje Temático</label>
+                                        <select name="team_member_antecedent_axis_{{ forloop.parentloop.counter0 }}" class="form-select">
+                                            <option value="">-- Seleccionar Eje Temático --</option>
+                                            {% for axis in thematic_axes %}
+                                                <option value="{{ axis.id }}" {% if antecedent.thematic_axis_id == axis.id %}selected{% endif %}>
+                                                    {{ axis.name }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div> -->
+                                    <div class="mb-2">
+                                        <label class="form-label">Descripción *</label>
+                                        <textarea name="team_member_antecedent_description_{{ forloop.parentloop.counter0 }}" class="form-control" rows="2" required>{{ antecedent.description }}</textarea>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label">URL de Evidencia (Opcional)</label>
+                                        <input type="url" name="team_member_antecedent_url_{{ forloop.parentloop.counter0 }}" class="form-control" value="{{ antecedent.evidence_url }}">
+                                    </div>
+                                </div>
+                            {% empty %}
+                                <p class="text-muted">No se han agregado antecedentes aún.</p>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary add-antecedent">+ Agregar Antecedente</button>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="alert alert-info">
+                    No se han definido colaboradores aún.
+                </div>
+            {% endfor %}
+        </div>
+        <div class="mb-3">
+            <button type="button" id="add-team-member-btn" class="btn btn-outline-primary">+ Agregar colaborador</button>
+        </div>
+        <hr>
+        <!-- Budget Items Section -->
+        <h4 class="mb-3">Presupuesto</h4>
+        <p class="text-muted">Defina el presupuesto por categoría y periodo.</p>
+        <div 
+            id="budget-items-container"
+            data-budget-item-count="{{ existing_budget_items|length|default:0 }}"
+            data-scale-choices='{{ scale_choices_json|safe }}'
+        >
+            {% for item in existing_budget_items %}
+                <div class="budget-item-entry card mb-3 p-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fs-6 mb-0">Ítem de presupuesto {{ forloop.counter }}</h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-budget-item">Remove</button>
+                    </div>
+                    <input type="hidden" name="budget_item_index_{{ forloop.counter0 }}" value="{{ forloop.counter0 }}">
+                    <div class="row mb-2">
+                        <div class="col-md-4">
+                            <label class="form-label">Categoría *</label>
+                            <select name="budget_item_category_{{ forloop.counter0 }}" class="form-select" required>
+                                <option value="">-- Seleccionar Categoría --</option>
+                                {% for cat in budget_categories %}
+                                    <option value="{{ cat.id }}" {% if item.category_id == cat.id %}selected{% endif %}>
+                                        {{ cat.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Periodo *</label>
+                            <select name="budget_item_period_{{ forloop.counter0 }}" class="form-select" required>
+                                <option value="">-- Seleccionar Periodo --</option>
+                                {% for period in budget_periods %}
+                                    <option value="{{ period.id }}" {% if item.period_id == period.id %}selected{% endif %}>
+                                        {{ period.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Monto (COP) *</label>
+                            <input type="number" name="budget_item_amount_{{ forloop.counter0 }}" class="form-control" step="0.01" min="0" value="{{ item.amount }}" required>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button" class="btn btn-outline-danger w-100 remove-budget-item">✕</button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea name="budget_item_notes_{{ forloop.counter0 }}" class="form-control" rows="1">{{ item.notes }}</textarea>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="alert alert-info">Aún no se agrega presupuesto.</div>
+            {% endfor %}
+        </div>
+
+        <div class="mb-3">
+            <button type="button" id="add-budget-item-btn" class="btn btn-outline-primary">+ Agregar Ítem de Presupuesto</button>
+        </div>
+
+        <div class="mt-3 p-3 bg-light rounded">
+            <strong>Total Budget:</strong> <span id="total-budget">$0.00</span>
+        </div>
+        <div class="mt-3 p-3 bg-custom-blue rounded">
+            <strong>Escala del Presupuesto:</strong> 
+            <span id="scale-display" class="badge">Cargando...</span>
+            <input type="hidden" name="scale" value="{{ expression.scale.name|default:'' }}">
+        </div>
+
+        <hr>
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <a href="{% url 'calls:researcher_dashboard' %}" class="btn btn-secondary me-md-2">Cancelar</a>
+            <button type="submit" name="save_draft" class="btn btn-secondary">
+                Guardar Borrador
+            </button>
+            <button type="submit" name="submit_application" class="btn btn-primary">Enviar Expresión de Interés</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% block extra_js %}
+{{ institutions|json_script:"institutions-json" }}
+{{ people_json|json_script:"people-json" }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    //debugger;
+    console.log("Initializing form components...");
+
+
+    document.querySelectorAll(".remove-document").forEach(button => {
+        button.addEventListener("click", function () {
+            const docId = this.dataset.docId;
+
+            fetch("", {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({ remove_document: docId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    this.closest("li").remove();
+                }
+            });
+        });
+    });
+    
+    // ============================
+    // 6. ATTACH PERSON AUTOCOMPLETE (GLOBAL DECLARATION)
+    // ============================
+    const personSearchInputs = document.querySelectorAll('.person-search');
+    const peopleScript = document.getElementById('people-json');
+    const peopleList = JSON.parse(peopleScript.textContent.trim());
+    // console.log("HELLO", peopleScript)
+    // console.log(peopleList)
+    // console.log(typeof peopleList);
+    console.log("People array correctly serialized:", Array.isArray(peopleList));
+    // console.log(peopleList.constructor.name);
+    // console.log("CUT")
+    // const script = document.getElementById('people-json');
+    // console.log('Raw text:', script.textContent);
+    // console.log('Type of text:', typeof script.textContent);
+    // console.log('Parsed result:', JSON.parse(script.textContent));
+    // console.log('Is it an array?', Array.isArray(JSON.parse(script.textContent)));
+    // console.log("CUT2")
+    // ============================
+    // 5. PERSON AUTOCOMPLETE FUNCTION
+    // ============================
+    function setupPersonAutocomplete(input) {
+        const container = input.closest('.mb-3');
+        const hiddenIdInput = container.querySelector('input[type="hidden"][name^="team_member_person_id_"]');
+        if (!hiddenIdInput) {
+            console.warn("Could not find corresponding hidden input for person search:", input);
+            return;
+        }
+        input.addEventListener('input', function () {
+            const query = this.value.trim().toLowerCase();
+            const results = peopleList.filter(person =>
+                person.first_name.toLowerCase().includes(query) ||
+                person.first_last_name.toLowerCase().includes(query) ||
+                `${person.first_name} ${person.first_last_name}`.toLowerCase().includes(query)
+            );
+            // Clear old suggestions
+            let suggestions = container.querySelector('.suggestions-list');
+            if (suggestions) suggestions.remove();
+            if (!query || results.length === 0) return;
+            // Create suggestion list
+            suggestions = document.createElement('ul');
+            suggestions.className = 'suggestions-list list-group position-absolute w-100 mt-1 shadow-sm';
+            suggestions.style.maxHeight = '200px';
+            suggestions.style.overflowY = 'auto';
+            suggestions.style.zIndex = '1000';
+            results.forEach(person => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item cursor-pointer';
+                li.textContent = `${person.first_name} ${person.first_last_name}`;
+                li.dataset.id = person.id;
+                li.addEventListener('click', () => {
+                    input.value = `${person.first_name} ${person.first_last_name}`; // Fixed
+                    hiddenIdInput.value = person.id;
+                    suggestions.remove();
+                });
+                suggestions.appendChild(li);
+            });
+            container.appendChild(suggestions);
+        });
+        // Blur: if user typed something but didn't pick a valid item
+        input.addEventListener('blur', function () {
+            if (this.value && !hiddenIdInput.value) {
+                this.value = '';
+                hiddenIdInput.value = '';
+            }
+        });
+    }
+
+    // Attach autocomplete to each person search input
+    personSearchInputs.forEach(input => {
+        setupPersonAutocomplete(input);
+    });
+
+    // Event delegation for dynamically added person search inputs
+    document.getElementById('team-members-container').addEventListener('focusin', function(e) {
+        if (e.target.classList.contains('person-search')) {
+            setupPersonAutocomplete(e.target);
+        }
+    });
+
+    // One global click listener for all person inputs
+    document.addEventListener('click', function (e) {
+        // Skip if clicking a submit button
+        if (e.target.tagName === 'BUTTON' && e.target.type === 'submit') {
+            return;
+        }
+        personSearchInputs.forEach(input => {
+            const container = input.closest('.mb-3');
+            if (!container) return;
+            if (container.contains(e.target)) return;
+            if (e.target.classList.contains('person-create-btn')) return;
+            if (e.target.closest('.person-create-btn')) return;
+            const suggestions = container.querySelector('.suggestions-list');
+            if (suggestions) suggestions.remove();
+        });
+    });
+
+    // ============================
+    // 1. PRODUCTS & STRATEGIC EFFECTS
+    // ============================
+    const thematicAxisSelect = document.querySelector('select[name="thematic_axis"]');
+    const productsContainer = document.getElementById('products-container');
+    const addProductButton = document.getElementById('add-product-btn');
+    if (thematicAxisSelect && productsContainer && addProductButton) {
+        // Get strategic effects data
+        let allStrategicEffects = [];
+        try {
+            const data = productsContainer.getAttribute('data-strategic-effects') || '[]';
+            allStrategicEffects = JSON.parse(data);
+            console.log("Strategic Effects loaded:", allStrategicEffects);
+        } catch (e) {
+            console.error('Failed to parse strategic effects:', e);
+        }
+        // Update Product Strategic Effects dropdowns based on selected Thematic Axis
+        function updateProductStrategicEffects() {
+            const selectedAxisId = thematicAxisSelect.value;
+            const productDropdowns = document.querySelectorAll('.product-strategic-effects');
+            productDropdowns.forEach(dropdown => {
+                dropdown.innerHTML = '';
+                if (!selectedAxisId) {
+                    dropdown.innerHTML = '<option value="">-- Select Strategic Effect --</option>';
+                    return;
+                }
+                const filteredEffects = allStrategicEffects.filter(effect => 
+                    effect.thematic_axis_id === selectedAxisId
+                );
+                if (filteredEffects.length > 0) {
+                    filteredEffects.forEach(effect => {
+                        const option = document.createElement('option');
+                        option.value = effect.id;
+                        option.textContent = effect.name;
+                        dropdown.appendChild(option);
+                    });
+                } else {
+                    dropdown.innerHTML = '<option value="">No effects for this axis</option>';
+                }
+            });
+        }
+        // Initialize on page load
+        if (thematicAxisSelect.value) {
+            updateProductStrategicEffects();
+        }
+        // Update on Thematic Axis change
+        thematicAxisSelect.addEventListener('change', updateProductStrategicEffects);
+        // Product Management
+        let productCount = parseInt(productsContainer.getAttribute('data-product-count'), 10) || 0;
+        function createProductEntry(index) {
+            const div = document.createElement('div');
+            div.className = 'product-entry card mb-3 p-3';
+            div.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Product ${index + 1}</h6>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-product">Remove</button>
+                </div>
+                <input type="hidden" name="product_index_${index}" value="${index}">
+                <div class="mb-3">
+                    <label class="form-label">Nombre del Producto *</label>
+                    <input type="text" name="product_title_${index}" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Descripción</label>
+                    <textarea name="product_description_${index}" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Relación con el efecto estratégico</label>
+                    <textarea name="product_outcome_${index}" class="form-control" rows="3"></textarea>
+                </div>
+                <!--<div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Fecha de Inicio</label>
+                        <input type="date" name="product_start_date_${index}" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Fecha de Finalización</label>
+                        <input type="date" name="product_end_date_${index}" class="form-control">
+                    </div>
+                </div>-->
+                <div class="mb-3">
+                    <label class="form-label">Efectos Estratégicos</label>
+                    <select name="product_strategic_effects_${index}" class="form-select product-strategic-effects" multiple>
+                    </select>
+                    <small class="text-muted">Hold Ctrl (or Cmd on Mac) to select multiple effects.</small>
+                </div>
+            `;
+            productsContainer.appendChild(div);
+            updateProductStrategicEffects(); // Update dropdown for new product
+            return div;
+        }
+        addProductButton.addEventListener('click', function() {
+            const newProduct = createProductEntry(productCount);
+            productCount++;
+            newProduct.querySelector('.remove-product').addEventListener('click', function() {
+                productsContainer.removeChild(newProduct);
+                productCount--;
+            });
+        });
+        productsContainer.addEventListener('click', function(event) {
+            if (event.target && event.target.classList.contains('remove-product')) {
+                const productEntry = event.target.closest('.product-entry');
+                if (productEntry) {
+                    productsContainer.removeChild(productEntry);
+                    productCount--;
+                }
+            }
+        });
+        console.log("Products initialized.");
+    }
+
+    // ============================
+    // 1. INSTITUTION AUTOCOMPLETE
+    // ============================
+
+    // Reusable function to attach autocomplete to any institution input pair
+    function setupInstitutionAutocomplete(searchInput, hiddenIdInput) {
+        const container = searchInput.closest('.mb-3');
+        
+        searchInput.addEventListener('input', function () {
+            const query = this.value.trim().toLowerCase();
+            const results = institutionsList.filter(inst =>
+                inst.name.toLowerCase().includes(query)
+            );
+
+            // Clear old suggestions
+            let suggestions = container.querySelector('.suggestions-list');
+            if (suggestions) suggestions.remove();
+
+            if (!query || results.length === 0) return;
+
+            // Create suggestion list
+            suggestions = document.createElement('ul');
+            suggestions.className = 'suggestions-list list-group position-absolute w-100 mt-1 shadow-sm';
+            suggestions.style.maxHeight = '200px';
+            suggestions.style.overflowY = 'auto';
+            suggestions.style.zIndex = '1000';
+
+            results.forEach(inst => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item cursor-pointer';
+                li.textContent = inst.name;
+                li.dataset.id = inst.id;
+                li.addEventListener('click', () => {
+                    searchInput.value = inst.name;
+                    hiddenIdInput.value = inst.id;
+                    suggestions.remove();
+                });
+                suggestions.appendChild(li);
+            });
+
+            container.appendChild(suggestions);
+        });
+
+        // Blur: if user typed something but didn't pick a valid item
+        searchInput.addEventListener('blur', function () {
+            if (this.value && !hiddenIdInput.value) {
+                this.value = '';
+                hiddenIdInput.value = '';
+            }
+        });
+    }
+    const institutionSearchInputs = document.querySelectorAll('.institution-search');
+    const institutionsScript = document.getElementById('institutions-json');
+    const institutionsList = JSON.parse(institutionsScript.textContent);
+
+    // Attach autocomplete to each input
+    institutionSearchInputs.forEach(input => {
+        const hiddenIdInput = input.nextElementSibling; // hidden input for ID
+        const container = input.closest('.mb-3');
+
+        input.addEventListener('input', function () {
+            const query = this.value.trim().toLowerCase();
+            const results = institutionsList.filter(inst =>
+                inst.name.toLowerCase().includes(query)
+            );
+
+            // Clear old suggestions
+            let suggestions = container.querySelector('.suggestions-list');
+            if (suggestions) suggestions.remove();
+
+            if (!query || results.length === 0) return;
+
+            // Create suggestion list
+            suggestions = document.createElement('ul');
+            suggestions.className =
+                'suggestions-list list-group position-absolute w-100 mt-1 shadow-sm';
+            suggestions.style.maxHeight = '200px';
+            suggestions.style.overflowY = 'auto';
+            suggestions.style.zIndex = '1000';
+
+            results.forEach(inst => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item cursor-pointer';
+                li.textContent = inst.name;
+                li.dataset.id = inst.id;
+                li.addEventListener('click', () => {
+                    input.value = inst.name;
+                    hiddenIdInput.value = inst.id;
+                    suggestions.remove();
+                });
+                suggestions.appendChild(li);
+            });
+
+            container.appendChild(suggestions);
+        });
+
+        // Blur: if user typed something but didn't pick a valid item
+        input.addEventListener('blur', function () {
+            if (this.value && !hiddenIdInput.value) {
+                this.value = '';
+                hiddenIdInput.value = '';
+            }
+        });
+    });
+
+    // One global click listener for all inputs
+    // document.addEventListener('click', function (e) {
+    //     institutionSearchInputs.forEach(input => {
+    //         const container = input.closest('.mb-3');
+    //         if (
+    //             !container.contains(e.target) &&
+    //             !e.target.classList.contains('institution-create-btn') &&
+    //             !e.target.closest('.institution-create-btn')
+    //         ) {
+    //             const suggestions = container.querySelector('.suggestions-list');
+    //             if (suggestions) suggestions.remove();
+    //         }
+    //     });
+    // });
+    document.addEventListener('click', function (e) {
+        // Skip if clicking a submit button
+        if (e.target.tagName === 'BUTTON' && e.target.type === 'submit') {
+            return;
+        }
+
+        institutionSearchInputs.forEach(input => {
+            const container = input.closest('.mb-3');
+            if (!container) return;
+
+            if (container.contains(e.target)) return;
+            if (e.target.classList.contains('institution-create-btn')) return;
+            if (e.target.closest('.institution-create-btn')) return;
+
+            const suggestions = container.querySelector('.suggestions-list');
+            if (suggestions) suggestions.remove();
+        });
+    });
+
+    function showMessage(type, text) {
+        const alert = document.createElement('div');
+        alert.className = `alert alert-${type} alert-dismissible fade show`;
+        alert.role = 'alert';
+        alert.innerHTML = `
+            ${text}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        const container = document.querySelector('.container');
+        if (container) {
+            // Append to container. No dependency on form position
+            container.appendChild(alert);
+        }
+        setTimeout(() => {
+            if (alert.parentNode) {
+                alert.remove();
+            }
+        }, 5000);
+    }
+
+    document.addEventListener('click', function(e) {
+        const removeBtn = e.target.closest('.remove-document');
+        if (!removeBtn) return;
+
+        e.preventDefault();
+
+        const docId = removeBtn.getAttribute('data-doc-id');
+        if (!docId) return;
+
+        if (!confirm('¿Estás seguro de que deseas eliminar este archivo?')) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('remove_document', docId);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        fetch('', {
+            method: 'POST',
+            body: formData,
+        })
+        .then(response => {
+            console.log("Response status:", response.status);
+            return response.text().then(text => {
+                console.log("Raw response:", text);
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error("JSON parse failed:", e);
+                    throw new Error("Server did not return JSON. See console for raw response.");
+                }
+            });
+        })
+        .then(data => {
+            console.log("Parsed data:", data, "Type:", typeof data);
+
+            if (data.success) {
+                showMessage('success', 'Archivo eliminado correctamente.');
+
+                const li = removeBtn.closest('li');
+                console.log("Found li?", li);
+
+                if (li) {
+                    li.remove();
+                } else {
+                    console.warn("No <li> found for button:", removeBtn);
+                }
+            } else {
+                showMessage('danger', 'El servidor no confirmó la eliminación.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al eliminar el archivo. Por favor, inténtalo de nuevo.');
+        });
+    });
+
+
+    // ============================
+    // 2. PROJECT TEAM MEMBERS
+    // ============================
+    const teamContainer = document.getElementById('team-members-container');
+    const addTeamButton = document.getElementById('add-team-member-btn');
+    if (teamContainer && addTeamButton) {
+        let teamMemberCount = parseInt(teamContainer.getAttribute('data-team-member-count'), 10) || 0;
+        function createTeamMemberEntry(index) {
+            const div = document.createElement('div');
+            div.className = 'team-member-entry card mb-4 p-3';
+            div.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0">Colaborador ${index + 1}</h6>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-team-member">Remove</button>
+                </div>
+                <input type="hidden" name="team_member_index_${index}" value="${index}">
+                <!-- Person -->
+                <div class="mb-3">
+                    <label class="form-label">Persona *</label>
+                    <div class="input-group">
+                        <input type="text"
+                            name="team_member_person"
+                            class="form-control person-search"
+                            placeholder="Buscar persona por nombre..."
+                            aria-label="Persona"
+                            value=""
+                            required
+                        >
+                        <input type="hidden"
+                            name="team_member_person_id_${index}"
+                            value=""
+                        >
+                    </div>
+                    <a href="{% url 'calls:create_person_page' %}?return_url={{ request.get_full_path }}&field_name=team_member_person_id_${index}" 
+                    target="_blank" 
+                    class="btn btn-outline-primary mt-2">
+                        + Crear
+                    </a>
+                    <small class="form-text text-muted">Escriba para buscar, o haga clic en “Crear” para agregar una nueva.</small>
+                </div>
+                <!-- Role -->
+                <div class="mb-3">
+                    <label class="form-label">Rol *</label>
+                    <input type="text" name="team_member_role_${index}" class="form-control" required>
+                </div>
+                <!-- Institution -->
+                <div class="mb-3">
+                    <label class="form-label">Institución *</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control institution-search" placeholder="Buscar institución..." aria-label="Institución">
+                        <input type="hidden" name="team_member_institution_${index}" class="institution-id">
+                    </div>
+                    <small class="form-text text-muted">Escriba el nombre de la institución para buscar.</small>
+                    <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=institution_id_{{ index }}" 
+                    target="_blank" 
+                    class="btn btn-outline-primary mt-2">
+                        + Crear
+                    </a>
+                </div>
+                <!-- Dates -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Fecha de Inicio</label>
+                        <input type="date" name="team_member_start_date_${index}" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Fecha de Finalización</label>
+                        <input type="date" name="team_member_end_date_${index}" class="form-control">
+                    </div>
+                </div>
+                <!-- Conditions -->
+                <!--<div class="mb-3">
+                    <label class="form-label">Conditions</label>
+                    <div class="conditions-container"></div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary add-condition mt-2">+ Agregar Condición</button>
+                </div>-->
+                <!-- Thematic Antecedents -->
+                <div class="mb-3">
+                    <label class="form-label">Antecedentes Temáticos</label>
+                    <div class="antecedents-container"></div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary add-antecedent mt-2">+ Agregar Antecedente</button>
+                </div>
+            `;
+            const newEntry = div;
+            
+            return newEntry;
+        }
+        
+        addTeamButton.addEventListener('click', function() {
+            const newTeamMember = createTeamMemberEntry(teamMemberCount);
+            teamContainer.appendChild(newTeamMember);
+            teamMemberCount++;
+
+            const newSearchInput = newTeamMember.querySelector('.institution-search');
+            const newHiddenIdInput = newTeamMember.querySelector('.institution-id');
+            if (newSearchInput && newHiddenIdInput) {
+                setupInstitutionAutocomplete(newSearchInput, newHiddenIdInput);
+            }
+
+
+            newTeamMember.querySelector('.remove-team-member').addEventListener('click', function() {
+                teamContainer.removeChild(newTeamMember);
+                teamMemberCount--;
+            });
+        });
+
+        // ============================
+        // 3. BUDGET ITEMS
+        // ============================
+        const budgetContainer = document.getElementById('budget-items-container');
+        const addBudgetButton = document.getElementById('add-budget-item-btn');
+        if (budgetContainer && addBudgetButton) {
+            let budgetItemCount = parseInt(budgetContainer.getAttribute('data-budget-item-count'), 10) || 0;
+
+            function createBudgetItemEntry(index) {
+                const div = document.createElement('div');
+                div.className = 'budget-item-entry card mb-3 p-3';
+                div.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fs-6 mb-0">Ítem de presupuesto  ${index + 1}</h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-budget-item">Remove</button>
+                    </div>
+                    <input type="hidden" name="budget_item_index_${index}" value="${index}">
+                    <div class="row mb-2">
+                        <div class="col-md-4">
+                            <label class="form-label">Categoría *</label>
+                            <select name="budget_item_category_${index}" class="form-select" required>
+                                <option value="">-- Seleccionar Categoría --</option>
+                                {% for cat in budget_categories %}
+                                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Periodo *</label>
+                            <select name="budget_item_period_${index}" class="form-select" required>
+                                <option value="">-- Seleccionar Periodo --</option>
+                                {% for period in budget_periods %}
+                                    <option value="{{ period.id }}">{{ period.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Monto (COP) *</label>
+                            <input type="number" name="budget_item_amount_${index}" class="form-control" step="0.01" min="0" placeholder="0.00" required>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button" class="btn btn-outline-danger w-100 remove-budget-item">✕</button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea name="budget_item_notes_${index}" class="form-control" rows="1"></textarea>
+                    </div>
+                `;
+                return div;
+            }
+
+            addBudgetButton.addEventListener('click', function() {
+                const newItem = createBudgetItemEntry(budgetItemCount);
+                budgetContainer.appendChild(newItem);
+                budgetItemCount++;
+                newItem.querySelector('.remove-budget-item').addEventListener('click', function() {
+                    budgetContainer.removeChild(newItem);
+                    budgetItemCount--;
+                });
+            });
+
+            // Event delegation for remove buttons
+            budgetContainer.addEventListener('click', function(event) {
+                if (event.target.classList.contains('remove-budget-item')) {
+                    const entry = event.target.closest('.budget-item-entry');
+                    if (entry) {
+                        budgetContainer.removeChild(entry);
+                        budgetItemCount--;
+                    }
+                }
+            });
+
+            console.log("Budget Items initialized.");
+
+            // ============================
+            // 4. BUDGET TOTAL CALCULATION
+            // ============================
+
+            const scaleChoicesJson = budgetContainer.getAttribute('data-scale-choices');
+            const scaleChoicesData = JSON.parse(scaleChoicesJson);
+
+            // Build lookup map
+            const scaleMap = {};
+            scaleChoicesData.forEach(s => {
+                scaleMap[s.name] = s;
+            });
+            function updateTotal() {
+                let total = 0;
+                document.querySelectorAll('[name^="budget_item_amount_"]').forEach(input => {
+                    const val = parseFloat(input.value) || 0;
+                    total += val;
+                });
+                document.getElementById('total-budget').textContent = `$${total.toLocaleString('es-CO')}`;
+                updateScale(total); // Pass total to scale updater
+            }
+
+            function updateScale(total) {
+                const scaleDisplay = document.getElementById('scale-display');
+                const scaleInput = document.querySelector('input[name="scale"]');
+
+                // Clear previous state
+                scaleDisplay.textContent = 'Cargando...';
+                scaleDisplay.className = 'badge badge-secondary';
+                if (scaleInput) scaleInput.value = '';
+
+                const MAX_BUDGET = 900000000;
+
+                if (total > MAX_BUDGET) {
+                    scaleDisplay.textContent = 'Presupuesto excede el límite permitido (900 millones)';
+                    scaleDisplay.className = 'badge bg-danger';
+                    return;
+                }
+
+                // Assign scale based on total amount
+                let scale = null;
+                if (total <= 250000000) {
+                    scale = scaleMap['S'];
+                } else if (total <= 500000000) {
+                    scale = scaleMap['M'];
+                } else if (total <= 900000000) {
+                    scale = scaleMap['B'];
+                }
+
+                if (scale && scaleInput) {
+                    scaleDisplay.textContent = scale.description || scale.name;
+                    //scaleDisplay.className = `badge bg-${scale.name === 'S' ? 'success' : scale.name === 'M' ? 'warning' : 'danger'}`;
+                    scaleDisplay.className = `badge-${scale.name === 'S' ? 'success-custom' : scale.name === 'M' ? 'warning-custom' : 'danger-custom'}`;
+                    scaleInput.value = scale.name;
+                } else {
+                    scaleDisplay.textContent = 'Sin escala';
+                }
+            }
+
+            // Prevent form submission if over budget
+            document.querySelector('form')?.addEventListener('submit', function(e) {
+                const total = Array.from(document.querySelectorAll('[name^="budget_item_amount_"]'))
+                    .reduce((sum, input) => sum + (parseFloat(input.value) || 0), 0);
+
+                const MAX_BUDGET = 900000000;
+                if (total > MAX_BUDGET) {
+                    e.preventDefault();
+                    alert('El presupuesto total no puede exceder los $900.000.000 COP.');
+                    return;
+                }
+
+                // Ensure hidden scale field has value
+                const scaleInput = document.querySelector('input[name="scale"]');
+                if (scaleInput && !scaleInput.value) {
+                    updateTotal(); // Recalculate scale
+                }
+            });
+
+            // Listen for changes in any budget amount
+            budgetContainer.addEventListener('input', function(e) {
+                if (e.target.name.startsWith('budget_item_amount_')) {
+                    updateTotal();
+                }
+            });
+
+            // Initialize on page load
+            updateTotal();
+        }
+
+        // ============================
+        // 3. ADD ANTECEDENT DELEGATION
+        // ============================
+        teamContainer.addEventListener('click', function(event) {
+            if (event.target && event.target.classList.contains('add-antecedent')) {
+                const teamMemberEntry = event.target.closest('.team-member-entry');
+                if (!teamMemberEntry) return;
+
+                const container = teamMemberEntry.querySelector('.antecedents-container');
+                const index = teamMemberEntry.querySelector('input[name^="team_member_index_"]').value;
+
+                const antecedentDiv = document.createElement('div');
+                antecedentDiv.className = 'antecedent-entry card mb-3 p-3';
+                antecedentDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="fs-6 mb-0">Antecedente</h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-antecedent">Remove</button>
+                    </div>
+                    <!--<div class="mb-2">
+                        <label class="form-label">Eje Temático</label>
+                        <select name="team_member_antecedent_axis_${index}" class="form-select" required>
+                            <option value="">-- Seleccionar Eje Temático --</option>
+                            {% for axis in thematic_axes %}
+                                <option value="{{ axis.id }}">{{ axis.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>-->
+                    <div class="mb-2">
+                        <label class="form-label">Descripción *</label>
+                        <textarea name="team_member_antecedent_description_${index}" class="form-control" rows="2" required></textarea>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">URL Evidencia</label>
+                        <input type="url" name="team_member_antecedent_url_${index}" class="form-control">
+                    </div>
+                `;
+
+                container.appendChild(antecedentDiv);
+
+                // Attach remove handler to the new antecedent's remove button
+                antecedentDiv.querySelector('.remove-antecedent').addEventListener('click', function() {
+                    container.removeChild(antecedentDiv);
+                });
+            }
+        });
+
+        // ============================
+        // 4. ADD CONDITION DELEGATION
+        // ============================
+        // teamContainer.addEventListener('click', function(event) {
+        //     if (event.target && event.target.classList.contains('add-condition')) {
+        //         const teamMemberEntry = event.target.closest('.team-member-entry');
+        //         if (!teamMemberEntry) return;
+
+        //         const container = teamMemberEntry.querySelector('.conditions-container');
+        //         const index = teamMemberEntry.querySelector('input[name^="team_member_index_"]').value;
+
+        //         const conditionDiv = document.createElement('div');
+        //         conditionDiv.className = 'input-group mb-2';
+        //         conditionDiv.innerHTML = `
+        //             <input type="text" name="team_member_condition_text_${index}" class="form-control" placeholder="Enter condition" required>
+        //             <button type="button" class="btn btn-outline-danger remove-condition">Remove</button>
+        //         `;
+        //         container.appendChild(conditionDiv);
+
+        //         conditionDiv.querySelector('.remove-condition').addEventListener('click', function() {
+        //             container.removeChild(conditionDiv);
+        //         });
+        //     }
+        // });
+
+        // ============================
+        // 5. REMOVE BUTTON DELEGATION
+        // ============================
+        teamContainer.addEventListener('click', function(event) {
+            if (event.target.classList.contains('remove-team-member')) {
+                const entry = event.target.closest('.team-member-entry');
+                if (entry) {
+                    teamContainer.removeChild(entry);
+                    teamMemberCount--;
+                }
+            // } else if (event.target.classList.contains('remove-condition')) {
+            //     const entry = event.target.closest('.input-group');
+            //     if (entry) entry.remove();
+            } else if (event.target.classList.contains('remove-antecedent')) {
+                const entry = event.target.closest('.antecedent-entry');
+                if (entry) entry.remove();
+            }
+        });
+
+        console.log("Team Members initialized.");
+    }
+    console.log("Form initialization complete.");
+
+    document.querySelector('form').addEventListener('submit', function(e) {
+        console.log("Form submit event triggered!");
+        // Pevent default submission for debugging:
+        // e.preventDefault();
+        // console.log("Form data:", new FormData(this));
+    });
+
+
+});
+</script>
+{% endblock %}

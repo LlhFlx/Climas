@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}Crear Persona - Climas{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 600px; margin: 3rem auto;">
+    <h3>Crear Nueva Persona</h3>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="return_url" value="{{ request.GET.return_url }}">
+        <input type="hidden" name="field_name" value="{{ request.GET.field_name }}">
+
+        <div class="mb-3">
+            <label class="form-label">Nombre *</label>
+            <input type="text" name="first_name" class="form-control" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Apellido *</label>
+            <input type="text" name="first_last_name" class="form-control" required>
+        </div>
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <a href="{{ return_url }}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Crear Persona</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

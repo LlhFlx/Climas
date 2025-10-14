@@ -1,0 +1,175 @@
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5>Asignar Evaluadores</h5>
+        <!-- "View All Evaluations" Button -->
+        <a href="{% url 'evaluations:coordinator_view_evaluations' %}" 
+           class="btn btn-outline-info btn-sm">
+            👁️ Ver Evaluaciones Completadas
+        </a>
+    </div>
+    <div class="card-body">
+        <!-- ========== EXPRESSIONS ========== -->
+        {% if submitted_expressions %}
+        <h4 class="mt-5">Expresiones Recibidas ({{ submitted_expressions.count }})</h4>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Proyecto</th>
+                            <th>Investigador</th>
+                            <th>Convocatoria</th>
+                            <th>Fecha Envío</th>
+                            <th>Evaluador</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for expr in submitted_expressions %}
+                            <tr>
+                                <td>{{ expr.project_title|truncatechars:40 }}</td>
+                                <td>{{ expr.user.person|default:expr.user.user.username }}</td>
+                                <td>{{ expr.call.title|truncatechars:30 }}</td>
+                                <td>{{ expr.submission_datetime|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    <form method="post" action="{% url 'evaluations:assign_evaluator' 'expression' expr.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <!-- Hidden fields for target type and ID -->
+                                        <input type="hidden" name="target_type" value="expression">
+                                        <input type="hidden" name="target_id" value="{{ expr.id }}">
+
+                                        <!-- Evaluator Selection -->
+                                        <div class="mb-1">
+                                            <label for="evaluator_id_{{ expr.id }}" class="form-label visually-hidden">Evaluador</label>
+                                            <select name="evaluator_id" id="evaluator_id_{{ expr.id }}" class="form-select form-select-sm" required>
+                                                <option value="">-- Asignar --</option>
+                                                {% for evaluator in evaluators %}
+                                                    <option value="{{ evaluator.id }}">{{ evaluator.person|default:evaluator.user.username }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+
+                                        <!-- Template Selection -->
+                                        {% if expr.call.evaluation_templates.exists %}
+                                            <div class="mb-1">
+                                                <label for="template_id_{{ expr.id }}" class="form-label visually-hidden">Plantilla</label>
+                                                <select name="template_id" id="template_id_{{ expr.id }}" class="form-select form-select-sm">
+                                                    <option value="">-- Usar plantilla por defecto --</option>
+                                                    {% for template in expr.call.evaluation_templates.all %}
+                                                        {% if template.applies_to_expression %}
+                                                            <option value="{{ template.id }}">{{ template.name }}</option>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        {% else %}
+                                            <div class="mb-1 text-muted">
+                                                <small>No hay plantillas asignadas a esta convocatoria.</small>
+                                            </div>
+                                        {% endif %}
+
+                                        <!-- Submit Button -->
+                                        <button type="submit" class="btn btn-sm btn-primary mt-1">Asignar</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="5">No hay expresiones enviadas.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info">No hay expresiones enviadas aún.</div>
+        {% endif %}
+
+        <!-- ========== PROPOSALS ========== -->
+        {% if submitted_proposals %}
+            <h4 class="mt-5">Propuestas Recibidas ({{ submitted_proposals.count }})</h4>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Proyecto</th>
+                            <th>Investigador</th>
+                            <th>Convocatoria</th>
+                            <th>Fecha Envío</th>
+                            <th>Evaluador</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prop in submitted_proposals %}
+                            <tr>
+                                <!-- project_title_override can be blank or None -->
+                                <td>{{ prop.project_title_override|default_if_none:prop.project_title|default:prop.project_title|truncatechars:40 }}</td>
+                                <td>{{ prop.user.person|default:prop.user.user.username }}</td>
+                                <td>{{ prop.call.title|truncatechars:30 }}</td>
+                                <td>{{ prop.submission_datetime|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    <form method="post" action="{% url 'evaluations:assign_evaluator' 'proposal' prop.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="target_type" value="proposal">
+                                        <input type="hidden" name="target_id" value="{{ prop.id }}">
+                                        <div class="mb-1">
+                                            <label for="evaluator_id_prop_{{ prop.id }}" class="form-label visually-hidden">Evaluador</label>
+                                            <select name="evaluator_id" id="evaluator_id_prop_{{ prop.id }}" class="form-select form-select-sm" required>
+                                                <option value="">-- Asignar --</option>
+                                                {% for evaluator in evaluators %}
+                                                    <option value="{{ evaluator.id }}">{{ evaluator.person|default:evaluator.user.username }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        {% if prop.call.evaluation_templates.exists %}
+                                            <div class="mb-1">
+                                                <label for="template_id_prop_{{ prop.id }}" class="form-label visually-hidden">Plantilla</label>
+                                                <select name="template_id" id="template_id_prop_{{ prop.id }}" class="form-select form-select-sm">
+                                                    <option value="">-- Usar plantilla por defecto --</option>
+                                                    {% for template in prop.call.evaluation_templates.all %}
+                                                        {% if template.applies_to_proposal %}
+                                                            <option value="{{ template.id }}">{{ template.name }}</option>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        {% else %}
+                                            <div class="mb-1 text-muted">
+                                                <small>No hay plantillas asignadas a esta convocatoria.</small>
+                                            </div>
+                                        {% endif %}
+                                        <button type="submit" class="btn btn-sm btn-primary mt-1">Asignar</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">No hay propuestas enviadas aún.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info mt-4">No hay propuestas enviadas aún.</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- List of Evaluators -->
+<div class="card">
+    <div class="card-header">
+        <h5>Evaluadores Disponibles</h5>
+    </div>
+    <div class="card-body">
+        {% if evaluators %}
+            <ul class="list-group list-group-flush">
+                {% for evaluator in evaluators %}
+                    <li class="list-group-item">
+                        <strong>{{ evaluator.person|default:evaluator.user.username }}</strong>
+                        <br>
+                        <small class="text-muted">{{ evaluator.user.email }}</small>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="alert alert-warning">No hay usuarios con rol Evaluator.</div>
+        {% endif %}
+    </div>
+</div>

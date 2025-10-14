@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+
+{% block title %}Register - Climas{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8" style="margin-top: 5rem;"> <!-- Wider container for two columns -->
+            <h4 class="text-center mb-4">Register as Researcher</h4>
+            
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="row">
+                    <!-- === Left Column: Account Information === -->
+                    <div class="col-md-6">
+                        <h5 class="mb-3">Account Information</h5>
+
+                        <div class="mb-3">
+                            <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
+                            {{ form.username|attr:"class:form-control" }}
+                            {% if form.username.errors %}
+                                <div class="text-danger small">{{ form.username.errors.0 }}</div>
+                            {% endif %}
+                            {% if form.username.help_text %}
+                                <small class="form-text text-muted">{{ form.username.help_text }}</small>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.email.id_for_label }}" class="form-label">Email</label>
+                            {{ form.email|attr:"class:form-control" }}
+                            {% if form.email.errors %}
+                                <div class="text-danger small">{{ form.email.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.phone_number.id_for_label }}" class="form-label">Phone Number (Optional)</label>
+                            {{ form.phone_number|attr:"class:form-control" }}
+                            <small class="form-text text-muted">Format: +57(601)1234444 or +1 555-123-4567</small>
+                            {% if form.phone_number.errors %}
+                                <div class="text-danger small">{{ form.phone_number.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.password1.id_for_label }}" class="form-label">Password</label>
+                            {{ form.password1|attr:"class:form-control" }}
+                            {% if form.password1.errors %}
+                                <div class="text-danger small">{{ form.password1.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.password2.id_for_label }}" class="form-label">Confirm Password</label>
+                            {{ form.password2|attr:"class:form-control" }}
+                            {% if form.password2.errors %}
+                                <div class="text-danger small">{{ form.password2.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- === Right Column: Personal Information === -->
+                    <div class="col-md-6">
+                        <h5 class="mb-3">Personal Information</h5>
+
+                        <div class="mb-3">
+                            <label for="{{ form.document_type.id_for_label }}" class="form-label">Document Type</label>
+                            {{ form.document_type|attr:"class:form-select" }}
+                            {% if form.document_type.errors %}
+                                <div class="text-danger small">{{ form.document_type.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.document_number.id_for_label }}" class="form-label">Document Number</label>
+                            {{ form.document_number|attr:"class:form-control" }}
+                            {% if form.document_number.errors %}
+                                <div class="text-danger small">{{ form.document_number.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.first_name.id_for_label }}" class="form-label">First Name</label>
+                            {{ form.first_name|attr:"class:form-control" }}
+                            {% if form.first_name.errors %}
+                                <div class="text-danger small">{{ form.first_name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.second_name.id_for_label }}" class="form-label">Second Name (Optional)</label>
+                            {{ form.second_name|attr:"class:form-control" }}
+                            {% if form.second_name.errors %}
+                                <div class="text-danger small">{{ form.second_name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.first_last_name.id_for_label }}" class="form-label">First Last Name</label>
+                            {{ form.first_last_name|attr:"class:form-control" }}
+                            {% if form.first_last_name.errors %}
+                                <div class="text-danger small">{{ form.first_last_name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.second_last_name.id_for_label }}" class="form-label">Second Last Name (Optional)</label>
+                            {{ form.second_last_name|attr:"class:form-control" }}
+                            {% if form.second_last_name.errors %}
+                                <div class="text-danger small">{{ form.second_last_name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.gender.id_for_label }}" class="form-label">Gender</label>
+                            {{ form.gender|attr:"class:form-select" }}
+                            {% if form.gender.errors %}
+                                <div class="text-danger small">{{ form.gender.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CAPTCHA FIELD -->
+                <div class="mb-4">
+                    {{ form.captcha.label_tag }}
+                    {{ form.captcha }}
+                    {% if form.captcha.errors %}
+                        {% for error in form.captcha.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    {% endif %}
+                    <small class="form-text text-muted">Por favor, confirme que no es un robot.</small>
+                </div>
+
+                <div class="text-center mt-4">
+                    <button type="submit" class="btn btn-primary px-5">Register</button>
+                </div>
+            </form>
+ 
+            <p class="mt-3 text-center">
+                Already have an account? <a href="{% url 'accounts:login' %}">Login here</a>
+            </p>
+            
+            <hr>
+            <p class="text-center"><strong>Need Coordinator or Evaluator Access?</strong></p>
+            <p class="text-muted text-center">These roles require approval. First register as a researcher, then request elevated access from your profile.</p>
+        </div>
+    </div>
+</div>
+{% endblock content %}

@@ -1,0 +1,68 @@
+<div class="row" style="margin-top: 20px;">
+    <div class="eight columns offset-by-two">
+        <h4>My Profile</h4>
+        
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="row">
+            <div class="four columns">
+                <h6>Account Information</h6>
+                <p><strong>Username:</strong> {{ user.username }}</p>
+                <p><strong>Role:</strong> {{ custom_user.role.name|default:"No Role Assigned" }}</p>
+                <p><strong>Member since:</strong> {{ user.date_joined|date:"M d, Y" }}</p>
+            </div>
+            
+            <div class="eight columns">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="six columns">
+                            <label for="{{ form.first_name.id_for_label }}">First Name</label>
+                            {{ form.first_name }}
+                        </div>
+                        <div class="six columns">
+                            <label for="{{ form.last_name.id_for_label }}">Last Name</label>
+                            {{ form.last_name }}
+                        </div>
+                    </div>
+
+                    <label for="{{ form.email.id_for_label }}">Email</label>
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                        <small style="color: red;">{{ form.email.errors.0 }}</small>
+                    {% endif %}
+
+                    <label for="{{ form.phone_number.id_for_label }}">Phone Number</label>
+                    {{ form.phone_number }}
+                    {% if form.phone_number.errors %}
+                        <small style="color: red;">{{ form.phone_number.errors.0 }}</small>
+                    {% endif %}
+
+                    <label for="{{ form.birthdate.id_for_label }}">Birth Date</label>
+                    {{ form.birthdate }}
+
+                    <input class="button-primary" type="submit" value="Update Profile">
+                </form>
+            </div>
+        </div>
+
+        <hr>
+        
+        {% if custom_user.role.name == "Researcher" %}
+        <div class="row">
+            <div class="twelve columns">
+                <h6>Request Additional Access</h6>
+                <p>Need coordinator or evaluator privileges? These require administrative approval.</p>
+                <a href="{% url 'accounts:request_coordinator' %}" class="button">Request Coordinator Access</a>
+                <a href="{% url 'accounts:request_evaluator' %}" class="button">Request Evaluator Access</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

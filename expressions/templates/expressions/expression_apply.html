@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Aplicar – {{ call.title }}{% endblock %}
+
+{% block content %}
+<div x-data="expressionForm()">
+  <h1>{{ call.title }}</h1>
+  <p class="subtitle">{{ call.description }}</p>
+
+  <!-- Progress -->
+  <div class="progress">
+    <div class="u-full-width" :style="`width: ${progress}%`"></div>
+  </div>
+  <p><small>Progreso: {{ Math.round(progress) }}%</small></p>
+
+  <form id="expression-form" method="post" @submit.prevent="submit">
+    {% csrf_token %}
+    <input type="hidden" name="save_draft" :value="autoSaving ? '1' : '0'">
+
+    <!-- Tabs -->
+    <ul class="tabs">
+      <li :class="{ active: currentTab === 'general' }">
+        <a @click.prevent="currentTab = 'general'">Información General</a>
+      </li>
+      <li :class="{ active: currentTab === 'team' }">
+        <a @click.prevent="currentTab = 'team'">Equipo de Proyecto</a>
+      </li>
+      <li :class="{ active: currentTab === 'cbo' }">
+        <a @click.prevent="currentTab = 'cbo'">CBO</a>
+      </li>
+      <li :class="{ active: currentTab === 'products' }">
+        <a @click.prevent="currentTab = 'products'">Productos</a>
+      </li>
+    </ul>
+
+    <!-- Sections -->
+    <div x-show="currentTab === 'general'" class="section">
+      {% include "expressions/forms/general.html" %}
+    </div>
+    <div x-show="currentTab === 'team'" class="section">
+      {% include "expressions/forms/team.html" %}
+    </div>
+    <div x-show="currentTab === 'cbo'" class="section">
+      {% include "expressions/forms/cbo.html" %}
+    </div>
+    <div x-show="currentTab === 'products'" class="section">
+      {% include "expressions/forms/products.html" %}
+    </div>
+
+    <!-- Actions -->
+    <div class="buttons">
+      <button type="button" @click="prevSection" :disabled="currentTab === 'general'" class="button">
+        Anterior
+      </button>
+      <button type="button" @click="nextSection" :disabled="currentTab === 'products'" class="button">
+        Siguiente
+      </button>
+      <button type="submit" class="button button-primary" :disabled="submitting">
+        <span x-show="!submitting">Enviar Aplicación</span>
+        <span x-show="submitting">Enviando...</span>
+      </button>
+    </div>
+  </form>
+
+  <!-- Toast -->
+  <div x-show="toast" class="toast" x-text="toast" x-init="setTimeout(() => toast = '', 3000)"></div>
+</div>
+
+<script>
+function expressionForm() {
+  return {
+    currentTab: 'general',
+    tabs: ['general', 'team', 'cbo', 'products'],
+    autoSaving: false,
+    submitting: false,
+    toast: '',
+
+    get progress() {
+      const completed = this.tabs
+        .slice(0, this.tabs.indexOf(this.currentTab) + 1)
+        .map(tab => document.querySelectorAll(`#${tab}-form input:required`).length > 0)
+        .filter(Boolean).length;
+      return (completed / this.tabs.length) * 100;
+    },
+
+    nextSection() {
+      const index = this.tabs.indexOf(this.currentTab);
+      if (index < this.tabs.length - 1) this.currentTab = this.tabs[index + 1];
+    },
+
+    prevSection() {
+      const index = this.tabs.indexOf(this.currentTab);
+      if (index > 0) this.currentTab = this.tabs[index - 1];
+    },
+
+    async submit() {
+      this.submitting = true;
+      const form = document.getElementById('expression-form');
+      const formData = new FormData(form);
+
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+
+      if (response.ok) {
+        window.location.href = "{% url 'application_submitted' %}";
+      } else {
+        this.toast = 'Error al enviar. Revise los campos.';
+      }
+      this.submitting = false;
+    }
+  }
+}
+
+// Auto-save draft every 2 minutes
+setInterval(() => {
+  const form = document.getElementById('expression-form');
+  if (!form) return;
+
+  const formData = new FormData(form);
+  formData.append('save_draft', '1');
+
+  fetch(form.action, {
+    method: 'POST',
+    body: formData,
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  }).then(() => {
+    Alpine.store('ui').showToast('Borrador guardado');
+  });
+}, 120000); // 2 minutes
+
+// Global UI store
+Alpine.store('ui', {
+  toast: '',
+  showToast(message) {
+    this.toast = message;
+    setTimeout(() => this.toast = '', 3000);
+  }
+});
+</script>
+{% endblock %}

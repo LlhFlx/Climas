@@ -1,0 +1,64 @@
+<h4>Evaluaciones Completadas ({{ evaluations.count }})</h4>
+
+{% if evaluations %}
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Tipo</th>
+                    <th>Proyecto</th>
+                    <th>Investigador</th>
+                    <th>Evaluador</th>
+                    <th>Plantilla</th>
+                    <th>Puntaje</th>
+                    <th>Resultado</th>
+                    <th>Estado</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in evaluations %}
+                    <tr>
+                        <td>
+                            {% if e.target_content_type.model == 'expression' %}
+                                <span class="badge bg-info">Expresión</span>
+                            {% else %}
+                                <span class="badge bg-success">Propuesta</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ e.target.project_title|truncatewords:10 }}</td>
+                        <td>{{ e.target.user.person|default:e.target.user.user.username }}</td>
+                        <td>{{ e.evaluator.person|default:e.evaluator.user.username }}</td>
+                        <td>{{ e.template.name }}</td>
+                        <td>{{ e.total_score|floatformat:1 }} / {{ e.max_possible_score }}</td>
+                        <td>
+                            {% if e.is_positive %}
+                                <span class="badge bg-success"> Positiva</span>
+                            {% else %}
+                                <span class="badge bg-danger">❌ Negativa</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if e.is_validated %}
+                                <span class="badge bg-primary">Validada</span>
+                            {% elif e.status.name == 'Completada' %}
+                                <span class="badge bg-secondary">Pendiente Validación</span>
+                            {% else %}
+                                {{ e.status.name }}
+                            {% endif %}
+                        </td>
+                        <td>{{ e.submission_datetime|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <div class="alert alert-info">No hay evaluaciones completadas aún.</div>
+{% endif %}
+
+<div class="mt-3">
+    <a href="{% url 'evaluations:coordinator_view_evaluations' %}" class="btn btn-sm btn-outline-info">
+        + Exportar a Excel
+    </a>
+</div>

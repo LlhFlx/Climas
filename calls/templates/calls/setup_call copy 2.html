@@ -1,0 +1,107 @@
+
+<!--
+{% extends "base.html" %}
+
+{% block title %}Configurar Plantillas – {{ call.title }}{% endblock %}
+
+{% block content %}
+<h1>Configurar Plantillas para "{{ call.title }}"</h1>
+
+<form method="post">
+  {% csrf_token %}
+
+  <h2>Formulario del Proponente</h2>
+  <div id="proponent-questions">
+    {% for q in proponent_questions %}
+      <div class="card">
+        <input type="text" name="proponent_question_{{ forloop.counter0 }}" value="{{ q.question }}" placeholder="Pregunta" class="u-full-width" required>
+        <select name="proponent_field_type_{{ forloop.counter0 }}" class="u-full-width" required>
+          <option value="text" {% if q.field_type == 'text' %}selected{% endif %}>Texto largo</option>
+          <option value="short_text" {% if q.field_type == 'short_text' %}selected{% endif %}>Texto corto</option>
+          <option value="number" {% if q.field_type == 'number' %}selected{% endif %}>Número</option>
+          <option value="boolean" {% if q.field_type == 'boolean' %}selected{% endif %}>Sí/No</option>
+          <option value="dropdown" {% if q.field_type == 'dropdown' %}selected{% endif %}>Desplegable</option>
+          <option value="radio" {% if q.field_type == 'radio' %}selected{% endif %}>Opción múltiple</option>
+        </select>
+        <label>
+          <input type="checkbox" name="proponent_required_{{ forloop.counter0 }}" {% if q.is_required %}checked{% endif %}> Requerida
+        </label>
+      </div>
+    {% endfor %}
+  </div>
+  <button type="button" onclick="addProponentQuestion()" class="button">+ Añadir Pregunta</button>
+
+  <h2>Plantilla de Evaluación</h2>
+  <div id="evaluation-questions">
+    {% for item in evaluation_questions %}
+      <div class="card">
+        <input type="text" name="evaluation_question_{{ forloop.counter0 }}" value="{{ item.question }}" placeholder="Pregunta" class="u-full-width" required>
+        <select name="evaluation_field_type_{{ forloop.counter0 }}" class="u-full-width" required>
+          <option value="text" {% if item.field_type == 'text' %}selected{% endif %}>Texto largo</option>
+          <option value="short_text" {% if item.field_type == 'short_text' %}selected{% endif %}>Texto corto</option>
+          <option value="number" {% if item.field_type == 'number' %}selected{% endif %}>Número</option>
+          <option value="boolean" {% if item.field_type == 'boolean' %}selected{% endif %}>Sí/No</option>
+          <option value="dropdown" {% if item.field_type == 'dropdown' %}selected{% endif %}>Desplegable</option>
+          <option value="radio" {% if item.field_type == 'radio' %}selected{% endif %}>Opción múltiple</option>
+        </select>
+        <input type="number" step="0.1" name="evaluation_max_score_{{ forloop.counter0 }}" value="{{ item.max_score }}" placeholder="Puntuación Máxima" class="u-full-width">
+      </div>
+    {% endfor %}
+  </div>
+  <button type="button" onclick="addEvaluationQuestion()" class="button">+ Añadir Pregunta</button>
+
+  <!-- Hidden counter -->
+  <input type="hidden" name="proponent_question_count" id="proponent_question_count" value="{{ proponent_questions|length }}">
+  <input type="hidden" name="evaluation_question_count" id="evaluation_question_count" value="{{ evaluation_questions|length }}">
+
+  <button type="submit" class="button button-primary">Guardar Plantillas</button>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+
+<script>
+let proponentIndex = {{ proponent_questions|length }};
+let evaluationIndex = {{ evaluation_questions|length }};
+
+function addProponentQuestion() {
+  const container = document.getElementById('proponent-questions');
+  const div = document.createElement('div');
+  div.className = 'card';
+  div.innerHTML = `
+    <input type="text" name="proponent_question_${proponentIndex}" placeholder="Pregunta" class="u-full-width" required>
+    <select name="proponent_field_type_${proponentIndex}" class="u-full-width" required>
+      <option value="text">Texto largo</option>
+      <option value="short_text">Texto corto</option>
+      <option value="number">Número</option>
+      <option value="boolean">Sí/No</option>
+      <option value="dropdown">Desplegable</option>
+      <option value="radio">Opción múltiple</option>
+    </select>
+    <label><input type="checkbox" name="proponent_required_${proponentIndex}"> Requerida</label>
+  `;
+  container.appendChild(div);
+  document.getElementById('proponent_question_count').value = ++proponentIndex;
+}
+
+function addEvaluationQuestion() {
+  const container = document.getElementById('evaluation-questions');
+  const div = document.createElement('div');
+  div.className = 'card';
+  div.innerHTML = `
+    <input type="text" name="evaluation_question_${evaluationIndex}" placeholder="Pregunta" class="u-full-width" required>
+    <select name="evaluation_field_type_${evaluationIndex}" class="u-full-width" required>
+      <option value="text">Texto largo</option>
+      <option value="short_text">Texto corto</option>
+      <option value="number">Número</option>
+      <option value="boolean">Sí/No</option>
+      <option value="dropdown">Desplegable</option>
+      <option value="radio">Opción múltiple</option>
+    </select>
+    <input type="number" step="0.1" name="evaluation_max_score_${evaluationIndex}" value="5.0" placeholder="Puntuación Máxima" class="u-full-width">
+  `;
+  container.appendChild(div);
+  document.getElementById('evaluation_question_count').value = ++evaluationIndex;
+}
+</script>
+{% endblock %}-

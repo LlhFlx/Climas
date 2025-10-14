@@ -1,0 +1,1782 @@
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+{% load dict_extras %}
+{% block title %}Enviar Propuesta Formal - {{ call.title }} - Climas{% endblock %}
+{% block content %}
+<div class="container" style="max-width: 800px; margin: 3rem auto;">
+    <h3 class="mb-4">Enviar Propuesta Formal</h3>
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <!-- HIDDEN PROPOSAL ID FOR AJAX UPLOADS -->
+        <input type="hidden" name="proposal_id" value="{{ proposal.id }}">
+
+        <!-- Expression Fields (READ-ONLY) -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">Información de la Expresión de Interés</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Título del Proyecto</label>
+                    <p class="form-control-plaintext">{{ expression.project_title }}</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Eje Temático</label>
+                    <p class="form-control-plaintext">{{ expression.thematic_axis.name }}</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">País de Implementación</label>
+                    <p class="form-control-plaintext">{{ expression.implementation_country.name }}</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Institución Principal</label>
+                    <p class="form-control-plaintext">{{ expression.primary_institution.name }}</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Descripción del Problema</label>
+                    <p class="form-control-plaintext">{{ expression.problem|linebreaks }}</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Objetivo General</label>
+                    <p class="form-control-plaintext">{{ expression.general_objective|linebreaks }}</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Metodología</label>
+                    <p class="form-control-plaintext">{{ expression.methodology|linebreaks }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Proposal Fields -->
+        <h4 class="mb-4">Información de la Propuesta Formal</h4>
+
+        <!-- 0.1. Project Title Override -->
+        <div class="mb-3">
+            <label class="form-label">Título del Proyecto (Opcional)</label>
+            <input type="text"
+                name="project_title_override"
+                class="form-control"
+                value="{{ post_data.project_title_override|default:proposal.project_title_override|default:'' }}"
+                placeholder="Puede sobrescribir el título anterior">
+            <small class="form-text text-muted">Máximo 50 palabras</small>
+        </div>
+
+        
+        <!-- 0.1. General Objective Override -->
+        <div class="mb-3">
+            <label class="form-label">Objetivo General del Proyecto (Opcional)</label>
+            <input type="text"
+                name="general_objective_override"
+                class="form-control"
+                value="{{ post_data.general_objective_override|default:proposal.general_objective_override|default:'' }}"
+                placeholder="Puede sobrescribir el objetivo general anterior">
+            <small class="form-text text-muted">Máximo 50 palabras</small>
+        </div>
+        <!-- 0.2. Thematic Axis Override -->
+        <div class="mb-3">
+            <label class="form-label">Eje Temático</label>
+            <select name="thematic_axis_override" class="form-select">
+                <option value="">-- Mantener eje de expresión --</option>
+                {% for axis in thematic_axes %}
+                    <option value="{{ axis.id }}" {% if post_data.thematic_axis_override == axis.id|stringformat:"i" %}selected{% endif %}>
+                        {{ axis.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- 0.3. Principal Investigator Role & Title -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Título del Investigador Principal *</label>
+                <input type="text"
+                    name="principal_investigator_title"
+                    class="form-control"
+                    value="{{ proposal.principal_investigator_title }}">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Cargo Actual del Investigador Principal *</label>
+                <input type="text"
+                    name="principal_investigator_position"
+                    class="form-control"
+                    value="{{ proposal.principal_investigator_position }}">
+            </div>
+        </div>
+
+        <!-- 0.4. Primary Institution (Proposal Level) -->
+        <div class="mb-3">
+            <label class="form-label">Institución Principal *</label>
+            <div class="input-group">
+                <input type="text"
+                    name="primary_institution_search"
+                    class="form-control institution-search-primary"
+                    placeholder="Buscar..."
+                    value="{% if proposal.primary_institution %}{{ proposal.primary_institution.name }}{% endif %}">
+                <input type="hidden"
+                    name="primary_institution_id"
+                    value="{% if proposal.primary_institution %}{{ proposal.primary_institution.id }}{% endif %}">
+            </div>
+            <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=primary_institution_id"
+            target="_blank"
+            class="btn btn-outline-primary mt-2">+ Crear</a>
+            <small class="form-text text-muted">Seleccione o cree una nueva.</small>
+        </div>
+        <!-- 1. Principal Research Experience -->
+        <div class="mb-3">
+            <label class="form-label">Experiencia en investigación del Investigador/a Principal *</label>
+            <textarea name="principal_research_experience" class="form-control" rows="4" maxlength="1000" required>{{ proposal.principal_research_experience }}</textarea>
+            <small class="form-text text-muted">Máximo 250 palabras (≈1000 caracteres)</small>
+        </div>
+
+        <!-- 2. Partner Institutions & Commitment Letters (GROUPED) -->
+        <div class="mb-4">
+            <h5>Instituciones Aliadas y Cartas de Compromiso</h5>
+            <p class="text-muted">Seleccione instituciones y cargue una carta de compromiso por cada una.</p>
+
+            <!-- Institution Search -->
+            <div class="input-group mb-3">
+                <input type="text"
+                    name="partner_institution_search"
+                    class="form-control institution-search-partner"
+                    placeholder="Buscar institución..."
+                    aria-label="Buscar institución"
+                    value=""
+                >
+                <button type="button" class="btn btn-outline-primary add-institution" disabled>Agregar</button>
+            </div>
+            <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=primary_institution_id"
+            target="_blank"
+            class="btn btn-outline-primary mt-2">+ Crear</a>
+            <small class="form-text text-muted">Seleccione o cree una nueva.</small>
+
+            <!-- Selected Institutions List -->
+            <div id="partner-institutions-list" class="mb-3">
+                {% for inst in proposal.partner_institutions.all %}
+                    <div class="d-flex align-items-center mb-2 p-2 bg-light rounded" data-institution-id="{{ inst.id }}">
+                        <span class="me-2">{{ inst.name }}</span>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-institution" data-institution-id="{{ inst.id }}">Eliminar</button>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Commitment Letters Section -->
+            <div id="commitment-documents-container">
+                {% for inst in proposal.partner_institutions.all %}
+                    <div class="card mb-3 p-3 commitment-doc-section" data-institution-id="{{ inst.id }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Carta de Compromiso: {{ inst.name }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-section" data-institution-id="{{ inst.id }}">Eliminar</button>
+                        </div>
+
+                        <!-- Show ONLY docs linked to this institution -->
+                        {% if docs_by_institution %}
+                            {% with docs=docs_by_institution|get_item:inst %}
+                                {% if docs %}
+                                    {% for doc in docs %}
+                                        <div class="d-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded">
+                                            <span class="flex-grow-1">{{ doc.name }}</span>
+                                            <a href="{% url 'proposals:download_proposal_document' doc.id %}"
+                                            target="_blank"
+                                            class="btn btn-sm btn-outline-secondary me-2">Ver</a>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger remove-commitment-doc"
+                                                    data-doc-id="{{ doc.id }}">Borrar</button>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-muted small">No hay cartas cargadas.</p>
+                                {% endif %}
+                            {% endwith %}
+                        {% endif %}
+
+                        <!-- Upload form for this institution -->
+                        <div class="input-group mb-2">
+                            <input type="file" name="commitment_document" class="form-control" accept=".xlsx, .pdf,.docx">
+                            <button type="button" class="btn btn-outline-primary upload-commitment" data-institution-id="{{ inst.id }}">Cargar</button>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Hidden field to store selected institution IDs -->
+            <!-- <input type="hidden" name="partner_institution_ids" value="{% for inst in proposal.partner_institutions.all %}{{ inst.id }},{% endfor %}"> -->
+        </div>
+
+        <!-- 3. Community Country + Description -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">País de la Comunidad</label>
+                <select name="community_country" class="form-select">
+                    <option value="">-- Seleccionar País --</option>
+                    {% for country in countries %}
+                        <option value="{{ country.id }}" {% if proposal.community_country_id == country.id %}selected{% endif %}>
+                            {{ country.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Descripción de la Comunidad</label>
+                <input type="text" name="community_description" class="form-control" value="{{ proposal.community_description }}">
+            </div>
+        </div>
+
+        <!-- 4. Project Location -->
+        <div class="mb-3">
+            <label class="form-label">País donde se desarrollará el proyecto *</label>
+            <select name="project_location" class="form-select" required>
+                <option value="">-- Seleccionar País --</option>
+                {% for country in countries %}
+                    <option value="{{ country.id }}" {% if proposal.project_location_id == country.id %}selected{% endif %}>
+                        {{ country.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- 5. Duration -->
+        <div class="mb-3">
+            <label class="form-label">Duración del proyecto (meses) *</label>
+            <input type="number" name="duration_months" class="form-control" min="1" value="{{ proposal.duration_months|default:12 }}" required>
+        </div>
+
+        <!-- 6. Summary -->
+        <div class="mb-3">
+            <label class="form-label">Resumen *</label>
+            <textarea name="summary" class="form-control" rows="4" maxlength="1000" required>{{ proposal.summary }}</textarea>
+            <small class="form-text text-muted">Máximo 250 palabras</small>
+        </div>
+
+        <!-- 7. Context, Problem & Justification -->
+        <div class="mb-3">
+            <label class="form-label">Contexto, problema y justificación *</label>
+            <textarea name="context_problem_justification" class="form-control" rows="5" maxlength="1600" required>{{ proposal.context_problem_justification }}</textarea>
+            <small class="form-text text-muted">Máximo 400 palabras</small>
+        </div>
+
+        <!-- 8. Specific Objectives -->
+        <div class="mb-3">
+            <label class="form-label">Objetivos Específicos</label>
+            <p class="text-muted">Agregue objetivos específicos adicionales o modificados.</p>
+            <div id="specific-objectives-container">
+                {% for obj in proposal.specific_objectives.all %}
+                    <div class="card mb-3 p-3 objective-entry">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Objetivo {{ forloop.counter }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-objective">Eliminar</button>
+                        </div>
+                        <div class="mb-3">
+                            <label>Título *</label>
+                            <input type="text" name="objective_title_{{ forloop.counter0 }}" class="form-control" value="{{ obj.title }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Descripción</label>
+                            <textarea name="objective_description_{{ forloop.counter0 }}" class="form-control" rows="3">{{ obj.description }}</textarea>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="alert alert-info">No hay objetivos específicos definidos.</div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-objective-btn" class="btn btn-outline-secondary">+ Agregar Objetivo</button>
+            <small class="form-text text-muted">Máximo 200 palabras por objetivo</small>
+        </div>
+
+        <!-- 8.5. Products -->
+        <div class="mb-4">
+            <h5>Productos Esperados</h5>
+            <p class="text-muted">Defina los productos derivados de esta propuesta.</p>
+            <div id="proposal-products-container"
+                data-initial-count="{{ existing_proposal_products|length }}"
+                data-strategic-effects='{{ strategic_effects_json|safe }}'>
+                {% for prod in existing_proposal_products %}
+                    <div class="card mb-3 p-3 product-entry">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Producto {{ forloop.counter }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-product">Eliminar</button>
+                        </div>
+                        <div class="mb-3">
+                            <label>Título *</label>
+                            <input type="text" name="proposal_product_title_{{ forloop.counter0 }}" class="form-control" value="{{ prod.title }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Descripción</label>
+                            <textarea name="proposal_product_description_{{ forloop.counter0 }}" class="form-control" rows="2">{{ prod.description }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label>Resultado o Impacto</label>
+                            <textarea name="proposal_product_outcome_{{ forloop.counter0 }}" class="form-control" rows="2">{{ prod.outcome }}</textarea>
+                        </div>
+                        <!-- <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>Fecha de Inicio</label>
+                                <input type="date" name="proposal_product_start_date_{{ forloop.counter0 }}" class="form-control" value="{{ prod.start_date|date:'Y-m-d' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label>Fecha de Finalización</label>
+                                <input type="date" name="proposal_product_end_date_{{ forloop.counter0 }}" class="form-control" value="{{ prod.end_date|date:'Y-m-d' }}">
+                            </div>
+                        </div> -->
+                        <div class="mb-3">
+                            <label>Efectos Estratégicos</label>
+                            <select name="proposal_product_strategic_effects_{{ forloop.counter0 }}" 
+                                class="form-select product-strategic-effects"    
+                                multiple>
+                                {% for effect in strategic_effects %}
+                                    <option value="{{ effect.id }}" {% if effect in prod.strategic_effects.all %}selected{% endif %}>
+                                        {{ effect.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="alert alert-info">No hay productos definidos.</div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-proposal-product-btn" class="btn btn-outline-primary">+ Agregar Producto</button>
+        </div>
+
+        <!-- 8.6. Team Members -->
+        <div class="mb-4">
+            <h5>Equipo de Investigación Detallado</h5>
+            <p class="text-muted">Agregue colaboradores con sus antecedentes temáticos.</p>
+            <div id="proposal-team-members-container">
+                {% for member in existing_proposal_team_members %}
+                    <div class="card mb-4 p-3 team-member-entry">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">Colaborador {{ forloop.counter }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-team-member">Eliminar</button>
+                        </div>
+                        <!-- Person -->
+                        <div class="mb-3">
+                            <label>Persona *</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control person-search" placeholder="Buscar..." value="{% if member.person %}{{ member.person.first_name }} {{ member.person.first_last_name }}{% endif %}">
+                                <input type="hidden" name="proposal_team_member_person_id_{{ forloop.counter0 }}" value="{{ member.person_id }}">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label>Rol *</label>
+                            <input type="text" name="proposal_team_member_role_{{ forloop.counter0 }}" class="form-control" value="{{ member.role }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Institución</label>
+                            <select name="proposal_team_member_institution_{{ forloop.counter0 }}" class="form-select">
+                                <option value="">-- Ninguna --</option>
+                                {% for inst in institutions %}
+                                    <option value="{{ inst.id }}" {% if member.institution_id == inst.id %}selected{% endif %}>{{ inst.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <!-- <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>Fecha de Inicio</label>
+                                <input type="date" name="proposal_team_member_start_date_{{ forloop.counter0 }}" class="form-control" value="{{ member.start_date|date:'Y-m-d' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label>Fecha de Finalización</label>
+                                <input type="date" name="proposal_team_member_end_date_{{ forloop.counter0 }}" class="form-control" value="{{ member.end_date|date:'Y-m-d' }}">
+                            </div>
+                        </div> -->
+                        <!-- Antecedents -->
+                        <div class="mb-3">
+                            <label>Antecedentes Temáticos</label>
+                            <div class="antecedents-container">
+                                {% for antecedent in member.thematic_antecedents.all %}
+                                    <div class="antecedent-entry card mb-2 p-2">
+                                        <div class="d-flex justify-content-between">
+                                            <h6 class="fs-6 mb-2">Antecedente {{ forloop.counter }}</h6>
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-antecedent">Eliminar</button>
+                                        </div>
+                                        <!-- <div class="mb-2">
+                                            <label>Eje Temático</label>
+                                            <select name="proposal_team_member_antecedent_axis_{{ forloop.parentloop.counter0 }}" class="form-select">
+                                                {% for axis in thematic_axes %}
+                                                    <option value="{{ axis.id }}" {% if antecedent.thematic_axis_id == axis.id %}selected{% endif %}>{{ axis.name }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div> -->
+                                        <div class="mb-2">
+                                            <label>Descripción *</label>
+                                            <textarea name="proposal_team_member_antecedent_description_{{ forloop.parentloop.counter0 }}" class="form-control" rows="2" required>{{ antecedent.description }}</textarea>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label>URL de Evidencia</label>
+                                            <input type="url" name="proposal_team_member_antecedent_url_{{ forloop.parentloop.counter0 }}" class="form-control" value="{{ antecedent.evidence_url }}">
+                                        </div>
+                                    </div>
+                                {% empty %}
+                                    <p class="text-muted">No hay antecedentes.</p>
+                                {% endfor %}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary add-antecedent">+ Agregar Antecedente</button>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="alert alert-info">No hay colaboradores definidos.</div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-proposal-team-member-btn" class="btn btn-outline-primary">+ Agregar Colaborador</button>
+        </div>
+
+        <!-- COMMUNITY-BASED ORGANIZATIONS -->
+        <div class="mb-4">
+            <h5>Organizaciones Comunitarias (CBOs)</h5>
+            <p class="text-muted">Agregue organizaciones con sus roles y antecedentes.</p>
+            <div id="cbo-container">
+                {% for cbo in proposal.community_organizations.all %}
+                    <div class="card mb-4 p-3 cbo-entry">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">CBO {{ forloop.counter }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-cbo">Eliminar</button>
+                        </div>
+                        <div class="mb-3">
+                            <label>Nombre *</label>
+                            <input type="text" name="cbo_name_{{ forloop.counter0 }}" class="form-control" value="{{ cbo.name }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Descripción (trabajo previo, reconocimiento, etc.) *</label>
+                            <textarea name="cbo_description_{{ forloop.counter0 }}" class="form-control" rows="3" required>{{ cbo.description }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label>Número de Miembros *</label>
+                            <input type="number" name="cbo_number_of_members_{{ forloop.counter0 }}" class="form-control" value="{{ cbo.number_of_members }}" min="1" required>
+                        </div>
+                        <!-- Roles -->
+                        <div class="mb-3">
+                            <label>Roles Relevantes</label>
+                            <div class="roles-container">
+                                {% for role in cbo.roles.all %}
+                                    <div class="role-entry card mb-2 p-2">
+                                        <div class="d-flex justify-content-between">
+                                            <h6 class="fs-6 mb-2">Rol {{ forloop.counter }}</h6>
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-role">Eliminar</button>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label>Nombre de la Persona *</label>
+                                            <input type="text" name="cbo_role_person_name_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}" class="form-control" value="{{ role.person_name }}" required>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label>Rol</label>
+                                            <select name="cbo_role_predefined_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}" class="form-select">
+                                                <option value="">-- Rol personalizado --</option>
+                                                {% for key, val in role.PREDEFINED_ROLE_CHOICES %}
+                                                    <option value="{{ key }}" {% if role.predefined_role == key %}selected{% endif %}>{{ val }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <input type="text" name="cbo_role_custom_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}" class="form-control mt-1" placeholder="O ingrese un rol personalizado" value="{{ role.custom_role }}">
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label>Teléfono</label>
+                                                <input type="text" name="cbo_role_phone_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}" class="form-control" value="{{ role.contact_phone }}">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label>Correo</label>
+                                                <input type="email" name="cbo_role_email_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}" class="form-control" value="{{ role.contact_email }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% empty %}
+                                    <p class="text-muted">No hay roles definidos.</p>
+                                {% endfor %}
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary add-role">+ Agregar Rol</button>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="alert alert-info">No hay CBOs definidas.</div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-cbo-btn" class="btn btn-outline-primary">+ Agregar CBO</button>
+        </div>
+
+        <!-- 9. Methodology, Analytical Plan & Ethics -->
+        <div class="mb-3">
+            <label class="form-label">Metodología, planeamiento analítico y aspectos éticos *</label>
+            <textarea name="methodology_analytical_plan_ethics" class="form-control" rows="8" maxlength="6000" required>{{ proposal.methodology_analytical_plan_ethics }}</textarea>
+            <small class="form-text text-muted">Máximo 1500 palabras</small>
+        </div>
+
+        <!-- 10. Equity, Gender, Intersectionality -->
+        <div class="mb-3">
+            <label class="form-label">Equidad, género, interseccionalidad e inclusión *</label>
+            <textarea name="equity_inclusion" class="form-control" rows="4" maxlength="1000" required>{{ proposal.equity_inclusion }}</textarea>
+            <small class="form-text text-muted">Máximo 250 palabras</small>
+        </div>
+
+        <!-- 11. Timeline -->
+        <div class="mb-3">
+            <label class="form-label">Cronograma *</label>
+            <div class="input-group">
+                <input type="file" name="timeline_document" class="form-control" accept=".xlsx, .pdf,.docx">
+                {% if proposal.timeline_document %}
+                    <a href="{% url 'proposals:download_proposal_document' proposal.timeline_document.id %}" 
+                       target="_blank" 
+                       class="btn btn-outline-secondary">
+                        Ver documento actual
+                    </a>
+                    <button type="submit" name="remove_timeline_doc" value="{{ proposal.timeline_document.id }}" class="btn btn-outline-danger">Borrar</button>
+                {% endif %}
+            </div>
+            <small class="form-text text-muted">Suba un archivo (XSLX, PDF, DOCX)</small>
+        </div>
+
+        <!-- 12. Communication Strategy -->
+        <div class="mb-3">
+            <label class="form-label">Estrategia de comunicación *</label>
+            <textarea name="communication_strategy" class="form-control" rows="2" maxlength="400" required>{{ proposal.communication_strategy }}</textarea>
+            <small class="form-text text-muted">Máximo 100 palabras</small>
+        </div>
+
+        <!-- 13. Risk Analysis -->
+        <div class="mb-3">
+            <label class="form-label">Riesgos y plan de mitigación *</label>
+            <textarea name="risk_analysis_mitigation" class="form-control" rows="4" maxlength="800" required>{{ proposal.risk_analysis_mitigation }}</textarea>
+            <small class="form-text text-muted">Máximo 200 palabras</small>
+        </div>
+
+        <!-- 14. Research Team -->
+        <div class="mb-3">
+            <label class="form-label">Equipo de investigación *</label>
+            <textarea name="research_team" class="form-control" rows="8" maxlength="3600" required>{{ proposal.research_team }}</textarea>
+            <small class="form-text text-muted">Máximo 900 palabras</small>
+        </div>
+
+        <!-- 15. Budget -->
+        <div class="mb-3">
+            <label class="form-label">Presupuesto *</label>
+            <div class="input-group">
+                <input type="file" name="budget_document" class="form-control" accept=".xlsx, .pdf,.docx">
+                {% if proposal.budget_document %}
+                    <a href="{% url 'proposals:download_proposal_document' proposal.budget_document.id %}" 
+                       target="_blank" 
+                       class="btn btn-outline-secondary">
+                        Ver documento actual
+                    </a>
+                    <button type="submit" name="remove_budget_doc" value="{{ proposal.budget_document.id }}" class="btn btn-outline-danger">Borrar</button>
+                {% endif %}
+            </div>
+            <small class="form-text text-muted">Suba un archivo (XSLX, PDF, DOCX)</small>
+        </div>
+
+        <!-- BUDGET ITEMS -->
+        <div class="mb-4">
+            <h5>Presupuesto Detallado</h5>
+            <p class="text-muted">Defina el presupuesto para esta propuesta.</p>
+            <div id="proposal-budget-container">
+                {% for item in existing_proposal_budget_items %}
+                    <div class="card mb-3 p-3 budget-item">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fs-6 mb-0">Ítem {{ forloop.counter }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-budget-item">Eliminar</button>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-md-4">
+                                <label>Categoría</label>
+                                <select name="proposal_budget_category_{{ forloop.counter0 }}" class="form-select" required>
+                                    {% for cat in budget_categories %}
+                                        <option value="{{ cat.id }}" {% if item.category_id == cat.id %}selected{% endif %}>
+                                            {{ cat.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label>Periodo</label>
+                                <select name="proposal_budget_period_{{ forloop.counter0 }}" class="form-select" required>
+                                    {% for period in budget_periods %}
+                                        <option value="{{ period.id }}" {% if item.period_id == period.id %}selected{% endif %}>
+                                            {{ period.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label>Monto (COP)</label>
+                                <input type="number"
+                                    name="proposal_budget_amount_{{ forloop.counter0 }}"
+                                    class="form-control"
+                                    step="0.01"
+                                    min="0"
+                                    value="{{ item.amount }}"
+                                    required>
+                            </div>
+                            <div class="col-md-1 d-flex align-items-end">
+                                <button type="button" class="btn btn-outline-danger w-100 remove-budget-item">✕</button>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label>Notas</label>
+                            <textarea name="proposal_budget_notes_{{ forloop.counter0 }}" class="form-control" rows="1">{{ item.notes }}</textarea>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="alert alert-info">No se han agregado ítems de presupuesto.</div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-proposal-budget-btn" class="btn btn-outline-primary">+ Agregar Ítem</button>
+        </div>
+
+        <!-- Submit Buttons -->
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <a href="{% url 'calls:researcher_dashboard' %}" class="btn btn-secondary me-md-2">Cancelar</a>
+            <button type="submit" name="save_draft" class="btn btn-secondary">Guardar Borrador</button>
+            <button type="submit" name="submit_proposal" class="btn btn-primary">Enviar Propuesta Formal</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ people_json|json_script:"people-json" }}
+{{ institutions|json_script:"institutions-json" }}
+{{ strategic_effects_json|json_script:"strategic-effects-data" }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const institutionSearchInput = document.querySelector('.institution-search');
+    const addInstitutionButton = document.querySelector('.add-institution');
+    const listContainer = document.getElementById('partner-institutions-list');
+    const commitmentContainer = document.getElementById('commitment-documents-container');
+    const institutionsScript = document.getElementById('institutions-json');
+    const institutionsList = JSON.parse(institutionsScript.textContent);
+
+    // function updatePartnerInstitutionIdsField() {
+    //     const ids = [];
+    //     document.querySelectorAll('#partner-institutions-list [data-institution-id]').forEach(el => {
+    //         ids.push(el.dataset.institutionId);
+    //     });
+    //     hiddenIdsInput.value = ids.join(',');
+    // }
+
+    // ============================
+    // 1. PRIMARY INSTITUTION SEARCH
+    // ============================
+
+    const primarySearch = document.querySelector('.institution-search-primary');
+    if (primarySearch) {
+        primarySearch.addEventListener('input', function () {
+            const query = this.value.trim().toLowerCase();
+            const results = institutionsList.filter(inst =>
+                inst.name.toLowerCase().includes(query)
+            );
+
+            // Clear previous suggestions
+            let suggestions = document.querySelector('.suggestions-list-primary');
+            if (suggestions) suggestions.remove();
+
+            if (!query || results.length === 0) return;
+
+            // Create suggestion dropdown
+            suggestions = document.createElement('ul');
+            suggestions.className = 'suggestions-list-primary list-group position-absolute w-100 mt-1 shadow-sm';
+            suggestions.style.maxHeight = '200px';
+            suggestions.style.overflowY = 'auto';
+            suggestions.style.zIndex = '1000';
+
+            results.forEach(inst => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item cursor-pointer';
+                li.textContent = inst.name;
+                li.dataset.id = inst.id;
+                li.dataset.type = inst.institution_type_name; // optional
+                li.addEventListener('click', () => {
+                    primarySearch.value = inst.name;
+                    document.querySelector('[name="primary_institution_id"]').value = inst.id;
+                    suggestions.remove();
+                });
+                suggestions.appendChild(li);
+            });
+
+            primarySearch.parentElement.appendChild(suggestions);
+        });
+
+        // Hide suggestions on blur
+        primarySearch.addEventListener('blur', function () {
+            setTimeout(() => {
+                const suggestions = document.querySelector('.suggestions-list-primary');
+                if (suggestions) suggestions.remove();
+            }, 200);
+        });
+    }
+
+    // ============================
+    // 2. PARTNER INSTITUTIONS – MULTI ADD
+    // ============================
+
+    const partnerSearch = document.querySelector('.institution-search-partner');
+    const addBtn = document.querySelector('.add-institution');
+    
+    function updatePartnerSuggestions() {
+        if (!partnerSearch) return;
+
+        const query = partnerSearch.value.trim().toLowerCase();
+        const results = institutionsList.filter(inst =>
+            inst.name.toLowerCase().includes(query)
+        );
+
+        addBtn.disabled = !query || results.length === 0;
+
+        // Clear old suggestions
+        let suggestions = document.querySelector('.suggestions-list-partner');
+        if (suggestions) suggestions.remove();
+
+        if (!query || results.length === 0) return;
+
+        // Build new ones
+        suggestions = document.createElement('ul');
+        suggestions.className = 'suggestions-list-partner list-group position-absolute w-100 mt-1 shadow-sm';
+        suggestions.style.maxHeight = '200px';
+        suggestions.style.overflowY = 'auto';
+        suggestions.style.zIndex = '1000';
+
+        results.forEach(inst => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item cursor-pointer';
+            li.textContent = inst.name;
+            li.dataset.id = inst.id;
+            li.dataset.name = inst.name;
+            li.addEventListener('click', () => {
+                addPartnerInstitution(inst.id, inst.name);
+                partnerSearch.value = '';
+                partnerSearch.focus();
+                suggestions.remove();
+            });
+            suggestions.appendChild(li);
+        });
+
+        partnerSearch.parentElement.appendChild(suggestions);
+    }
+
+    // Attach to input
+    partnerSearch?.addEventListener('input', updatePartnerSuggestions);
+
+    // Click outside → hide suggestions
+    document.addEventListener('click', function(e) {
+        const isPrimary = e.target.closest('.institution-search-primary');
+        const isPartner = e.target.closest('.institution-search-partner');
+        const isDropdown = e.target.classList.contains('cursor-pointer');
+
+        if (!isPrimary && !isPartner && !isDropdown) {
+            document.querySelector('.suggestions-list-primary')?.remove();
+            document.querySelector('.suggestions-list-partner')?.remove();
+        }
+    });
+
+    // Add partner institution
+    function addPartnerInstitution(id, name) {
+        if (listContainer.querySelector(`[data-institution-id="${id}"]`)) {
+            alert(`La institución "${name}" ya fue agregada.`);
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('institution_id', id);
+        formData.append('proposal_id', document.querySelector('[name="proposal_id"]').value);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        fetch('{% url "proposals:add_institution_to_proposal" %}', {
+            method: 'POST',
+            body: formData,
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const div = document.createElement('div');
+                div.className = 'd-flex align-items-center mb-2 p-2 bg-light rounded';
+                div.dataset.institutionId = data.institution_id;
+                div.innerHTML = `
+                    <span class="me-2">${data.institution_name}</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-institution" data-institution-id="${data.institution_id}">Eliminar</button>
+                `;
+                listContainer.appendChild(div);
+                createCommitmentSection(data.institution_id, data.institution_name);
+            } else {
+                alert('Error al agregar: ' + data.error);
+            }
+        })
+        .catch(err => {
+            console.error('Add institution failed:', err);
+            alert('Error de red.');
+        });
+    }
+
+    // Remove institution
+    listContainer?.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-institution')) {
+            const btn = e.target;
+            const id = e.target.dataset.institutionId;
+
+            if (!confirm('¿Está seguro de eliminar esta institución? Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            // Show loading state
+            btn.disabled = true;
+            btn.textContent = 'Eliminando...';
+
+            const formData = new FormData();
+            formData.append('institution_id', id);
+            formData.append('proposal_id', document.querySelector('[name="proposal_id"]').value);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('{% url "proposals:remove_institution_from_proposal" %}', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove UI elements
+                    e.target.closest('.d-flex').remove();
+
+                    const commitSection = commitmentContainer.querySelector(
+                        `.commitment-doc-section[data-institution-id="${id}"]`
+                    );
+                    if (commitSection) commitSection.remove();
+                } else {
+                    alert('Error al eliminar: ' + (data.error || 'Desconocido'));
+                }
+            })
+            .catch(err => {
+                console.error("Remove institution failed:", err);
+                alert("Error de red. No se pudo eliminar la institución.");
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = 'Eliminar';
+            });
+        }
+    });
+
+
+    // ============================
+    // SPECIFIC OBJECTIVES
+    // ============================
+    const addObjectiveBtn = document.getElementById('add-objective-btn');
+    const objectivesContainer = document.getElementById('specific-objectives-container');
+    let objectiveCount = {{ proposal.specific_objectives.count }};
+
+    if (addObjectiveBtn) {
+        addObjectiveBtn.addEventListener('click', () => {
+            const entry = createObjectiveEntry(objectiveCount);
+            objectivesContainer.appendChild(entry);
+            entry.querySelector('.remove-objective').addEventListener('click', () => {
+                entry.remove();
+                objectiveCount--;
+            });
+            objectiveCount++;
+        });
+    }
+
+    // Handle removal AND renumbering
+    objectivesContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-objective')) {
+            const entry = e.target.closest('.objective-entry');
+            if (entry) {
+                entry.remove();
+                renumberObjectives(); // Critical: renumber after removal
+            }
+        }
+    });
+
+    function renumberObjectives() {
+        const entries = document.querySelectorAll('.objective-entry');
+        entries.forEach((entry, newIndex) => {
+            // Update heading
+            const heading = entry.querySelector('h6');
+            if (heading) heading.textContent = `Objetivo ${newIndex + 1}`;
+            
+            // Update all name attributes to use newIndex
+            const inputs = entry.querySelectorAll('[name]');
+            inputs.forEach(input => {
+                input.name = input.name.replace(/objective_(title|description)_\d+/, 
+                    `objective_$1_${newIndex}`);
+            });
+        });
+    }
+
+
+    function createObjectiveEntry(index) {
+        const div = document.createElement('div');
+        div.className = 'card mb-3 p-3 objective-entry';
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">Objetivo ${index + 1}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-objective">Eliminar</button>
+            </div>
+            <div class="mb-3">
+                <label>Título *</label>
+                <input type="text" name="objective_title_${index}" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label>Descripción</label>
+                <textarea name="objective_description_${index}" class="form-control" rows="3"></textarea>
+            </div>
+        `;
+        return div;
+    }
+
+    // ============================
+    // PRODUCTS
+    // ============================
+    const thematicAxisSelect = document.querySelector('select[name="thematic_axis_override"]');
+    const productsContainer = document.getElementById('proposal-products-container');
+    const addProductBtn = document.getElementById('add-proposal-product-btn');
+
+    // Get fallback from template context
+    const fallbackAxisId = "{{ expression.thematic_axis.id }}";
+
+    if (thematicAxisSelect && productsContainer && addProductBtn) {
+        // Get strategic effects data
+        let allStrategicEffects = [];
+        try {
+            const data = productsContainer.getAttribute('data-strategic-effects') || '[]';
+            allStrategicEffects = JSON.parse(data);
+            console.log("Strategic Effects loaded:", allStrategicEffects);
+        } catch (e) {
+            console.error('Failed to parse strategic effects:', e);
+        }
+
+        // Update Product Strategic Effects dropdowns based on selected Thematic Axis
+        function updateProductStrategicEffects() {
+            console.log("updateProductStrategicEffects() called");
+            const selectedAxisId = thematicAxisSelect.value || fallbackAxisId;;
+            const productDropdowns = document.querySelectorAll('.product-strategic-effects');
+            console.log(productDropdowns)
+            productDropdowns.forEach(dropdown => {
+                // Save current selections before clearing
+                const selectedValues = Array.from(dropdown.selectedOptions).map(opt => opt.value);
+
+                // Clear dropdown
+                dropdown.innerHTML = '';
+                
+                if (!selectedAxisId) {
+                    dropdown.innerHTML = '<option value="">-- Seleccionar Eje Temático primero --</option>';
+                    return;
+                }
+
+                console.log("Selected Axis ID:", selectedAxisId);
+                console.log("All Strategic Effects:");
+
+                allStrategicEffects.forEach((effect, index) => {
+                    console.log(`Effect #${index + 1}:`, effect);
+                    console.log("  - effect.thematic_axis_id:", effect.thematic_axis_id);
+                    console.log("  - Matches selectedAxisId?", parseInt(effect.thematic_axis_id, 10) === parseInt(selectedAxisId, 10));
+                });
+                                
+                const filteredEffects = allStrategicEffects.filter(effect => 
+                    parseInt(effect.thematic_axis_id, 10) === parseInt(selectedAxisId, 10)
+                );
+
+                if (filteredEffects.length > 0) {
+                    filteredEffects.forEach(effect => {
+                        const option = document.createElement('option');
+                        option.value = effect.id;
+                        option.textContent = effect.name;
+                        if (selectedValues.includes(String(effect.id))) {
+                            option.selected = true;
+                        }
+                        dropdown.appendChild(option);
+                    });
+                } else {
+                    dropdown.innerHTML = '<option value="">No hay efectos para este eje</option>';
+                }
+            });
+        }
+
+        // Initialize on page load
+        // if (thematicAxisSelect.value) {
+        updateProductStrategicEffects();
+        // }
+
+        // Rebind on change
+        thematicAxisSelect.addEventListener('change', updateProductStrategicEffects);
+
+        // Product Management
+        let productCount = parseInt(productsContainer.getAttribute('data-initial-count'), 10) || 0;
+
+        function createProductEntry(index) {
+            const div = document.createElement('div');
+            div.className = 'card mb-3 p-3 product-entry';
+            div.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Producto ${index + 1}</h6>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-product">Eliminar</button>
+                </div>
+                <input type="hidden" name="proposal_product_index_${index}" value="${index}">
+                <div class="mb-3">
+                    <label class="form-label">Título *</label>
+                    <input type="text" name="proposal_product_title_${index}" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Descripción</label>
+                    <textarea name="proposal_product_description_${index}" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Resultado o Impacto</label>
+                    <textarea name="proposal_product_outcome_${index}" class="form-control" rows="3"></textarea>
+                </div>
+                <!--<div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Fecha de Inicio</label>
+                        <input type="date" name="proposal_product_start_date_${index}" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Fecha de Finalización</label>
+                        <input type="date" name="proposal_product_end_date_${index}" class="form-control">
+                    </div>
+                </div>-->
+                <div class="mb-3">
+                    <label class="form-label">Efectos Estratégicos</label>
+                    <select name="proposal_product_strategic_effects_${index}" class="form-select product-strategic-effects" multiple></select>
+                    <small class="text-muted">Mantenga presionado Ctrl (o Cmd en Mac) para seleccionar múltiples.</small>
+                </div>
+            `;
+            productsContainer.appendChild(div);
+            updateProductStrategicEffects(); // Populate dropdown immediately
+            return div;
+        }
+
+        // Add new product
+        addProductBtn.addEventListener('click', () => {
+            const entry = createProductEntry(productCount);
+            productCount++;
+            entry.querySelector('.remove-product').addEventListener('click', () => {
+                entry.remove();
+                renumberProducts();
+            });
+        });
+
+        // Handle removal via event delegation
+        productsContainer?.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-product')) {
+                const entry = e.target.closest('.product-entry');
+                if (entry) {
+                    entry.remove();
+                    renumberProducts();
+                }
+            }
+        });
+
+        // Renumber products after removal
+        function renumberProducts() {
+            document.querySelectorAll('.product-entry').forEach((entry, i) => {
+                // Update heading
+                const heading = entry.querySelector('h6');
+                if (heading) heading.textContent = `Producto ${i + 1}`;
+
+                // Update all name attributes
+                entry.querySelectorAll('[name]').forEach(input => {
+                    input.name = input.name.replace(/proposal_product_\w+_\d+/, match => {
+                        return match.replace(/\d+$/, i);
+                    });
+                });
+            });
+            // After renumbering, re-update strategic effects dropdowns
+            updateProductStrategicEffects();
+        }
+
+        console.log("Products initialized.");
+    }
+
+    // ============================
+    // TEAM MEMBERS
+    // ============================
+    const addTeamBtn = document.getElementById('add-proposal-team-member-btn');
+    const teamContainer = document.getElementById('proposal-team-members-container');
+    let teamCount = {{ existing_proposal_team_members|length }};
+
+    if (addTeamBtn) {
+        addTeamBtn.addEventListener('click', () => {
+            const entry = createTeamMemberEntry(teamCount);
+            teamContainer.appendChild(entry);
+            entry.querySelector('.remove-team-member').addEventListener('click', () => {
+                entry.remove();
+                teamCount--;
+            });
+            teamCount++;
+        });
+    }
+
+    // Handle removal AND renumbering
+    teamContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-team-member')) {
+            const entry = e.target.closest('.team-member-entry');
+            if (entry) {
+                entry.remove();
+                renumberTeamMembers(); // Critical: renumber after removal
+            }
+        }
+    });
+
+    function renumberTeamMembers() {
+        document.querySelectorAll('.team-member-entry').forEach((entry, i) => {
+            entry.querySelector('h6').textContent = `Colaborador ${i + 1}`;
+            entry.querySelectorAll('[name]').forEach(input => {
+                input.name = input.name.replace(/proposal_team_member_\w+_\d+/, match => {
+                    return match.replace(/\d+$/, i);
+                });
+            });
+            // Also update antecedent names inside this member
+            entry.querySelectorAll('.antecedent-entry [name]').forEach(input => {
+                input.name = input.name.replace(/proposal_team_member_antecedent_\w+_\d+/, match => {
+                    return match.replace(/\d+$/, i);
+                });
+            });
+        });
+    }
+
+    function createTeamMemberEntry(index) {
+        const div = document.createElement('div');
+        div.className = 'card mb-4 p-3 team-member-entry';
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">Colaborador ${index + 1}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-team-member">Eliminar</button>
+            </div>
+            <div class="mb-3">
+                <label>Persona *</label>
+                <div class="input-group">
+                    <input type="text" class="form-control person-search" placeholder="Buscar persona..." required>
+                    <input type="hidden" name="proposal_team_member_person_id_${index}">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label>Rol *</label>
+                <input type="text" name="proposal_team_member_role_${index}" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label>Institución</label>
+                <select name="proposal_team_member_institution_${index}" class="form-select">
+                    <option value="">-- Ninguna --</option>
+                    {% for inst in institutions %}
+                        <option value="{{ inst.id }}">{{ inst.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <!--<div class="row mb-3">
+                <div class="col-md-6">
+                    <label>Fecha de Inicio</label>
+                    <input type="date" name="proposal_team_member_start_date_${index}" class="form-control">
+                </div>
+                <div class="col-md-6">
+                    <label>Fecha de Finalización</label>
+                    <input type="date" name="proposal_team_member_end_date_${index}" class="form-control">
+                </div>
+            </div>-->
+            <div class="mb-3">
+                <label>Antecedentes Temáticos</label>
+                <div class="antecedents-container"></div>
+                <button type="button" class="btn btn-sm btn-outline-secondary add-antecedent">+ Agregar Antecedente</button>
+            </div>
+        `;
+        return div;
+    }
+
+    teamContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('add-antecedent')) {
+            const container = e.target.closest('.team-member-entry').querySelector('.antecedents-container');
+            const idx = teamCount - 1;
+            const antecedentDiv = document.createElement('div');
+            antecedentDiv.className = 'antecedent-entry card mb-2 p-2';
+            antecedentDiv.innerHTML = `
+                <div class="d-flex justify-content-between">
+                    <h6 class="fs-6 mb-2">Antecedente</h6>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-antecedent">Eliminar</button>
+                </div>
+                <!--<div class="mb-2">
+                    <label>Eje Temático</label>
+                    <select name="proposal_team_member_antecedent_axis_${idx}" class="form-select">
+                        {% for axis in thematic_axes %}
+                            <option value="{{ axis.id }}">{{ axis.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>-->
+                <div class="mb-2">
+                    <label>Descripción *</label>
+                    <textarea name="proposal_team_member_antecedent_description_${idx}" class="form-control" rows="2" required></textarea>
+                </div>
+                <div class="mb-2">
+                    <label>URL de Evidencia</label>
+                    <input type="url" name="proposal_team_member_antecedent_url_${idx}" class="form-control">
+                </div>
+            `;
+            container.appendChild(antecedentDiv);
+        } else if (e.target.classList.contains('remove-antecedent')) {
+            e.target.closest('.antecedent-entry').remove();
+        }
+    });
+    // ============================
+    // PERSON SEARCH AUTOCOMPLETE
+    // ============================
+
+    const peopleScript = document.getElementById('people-json');
+    const peopleList = JSON.parse(peopleScript.textContent);
+
+    function setupPersonSearch(input) {
+        const container = input.closest('.mb-3') || input.parentElement;
+        let hiddenInput = container.querySelector('input[type="hidden"]');
+
+        if (!hiddenInput) {
+            console.warn("No hidden ID input found for:", input);
+            return;
+        }
+
+        // Clear old suggestions on focus
+        input.addEventListener('focus', function () {
+            const existing = container.querySelector('.suggestions-list');
+            if (existing) existing.remove();
+        });
+
+        input.addEventListener('input', function () {
+            const query = this.value.trim().toLowerCase();
+            if (!query || query.length < 1) return;
+
+            const results = peopleList.filter(p =>
+                `${p.first_name} ${p.first_last_name}`
+                    .toLowerCase()
+                    .includes(query)
+            );
+
+            // Remove previous suggestions
+            let suggestions = container.querySelector('.suggestions-list');
+            if (suggestions) suggestions.remove();
+
+            suggestions = document.createElement('ul');
+            suggestions.className = 'suggestions-list list-group position-absolute w-100 mt-1 shadow-sm';
+            suggestions.style.zIndex = '1000';
+            suggestions.style.maxHeight = '200px';
+            suggestions.style.overflowY = 'auto';
+
+            results.forEach(person => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item cursor-pointer';
+                li.dataset.id = person.id;
+                li.textContent = `${person.first_name} ${person.first_last_name}`;
+                li.addEventListener('click', () => {
+                    input.value = li.textContent;
+                    hiddenInput.value = person.id;
+                    suggestions.remove();
+                });
+                suggestions.appendChild(li);
+            });
+
+            container.appendChild(suggestions);
+        });
+
+        // Hide on blur
+        input.addEventListener('blur', () => {
+            setTimeout(() => {
+                const suggestions = container.querySelector('.suggestions-list');
+                if (suggestions) suggestions.remove();
+            }, 200);
+        });
+
+        // Clear if invalid
+        input.addEventListener('change', () => {
+            if (input.value && !hiddenInput.value) {
+                input.value = '';
+            }
+        });
+    }
+
+    // Attach to existing elements
+    document.querySelectorAll('.person-search').forEach(setupPersonSearch);
+
+    // Delegate to future inputs
+    document.getElementById('proposal-team-members-container')?.addEventListener('focusin', function(e) {
+        if (e.target.classList.contains('person-search')) {
+            setupPersonSearch(e.target);
+        }
+    });
+
+    // ============================
+    // BUDGET ITEMS
+    // ============================
+    const addBudgetBtn = document.getElementById('add-proposal-budget-btn');
+    const budgetContainer = document.getElementById('proposal-budget-container');
+    let budgetCount = {{ existing_proposal_budget_items|length }};
+
+    if (addBudgetBtn) {
+        addBudgetBtn.addEventListener('click', () => {
+            const entry = createBudgetItemEntry(budgetCount);
+            budgetContainer.appendChild(entry);
+            entry.querySelector('.remove-budget-item').addEventListener('click', () => {
+                entry.remove();
+                budgetCount--;
+            });
+            budgetCount++;
+        });
+    }
+
+    // Handle removal AND renumbering
+    budgetContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-budget-item')) {
+            const entry = e.target.closest('.budget-item');
+            if (entry) {
+                entry.remove();
+                renumberBudgetItems(); // Critical: renumber after removal
+            }
+        }
+    });
+
+    function renumberBudgetItems() {
+        document.querySelectorAll('.budget-item').forEach((entry, i) => {
+            entry.querySelector('h6').textContent = `Ítem ${i + 1}`;
+            entry.querySelectorAll('[name]').forEach(input => {
+                input.name = input.name.replace(/proposal_budget_\w+_\d+/, match => {
+                    return match.replace(/\d+$/, i);
+                });
+            });
+        });
+    }
+
+    function createBudgetItemEntry(index) {
+        const div = document.createElement('div');
+        div.className = 'card mb-3 p-3 budget-item';
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="fs-6 mb-0">Ítem ${index + 1}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-budget-item">Eliminar</button>
+            </div>
+            <div class="row mb-2">
+                <div class="col-md-4">
+                    <label>Categoría</label>
+                    <select name="proposal_budget_category_${index}" class="form-select" required>
+                        {% for cat in budget_categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label>Periodo</label>
+                    <select name="proposal_budget_period_${index}" class="form-select" required>
+                        {% for period in budget_periods %}
+                            <option value="{{ period.id }}">{{ period.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label>Monto (COP)</label>
+                    <input type="number"
+                        name="proposal_budget_amount_${index}"
+                        class="form-control"
+                        step="0.01"
+                        min="0"
+                        required>
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="button" class="btn btn-outline-danger w-100 remove-budget-item">✕</button>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label>Notas</label>
+                <textarea name="proposal_budget_notes_${index}" class="form-control" rows="1"></textarea>
+            </div>
+        `;
+        return div;
+    }
+
+    // ============================
+    // CBOs
+    // ============================
+    const addCboBtn = document.getElementById('add-cbo-btn');
+    const cboContainer = document.getElementById('cbo-container');
+    let cboCount = {{ proposal.community_organizations.count }};
+
+    if (addCboBtn) {
+        addCboBtn.addEventListener('click', () => {
+            const entry = createCboEntry(cboCount);
+            cboContainer.appendChild(entry);
+            entry.querySelector('.remove-cbo').addEventListener('click', () => {
+                entry.remove();
+                cboCount--;
+            });
+            cboCount++;
+        });
+    }
+
+    // Handle removal AND renumbering
+    cboContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('remove-cbo')) {
+            const entry = e.target.closest('.cbo-entry');
+            if (entry) {
+                entry.remove();
+                renumberCBOs(); // Critical: renumber after removal
+            }
+        }
+    });
+
+    function renumberCBOs() {
+        document.querySelectorAll('.cbo-entry').forEach((entry, i) => {
+            entry.querySelector('h6').textContent = `CBO ${i + 1}`;
+            entry.querySelectorAll('[name]').forEach(input => {
+                // Replace top-level CBO fields
+                if (input.name.startsWith('cbo_') && !input.name.includes('role')) {
+                    input.name = input.name.replace(/cbo_\w+_\d+/, match => {
+                        return match.replace(/\d+$/, i);
+                    });
+                }
+            });
+            // Renumber roles inside this CBO
+            entry.querySelectorAll('.role-entry').forEach((roleEntry, j) => {
+                roleEntry.querySelectorAll('[name]').forEach(input => {
+                    if (input.name.includes('role')) {
+                        input.name = input.name.replace(/cbo_role_\w+_\d+_\d+/, 
+                            `cbo_role_${input.name.split('_')[2]}_${i}_${j}`);
+                    }
+                });
+            });
+        });
+    }
+
+    function createCboEntry(index) {
+        const div = document.createElement('div');
+        div.className = 'card mb-4 p-3 cbo-entry';
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">CBO ${index + 1}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-cbo">Eliminar</button>
+            </div>
+            <div class="mb-3">
+                <label>Nombre *</label>
+                <input type="text" name="cbo_name_${index}" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label>Descripción (trabajo previo, reconocimiento, etc.) *</label>
+                <textarea name="cbo_description_${index}" class="form-control" rows="3" required></textarea>
+            </div>
+            <div class="mb-3">
+                <label>Número de Miembros *</label>
+                <input type="number" name="cbo_number_of_members_${index}" class="form-control" min="1" required>
+            </div>
+            <div class="mb-3">
+                <label>Roles Relevantes</label>
+                <div class="roles-container"></div>
+                <button type="button" class="btn btn-sm btn-outline-secondary add-role">+ Agregar Rol</button>
+            </div>
+        `;
+        return div;
+    }
+
+    cboContainer?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('add-role')) {
+            const container = e.target.closest('.cbo-entry').querySelector('.roles-container');
+            const cboIdx = cboCount - 1;
+            const roleIdx = container.children.length;
+            const roleDiv = document.createElement('div');
+            roleDiv.className = 'role-entry card mb-2 p-2';
+            roleDiv.innerHTML = `
+                <div class="d-flex justify-content-between">
+                    <h6 class="fs-6 mb-2">Rol</h6>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-role">Eliminar</button>
+                </div>
+                <div class="mb-2">
+                    <label>Nombre de la Persona *</label>
+                    <input type="text" name="cbo_role_person_name_${cboIdx}_${roleIdx}" class="form-control" required>
+                </div>
+                <div class="mb-2">
+                    <label>Rol</label>
+                    <select name="cbo_role_predefined_${cboIdx}_${roleIdx}" class="form-select">
+                        <option value="">-- Rol personalizado --</option>
+                        {% for key, val in cbo_role_choices %}
+                            <option value="{{ key }}">{{ val }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="cbo_role_custom_${cboIdx}_${roleIdx}" class="form-control mt-1" placeholder="O ingrese un rol personalizado">
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label>Teléfono</label>
+                        <input type="text" name="cbo_role_phone_${cboIdx}_${roleIdx}" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label>Correo</label>
+                        <input type="email" name="cbo_role_email_${cboIdx}_${roleIdx}" class="form-control">
+                    </div>
+                </div>
+            `;
+            container.appendChild(roleDiv);
+        } else if (e.target.classList.contains('remove-role')) {
+            e.target.closest('.role-entry').remove();
+        }
+    });
+
+    // -------------------------------
+    // COMMITMENT DOCUMENTS
+    // -------------------------------
+    function createCommitmentSection(institutionId, institutionName) {
+        if (commitmentContainer.querySelector(`.commitment-doc-section[data-institution-id="${institutionId}"]`)) {
+            return;
+        }
+
+        const div = document.createElement('div');
+        div.className = 'card mb-3 p-3 commitment-doc-section';
+        div.dataset.institutionId = institutionId;
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">Carta de Compromiso: ${institutionName}</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-section" data-institution-id="${institutionId}">Eliminar</button>
+            </div>
+            <div class="input-group mb-2">
+                <input type="file" name="commitment_document" class="form-control" accept=".xlsx, .pdf,.docx">
+                <button type="button" class="btn btn-outline-primary upload-commitment" data-institution-id="${institutionId}">Cargar</button>
+            </div>
+        `;
+        commitmentContainer.appendChild(div);
+    }
+
+    // -------------------------------
+    // EVENT LISTENERS
+    // -------------------------------
+
+    // Click "Agregar" button
+    addInstitutionButton.addEventListener('click', function() {
+        const query = institutionSearchInput.value.trim();
+        const inst = institutionsList.find(i => i.name.toLowerCase() === query.toLowerCase());
+        if (inst) {
+            addInstitution(inst.id, inst.name);
+            institutionSearchInput.value = '';
+            institutionSearchInput.focus();
+            addInstitutionButton.disabled = true;
+        }
+    });
+
+    // Remove institution
+    listContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-institution')) {
+            const btn = e.target;
+            const id = e.target.dataset.institutionId;
+
+            if (!confirm('¿Está seguro de eliminar esta institución? Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            // Show loading state
+            btn.disabled = true;
+            btn.textContent = 'Eliminando...';
+
+            const formData = new FormData();
+            formData.append('institution_id', id);
+            formData.append('proposal_id', document.querySelector('[name="proposal_id"]').value);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('{% url "proposals:remove_institution_from_proposal" %}', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove from DOM
+                    e.target.closest('.d-flex').remove();
+
+                    // Remove commitment section if exists
+                    const commitSection = commitmentContainer.querySelector(`.commitment-doc-section[data-institution-id="${data.institution_id}"]`);
+                    if (commitSection) commitSection.remove();
+
+                    // Update hidden field
+
+                    // Reset button state (though it's removed, just in case)
+                    btn.disabled = false;
+                } else {
+                    alert('Error al eliminar institución: ' + data.error);
+                    btn.disabled = false;
+                    btn.textContent = 'Eliminar';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Error de red. Por favor, inténtelo de nuevo.');
+                btn.disabled = false;
+                btn.textContent = 'Eliminar';
+            });
+        }
+    });
+
+    // Remove commitment section
+    commitmentContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-commitment-section')) {
+            const btn = e.target;
+            const id = e.target.dataset.institutionId;
+
+            if (!confirm('¿Está seguro de eliminar esta institución y todas sus cartas de compromiso? Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Eliminando...';
+
+            const formData = new FormData();
+            formData.append('institution_id', id);
+            formData.append('proposal_id', document.querySelector('[name="proposal_id"]').value);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('{% url "proposals:remove_institution_from_proposal" %}', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Remove UI elements
+                    e.target.closest('.card').remove();
+                    const instDiv = listContainer.querySelector(`[data-institution-id="${data.institution_id}"]`);
+                    if (instDiv) instDiv.remove();
+
+
+                    btn.disabled = false;
+                    btn.textContent = 'Eliminar';
+                } else {
+                    alert('Error al eliminar institución: ' + data.error);
+                    btn.disabled = false;
+                    btn.textContent = 'Eliminar';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Error de red. Por favor, inténtelo de nuevo.');
+                btn.disabled = false;
+                btn.textContent = 'Eliminar';
+            });
+        }
+    });
+
+    // Upload commitment document
+    document.getElementById('commitment-documents-container')?.addEventListener('click', async function(e) {
+        const btn = e.target.closest('.upload-commitment');
+        if (!btn) return;
+
+        const container = btn.closest('.card'); // Each institution section
+        const fileInput = container.querySelector('input[type="file"]');
+        const file = fileInput?.files[0];
+        const institutionId = btn.dataset.institutionId;
+        const proposalId = document.querySelector('[name="proposal_id"]')?.value;
+
+        // Validate inputs
+        if (!file) {
+            alert('Por favor seleccione un archivo.');
+            return;
+        }
+        if (!institutionId) {
+            alert('Error interno: ID de institución no encontrada.');
+            console.error("Button dataset:", btn.dataset);
+            return;
+        }
+
+        // Show loading state
+        btn.disabled = true;
+        btn.textContent = 'Subiendo...';
+
+        const formData = new FormData();
+        formData.append('commitment_document', file);
+        formData.append('institution_id', institutionId);
+        formData.append('proposal_id', proposalId);
+        formData.append('ajax_upload', '1');
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+        try {
+            const response = await fetch('{% url "calls:upload_commitment_document" %}', { method: 'POST', body: formData });
+            const data = await response.json();
+
+            if (data.success) {
+                // Create success message div
+                const docDiv = document.createElement('div');
+                docDiv.className = 'd-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded';
+                docDiv.innerHTML = `
+                    <span class="flex-grow-1">${data.name}</span>
+                    <a href="${data.url}" target="_blank" class="btn btn-sm btn-outline-secondary me-2">Ver</a>
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-doc" data-doc-id="${data.id}">Borrar</button>
+                `;
+                // Insert after upload row
+                container.querySelector('.input-group').after(docDiv);
+
+                // Reset input
+                fileInput.value = '';
+
+            } else {
+                alert('Error al cargar: ' + (data.error || 'Desconocido'));
+            }
+
+        } catch (err) {
+            console.error('Upload failed:', err);
+            alert('Error de red. Verifique conexión o tamaño del archivo.');
+        } finally {
+            // Always re-enable button
+            btn.disabled = false;
+            btn.textContent = 'Cargar';
+        }
+    });
+
+    // Remove individual commitment document
+    commitmentContainer.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-commitment-doc')) {
+            const docId = e.target.dataset.docId;
+            if (!confirm('¿Está seguro de eliminar este documento?')) return;
+
+            const formData = new FormData();
+            formData.append('remove_document', docId);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    e.target.closest('.d-flex').remove();
+                } else {
+                    alert('Error al eliminar.');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Error de red.');
+            });
+        }
+    });
+
+    // Initialize existing removal buttons
+    document.querySelectorAll('.remove-commitment-doc').forEach(button => {
+        button.addEventListener('click', function() {
+            const docId = this.dataset.docId;
+            if (!confirm('¿Está seguro de eliminar este documento?')) return;
+
+            const formData = new FormData();
+            formData.append('remove_document', docId);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    this.closest('.d-flex').remove();
+                } else {
+                    alert('Error al eliminar.');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Error de red.');
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

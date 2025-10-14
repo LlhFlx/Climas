@@ -1,0 +1,61 @@
+[
+  {
+    "model": "budgets.budgetcategory",
+    "fields": {
+      "name": "Personal",
+      "description": "Salarios, honorarios, contrataciones.",
+      "is_active": true
+    }
+  },
+  {
+    "model": "budgets.budgetcategory",
+    "fields": {
+      "name": "Equipos",
+      "description": "Compra o alquiler de equipos.",
+      "is_active": true
+    }
+  },
+  {
+    "model": "budgets.budgetcategory",
+    "fields": {
+      "name": "Viajes",
+      "description": "Pasajes, alojamiento, viáticos.",
+      "is_active": true
+    }
+  },
+  {
+    "model": "budgets.budgetperiod",
+    "fields": {
+      "name": "Año 1 - Primer Semestre",
+      "order": 1
+    }
+  },
+  {
+    "model": "budgets.budgetperiod",
+    "fields": {
+      "name": "Año 1 - Segundo Semestre",
+      "order": 2
+    }
+  },
+  {
+    "model": "budgets.budgetperiod",
+    "fields": {
+      "name": "Año 2 - Primer Semestre",
+      "order": 3
+    }
+  },
+  {
+    "model": "budgets.budgetperiod",
+    "fields": {
+      "name": "Año 2 - Segundo Semestre",
+      "order": 4
+    }
+  },
+  {
+    "model": "budgets.budgetperiod",
+    "fields": {
+      "name": "Año 3",
+      "order": 5
+    }
+  }
+]

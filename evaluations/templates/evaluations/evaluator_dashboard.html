@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% load widget_tweaks evaluation_extras %} <!-- Add evaluation_extras -->
+{% block title %}Mis Evaluaciones - Evaluador{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px;">
+    <h3>Mis Asignaciones de Evaluación</h3>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if evaluations %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Proyecto</th>
+                        <th>Convocatoria</th>
+                        <th>Tipo</th>
+                        <th>Plantilla</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for eval in evaluations %}
+                        <tr>
+                            <td>{{ eval.target.project_title }}</td>
+                            <td>{{ eval.call.title }}</td>
+                            <td>
+                                {% if eval.target_content_type.model == 'expression' %}
+                                    <span class="badge bg-info">Expresión</span>
+                                {% else %}
+                                    <span class="badge bg-success">Propuesta</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ eval.template.name }}</td>
+                            <td>
+                                {% if eval.status.name == 'Pendiente' %}
+                                    <span class="badge bg-warning text-dark">Pendiente</span>
+                                {% elif eval.status.name == 'En Progreso' %}
+                                    <span class="badge bg-primary">En Progreso</span>
+                                {% elif eval.status.name == 'Completada' %}
+                                    <span class="badge bg-secondary">Completada</span>
+                                {% else %}
+                                    {{ eval.status.name }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if eval.status.name|status_in:"Pendiente,En Progreso" %}
+                                    <!-- Editable: Let evaluator complete it -->
+                                    <a href="{% url 'evaluations:evaluate_expression' eval.id %}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        ✏️ Evaluar
+                                    </a>
+                                {% elif eval.status.name == 'Completada' %}
+                                    <!-- Read-only: Show modal -->
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-info"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#evaluationDetailModal"
+                                            data-evaluation-id="{{ eval.id }}"
+                                            title="Ver detalles de la evaluación">
+                                        📄 Ver Detalles
+                                    </button>
+                                {% else %}
+                                    <span class="text-muted">No disponible</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="6">No tienes evaluaciones asignadas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            No tienes evaluaciones pendientes ni completadas.
+        </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{% url 'home' %}" class="btn btn-outline-secondary">← Volver al Inicio</a>
+    </div>
+</div>
+
+<!-- Shared Modal -->
+<div class="modal fade" id="evaluationDetailModal" tabindex="-1" aria-labelledby="evaluationDetailLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="evaluationDetailLabel">Detalles de la Evaluación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Cargando datos...</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('evaluationDetailModal');
+    if (!modal) return;
+
+    modal.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget;
+        const evaluationId = button.getAttribute('data-evaluation-id');
+        const modalBody = modal.querySelector('.modal-body');
+
+        modalBody.innerHTML = '<p>Cargando...</p>';
+
+        fetch(`{% url 'evaluations:evaluation_detail_json' 0 %}`.replace('0', evaluationId))
+            .then(response => response.json())
+            .then(data => {
+                if (!data.success) {
+                    modalBody.innerHTML = `<p class="text-danger">${data.error}</p>`;
+                    return;
+                }
+
+                let html = `
+                    <ul class="list-group list-group-flush mb-3">
+                        <li class="list-group-item"><strong>Tipo:</strong> ${data.target_type === 'expression' ? '📝 Expresión' : '📋 Propuesta'}</li>
+                        <li class="list-group-item"><strong>Proyecto:</strong> ${data.project_title}</li>
+                        <li class="list-group-item"><strong>Investigador:</strong> ${data.investigator_name}</li>
+                        <li class="list-group-item"><strong>Evaluador:</strong> ${data.evaluator_name}</li>
+                        <li class="list-group-item"><strong>Convocatoria:</strong> ${data.call_title}</li>
+                        <li class="list-group-item"><strong>Plantilla:</strong> ${data.template_name}</li>
+                        <li class="list-group-item"><strong>Puntaje Total:</strong> ${data.total_score || '-'} / ${data.max_possible_score}</li>
+                        <li class="list-group-item"><strong>Resultado:</strong>
+                            ${data.is_positive ?
+                                '<span class="badge bg-success"> Positiva</span>' :
+                                '<span class="badge bg-danger">❌ Negativa</span>'
+                            }
+                        </li>
+                        <li class="list-group-item"><strong>Fecha:</strong> ${data.submission_datetime}</li>
+                    </ul>
+                `;
+                
+                modalBody.innerHTML = html;
+            })
+            .catch(err => {
+                console.error("Error loading evaluation:", err);
+                modalBody.innerHTML = '<p class="text-danger">No se pudo cargar los datos.</p>';
+            });
+    });
+});
+</script>
+{% endblock %}

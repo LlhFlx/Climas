@@ -1,0 +1,389 @@
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+
+{% block title %}Coordinator Dashboard - Climas{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Coordinator Dashboard</h2>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Tab Navigation -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <ul class="nav nav-tabs" id="dashboardTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="calls-tab" data-bs-toggle="tab" data-bs-target="#calls" type="button" role="tab">Calls & Questions</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="evaluations-tab" data-bs-toggle="tab" data-bs-target="#evaluations" type="button" role="tab">
+                        Gestión de Evaluaciones
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="view-evaluations-tab" data-bs-toggle="tab" data-bs-target="#view-evaluations" type="button" role="tab">
+                        Ver Evaluaciones
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="evaluation-templates-tab" data-bs-toggle="tab" data-bs-target="#evaluation-templates" type="button" role="tab">Plantillas de Evaluación</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="institutions-tab" data-bs-toggle="tab" data-bs-target="#institutions" type="button" role="tab">Institutions & Geo</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="thematic-tab" data-bs-toggle="tab" data-bs-target="#thematic" type="button" role="tab">Thematic & Strategic</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="budget-tab" data-bs-toggle="tab" data-bs-target="#budget" type="button" role="tab">Budget</button>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="dashboardTabsContent">
+        <!-- Calls & Questions Tab -->
+        <div class="tab-pane fade show active" id="calls" role="tabpanel">
+            {% include 'calls/partials/calls_section.html' %}
+        </div>
+
+        <!-- Evaluations Management Tab -->
+        <div class="tab-pane fade" id="evaluations" role="tabpanel">
+            {% include 'calls/partials/evaluations_management.html' %}
+        </div>
+
+        <!-- Evaluations Templates Tab -->
+        <div class="tab-pane fade" id="evaluation-templates" role="tabpanel">
+            {% include 'calls/partials/evaluation_templates.html' %}
+        </div>
+
+        <!-- View All Evaluations -->
+        <div class="tab-pane fade" id="view-evaluations" role="tabpanel">
+            {% include 'evaluations/coordinator_view_evaluations.html' %}
+        </div>
+
+        <!-- Institutions & Geo Tab -->
+        <div class="tab-pane fade" id="institutions" role="tabpanel">
+            {% include 'calls/partials/institutions_section.html' %}
+        </div>
+
+        <!-- Thematic & Strategic Tab -->
+        <div class="tab-pane fade" id="thematic" role="tabpanel">
+            {% include 'calls/partials/thematic_section.html' %}
+        </div>
+
+        <!-- Budget Tab -->
+        <div class="tab-pane fade" id="budget" role="tabpanel">
+            {% include 'calls/partials/budget_section.html' %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Create Institution
+    const saveBtn = document.getElementById('saveInstitutionBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', function() {
+            const form = document.getElementById('createInstitutionForm');
+            const formData = new FormData(form);
+
+            fetch('{% url "calls:create_institution" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Institution created successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred. Check console.');
+            });
+        });
+    }
+
+    // Preview Source Model
+    const sourceModelSelect = document.querySelector('select[name="source_model"]');
+    const previewDiv = document.getElementById('sourceModelPreview');
+    const previewList = document.getElementById('previewList');
+
+    if (sourceModelSelect) {
+        sourceModelSelect.addEventListener('change', function() {
+            const selectedValue = this.value;
+
+            if (!selectedValue) {
+                previewDiv.style.display = 'none';
+                return;
+            }
+
+            previewList.innerHTML = '<li>Loading...</li>';
+            previewDiv.style.display = 'block';
+
+            fetch(`/calls/shared-question/preview/${selectedValue}/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.items.length > 0) {
+                        previewList.innerHTML = data.items.map(item => 
+                            `<li>${item}</li>`
+                        ).join('');
+                    } else {
+                        previewList.innerHTML = '<li class="text-muted">No data found or model has no "name" field.</li>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching preview:', error);
+                    previewList.innerHTML = '<li class="text-danger">Error loading preview.</li>';
+                });
+        });
+    }
+
+    // Create Thematic Axis
+    const saveThematicAxisBtn = document.getElementById('saveThematicAxisBtn');
+    if (saveThematicAxisBtn) {
+        saveThematicAxisBtn.addEventListener('click', function() {
+            const form = document.getElementById('createThematicAxisForm');
+            const formData = new FormData(form);
+
+            fetch('{% url "calls:create_thematic_axis" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Thematic Axis created successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred. Check console.');
+            });
+        });
+    }
+
+    // Create Strategic Effect
+    const saveStrategicEffectBtn = document.getElementById('saveStrategicEffectBtn');
+    if (saveStrategicEffectBtn) {
+        saveStrategicEffectBtn.addEventListener('click', function() {
+            const form = document.getElementById('createStrategicEffectForm');
+            const formData = new FormData(form);
+
+            fetch('{% url "calls:create_strategic_effect" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Strategic Effect created successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred. Check console.');
+            });
+        });
+    }
+
+    // Edit Thematic Axis
+    window.saveThematicAxisEdit = function(axisId) {
+        const form = document.getElementById(`editThematicAxisForm${axisId}`);
+        const formData = new FormData(form);
+
+        fetch('{% url "calls:edit_thematic_axis" 0 %}'.replace('0', axisId), {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Thematic Axis updated successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Check console.');
+        });
+    }
+
+    // Edit Strategic Effect
+    window.saveStrategicEffectEdit = function(effectId) {
+        const form = document.getElementById(`editStrategicEffectForm${effectId}`);
+        const formData = new FormData(form);
+
+        fetch('{% url "calls:edit_strategic_effect" 0 %}'.replace('0', effectId), {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Strategic Effect updated successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Check console.');
+        });
+    }
+
+    // Create Budget Category
+const saveBudgetCategoryBtn = document.getElementById('saveBudgetCategoryBtn');
+if (saveBudgetCategoryBtn) {
+    saveBudgetCategoryBtn.addEventListener('click', function() {
+        const form = document.getElementById('createBudgetCategoryForm');
+        const formData = new FormData(form);
+
+        fetch('{% url "calls:create_budget_category" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Budget Category created successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Check console.');
+        });
+    });
+}
+
+// Create Budget Period
+const saveBudgetPeriodBtn = document.getElementById('saveBudgetPeriodBtn');
+if (saveBudgetPeriodBtn) {
+    saveBudgetPeriodBtn.addEventListener('click', function() {
+        const form = document.getElementById('createBudgetPeriodForm');
+        const formData = new FormData(form);
+
+        fetch('{% url "calls:create_budget_period" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Budget Period created successfully!');
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Unknown error'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred. Check console.');
+        });
+    });
+}
+
+// Edit Budget Category
+window.saveBudgetCategoryEdit = function(categoryId) {
+    const form = document.getElementById(`editBudgetCategoryForm${categoryId}`);
+    const formData = new FormData(form);
+
+    fetch('{% url "calls:edit_budget_category" 0 %}'.replace('0', categoryId), {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Budget Category updated successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred. Check console.');
+    });
+}
+
+// Edit Budget Period
+window.saveBudgetPeriodEdit = function(periodId) {
+    const form = document.getElementById(`editBudgetPeriodForm${periodId}`);
+    const formData = new FormData(form);
+
+    fetch('{% url "calls:edit_budget_period" 0 %}'.replace('0', periodId), {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Budget Period updated successfully!');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred. Check console.');
+    });
+}
+});
+</script>
+{% endblock %}

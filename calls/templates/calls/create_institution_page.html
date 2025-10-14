@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% load widget_tweaks %}
+
+{% block title %}Crear Institución - Climas{% endblock %}
+
+{% block content %}
+<div class="container mt-5" style="max-width: 800px;">
+    <h2>Crear Nueva Institución</h2>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="return_url" value="{{ return_url }}">
+
+        <div class="mb-3">
+            <label class="form-label">Nombre *</label>
+            <input type="text" name="name" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Tipo de Institución *</label>
+            <select name="institution_type" class="form-select" required>
+                <option value="">-- Seleccione tipo --</option>
+                {% for it in institution_types %}
+                    <option value="{{ it.id }}">{{ it.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">País *</label>
+            <select name="country" class="form-select" required>
+                <option value="">-- Seleccione país --</option>
+                {% for c in countries %}
+                    <option value="{{ c.id }}">{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Dirección -->
+        <div class="mb-3">
+            <label class="form-label">Dirección Línea 1</label>
+            <input type="text" name="address_line1" class="form-control" placeholder="Calle, número, barrio">
+        </div>
+        <div class "mb-3">
+            <label class="form-label">Dirección Línea 2 (Opcional)</label>
+            <input type="text" name="address_line2" class="form-control" placeholder="Piso, oficina, referencias">
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">Ciudad</label>
+                <input type="text" name="city" class="form-control">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Estado / Departamento</label>
+                <input type="text" name="state" class="form-control">
+            </div>
+        </div>
+
+        <!-- Teléfono -->
+        <div class="mb-3">
+            <label class="form-label">Teléfono</label>
+            <input type="tel" name="phone_number" class="form-control"
+                   placeholder="+57(601)1234567 o +1 555 123 4567">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Número de Registro Tributario *</label>
+            <input type="text" name="tax_register_number" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Acrónimo</label>
+            <input type="text" name="acronym" class="form-control">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Sitio Web</label>
+            <input type="url" name="website" class="form-control">
+        </div>
+
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="is_active" id="isActive" checked>
+            <label class="form-check-label" for="isActive">
+                Activa
+            </label>
+        </div>
+
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <a href="{{ return_url }}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Crear Institución</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    {% if messages %}
+        {% for message in messages %}
+            {% if message.tags == "success" %}
+                // Auto-close modal tab and refresh parent
+                window.opener.location.reload();
+                window.close();
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+</script>
+{% endblock %}
+
+

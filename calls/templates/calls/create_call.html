@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load widget_tweaks %}
+
+{% block title %}Crear Convocatoria – Climas{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px; margin: 3rem auto;">
+    <h1 class="mb-4">Crear Nueva Convocatoria</h1>
+
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.errors %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <strong>Por favor corrige los siguientes errores:</strong>
+                <ul class="mb-0">
+                    {% for field, errors in form.errors.items %}
+                        <li><strong>{{ field }}:</strong> {{ errors|join:", " }}</li>
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endif %}
+
+        <div class="mb-3">
+            <label for="{{ form.title.id_for_label }}" class="form-label">{{ form.title.label }}</label>
+            {{ form.title|attr:"class:form-control" }}
+            {% if form.title.errors %}
+                <div class="text-danger small mt-1">{{ form.title.errors|join:", " }}</div>
+            {% endif %}
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label for="{{ form.opening_datetime.id_for_label }}" class="form-label">{{ form.opening_datetime.label }}</label>
+                {{ form.opening_datetime|attr:"class:form-control" }}
+                {% if form.opening_datetime.errors %}
+                    <div class="text-danger small mt-1">{{ form.opening_datetime.errors|join:", " }}</div>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                <label for="{{ form.closing_datetime.id_for_label }}" class="form-label">{{ form.closing_datetime.label }}</label>
+                {{ form.closing_datetime|attr:"class:form-control" }}
+                {% if form.closing_datetime.errors %}
+                    <div class="text-danger small mt-1">{{ form.closing_datetime.errors|join:", " }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}</label>
+            {{ form.description|attr:"class:form-control" }}
+            {% if form.description.errors %}
+                <div class="text-danger small mt-1">{{ form.description.errors|join:", " }}</div>
+            {% endif %}
+        </div>
+
+        <div class="d-grid">
+            <button type="submit" class="btn btn-primary btn-lg">Guardar y Configurar</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,21 @@
+<!-- templates/partials/institution_input.html -->
+<div class="mb-3">
+    <label class="form-label">Institución *</label>
+    <div class="input-group">
+        <input type="text"
+            name="team_member_institution_{{ index }}"
+            class="form-control institution-search"
+            placeholder="Buscar o crear institución..."
+            aria-label="Institución"
+            value="{{ institution_name }}"
+            required
+        >
+        <input type="hidden" name="team_member_institution_id_{{ index }}" value="{{ institution_id }}">
+    </div>
+    <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=team_member_institution_id_{{ index }}" 
+       target="_blank" 
+       class="btn btn-outline-primary mt-2">
+        Crear
+    </a>
+    <small class="form-text text-muted">Escriba para buscar, o haga clic en “Crear” para agregar una nueva.</small>
+</div>

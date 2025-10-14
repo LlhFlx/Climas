@@ -1,0 +1,882 @@
+{% extends 'base.html' %}
+{% block title %}Editar Plantilla: {{ template.name }}{% endblock %}
+{% block content %}
+<div class="container">
+    <h2>Plantilla: {{ template.name }}</h2>
+    <p>{{ template.description }}</p>
+
+    <div class="d-grid gap-2 d-md-flex justify-content-md-start mb-4">
+        <a href="{% url 'calls:coordinator_dashboard' %}?tab=evaluations" class="btn btn-secondary me-2">← Volver</a>
+        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+            + Nueva Categoría
+        </button>
+    </div>
+
+    <!-- Link Template to Calls -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5>Asociar Plantilla a Convocatorias</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{% url 'evaluations:link_template_to_call' template.id %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="call_id" class="form-label">Seleccionar Convocatoria</label>
+                    <select name="call_id" id="call_id" class="form-select" required>
+                        <option value="">-- Seleccionar --</option>
+                        {% for call in all_calls %}
+                            <option value="{{ call.id }}" {% if call in template.calls.all %}selected{% endif %}>
+                                {{ call.title }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Asociar Plantilla</button>
+            </form>
+
+            <!-- Show currently linked calls -->
+            {% if template.calls.exists %}
+                <div class="mt-3">
+                    <h6>Convocatorias Asociadas:</h6>
+                    <ul class="list-group list-group-flush">
+                        {% for call in template.calls.all %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ call.title }}
+                                <form method="post" action="{% url 'evaluations:unlink_template_from_call' template.id call.id %}" class="d-inline" onsubmit="return confirm('¿Desasociar esta convocatoria?')">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Quitar</button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% else %}
+                <div class="mt-3 text-muted">
+                    <small>No hay convocatorias asociadas aún.</small>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Categories and Subcategories -->
+    {% if categories %}
+    <div id="categories-list">
+    {% for category in categories %}
+    <div class="card mb-4" id="category-{{ category.id }}">
+        <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+            <strong>{{ category.name }}</strong>
+            <span class="text-muted ms-3">Orden: {{ category.order }}</span>
+        </div>
+        <div>
+            <a href="#" class="btn btn-sm btn-outline-warning me-1"
+            data-action="edit-category"
+            data-category-id="{{ category.id }}"
+            data-category-name="{{ category.name|escapejs }}"
+            data-category-order="{{ category.order }}">
+            Editar
+            </a>
+            <button type="button"
+            class="btn btn-sm btn-outline-danger delete-category-btn"
+            data-category-id="{{ category.id }}"
+            data-category-name="{{ category.name|escapejs }}">
+            Borrar
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-success ms-2"
+            onclick="openAddSubcategoryModal({{ category.id }}, '{{ category.name|escapejs }}')">
+            + Subcategoría
+            </button>
+        </div>
+        </div>
+        <div class="card-body">
+        <!-- Subcategories -->
+        {% if category.subcategories.exists %}
+        <div id="subcategories-{{ category.id }}">
+            {% for subcat in category.subcategories.all %}
+            <div class="card mb-3 border-start border-primary" id="subcategory-{{ subcat.id }}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                <strong>{{ subcat.name }}</strong>
+                <div>
+                    <a href="#" class="btn btn-sm btn-outline-warning me-1"
+                    data-action="edit-subcategory"
+                    data-id="{{ subcat.id }}"
+                    data-name="{{ subcat.name|escapejs }}"
+                    data-order="{{ subcat.order }}">
+                    Editar
+                    </a>
+                    <button type="button"
+                    class="btn btn-sm btn-outline-danger delete-subcategory-btn"
+                    data-id="{{ subcat.id }}"
+                    data-name="{{ subcat.name|escapejs }}">
+                    Borrar
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-success ms-2"
+                    onclick="openAddItemModal({{ subcat.id }}, '{{ subcat.name|escapejs }}')">
+                    + Ítem
+                    </button>
+                </div>
+                </div>
+
+                <!-- Items -->
+                {% if subcat.items.exists %}
+                <ul id="items-list-{{ subcat.id }}" class="list-group list-group-flush mt-2">
+                {% for item in subcat.items.all %}
+                <li class="list-group-item d-flex justify-content-between align-items-center" id="item-{{ item.id }}">
+                    <span><strong>{{ item.question }}</strong> ({{ item.get_field_type_display }}) - Max: {{ item.max_score }}</span>
+                    <div>
+                    <a href="#" class="btn btn-sm btn-outline-warning me-1"
+                        data-action="edit-item"
+                        data-item-id="{{ item.id }}"
+                        data-question="{{ item.question|escapejs }}">
+                        Editar
+                    </a>
+                    <button type="button"
+                        class="btn btn-sm btn-outline-danger delete-item-btn"
+                        data-id="{{ item.id }}"
+                        data-question="{{ item.question|escapejs }}">
+                        Borrar
+                    </button>
+                    </div>
+                </li>
+                {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted mt-2 mb-0">No hay ítems.</p>
+                {% endif %}
+            </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No hay subcategorías.</p>
+        {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Add Category Modal -->
+    <div class="modal fade" id="addCategoryModal" tabindex="-1" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" action="{% url 'evaluations:create_template_category' %}">
+                {% csrf_token %}
+                <input type="hidden" name="template_id" value="{{ template.id }}">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addCategoryModalLabel">Nueva Categoría</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="new-category-name" class="form-label">Nombre *</label>
+                            <input type="text" name="name" class="form-control" id="new-category-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="new-category-order" class="form-label">Orden</label>
+                            <input type="number" name="order" class="form-control" id="new-category-order" value="0" min="0">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-success">Crear Categoría</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Category Modal -->
+    <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" action="" id="editCategoryForm">
+                {% csrf_token %}
+                <input type="hidden" name="id" id="edit-category-id">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editCategoryModalLabel">Editar Categoría</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="edit-category-name" class="form-label">Nombre *</label>
+                            <input type="text" name="name" class="form-control" id="edit-category-name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit-category-order" class="form-label">Orden</label>
+                            <input type="number" name="order" class="form-control" id="edit-category-order" min="0" value="0">
+                        </div>
+                        <div class="mb-3 form-check">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="edit-category-is-active" checked>
+                            <label class="form-check-label" for="edit-category-is-active">
+                                Activa
+                            </label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add/Edit Subcategory Modal -->
+    <div class="modal fade" id="addSubcategoryModal" tabindex="-1">
+        <div class="modal-dialog">
+            <form method="post" id="subcategoryForm">
+            {% csrf_token %}
+            <input type="hidden" name="id" id="subcategory-id">
+            <input type="hidden" name="category_id" id="subcategory-category-id">
+            <div class="modal-content">
+                <div class="modal-header">
+                <h5 class="modal-title" id="subcategoryModalLabel">Nueva Subcategoría</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                <div class="mb-3">
+                    <label>Nombre *</label>
+                    <input type="text" name="name" class="form-control" required id="subcategory-name">
+                </div>
+                <div class="mb-3">
+                    <label>Orden</label>
+                    <input type="number" name="order" class="form-control" value="0" min="0" id="subcategory-order">
+                </div>
+                <div class="form-check">
+                    <input type="checkbox" name="is_active" id="subcategory-is-active" checked>
+                    <label class="form-check-label">Activa</label>
+                </div>
+                </div>
+                <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add/Edit Item Modal -->
+    <div class="modal fade" id="addItemModal" tabindex="-1" aria-labelledby="addItemModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <form method="post" action="" id="itemForm">
+                {% csrf_token %}
+                <input type="hidden" name="id" id="item-id">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addItemModalLabel">Nuevo Ítem de Evaluación</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="category_id" id="item-category-id">
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="itemQuestion" class="form-label">Pregunta *</label>
+                                    <textarea name="question" class="form-control" id="itemQuestion" rows="3" required></textarea>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="itemFieldType" class="form-label">Tipo de Campo *</label>
+                                    <select name="field_type" class="form-select" id="itemFieldType" required>
+                                        <option value="">-- Seleccionar --</option>
+                                        <option value="text">Texto largo</option>
+                                        <option value="short_text">Texto corto</option>
+                                        <option value="number">Número</option>
+                                        <option value="dropdown">Desplegable</option>
+                                        <option value="radio">Opción múltiple</option>
+                                        <option value="dynamic_dropdown">Desplegable Dinámico</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="itemMaxScore" class="form-label">Puntuación Máxima *</label>
+                            <input type="number" step="0.1" name="max_score" class="form-control" id="itemMaxScore" value="5.0" required>
+                        </div>
+
+                        <div id="options-container" class="mt-3">
+                            <h6>Opciones de Puntuación</h6>
+                            <div id="options-list"></div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="add-option-btn">+ Añadir Opción</button>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="sourceModel" class="form-label">Modelo Origen (para dinámicos)</label>
+                            <select name="source_model" class="form-select" id="sourceModel">
+                                <option value="">-- Ninguno --</option>
+                                <option value="geo.Country">País</option>
+                                <option value="common.Status">Estado</option>
+                                <option value="thematic_axes.ThematicAxis">Eje Temático</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar Ítem</button>
+                    </div>
+                </div>
+                <input type="hidden" name="options" id="itemOptionsInput" value="[]">
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Reusable function to show user feedback
+function showMessage(type, text) {
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.role = 'alert';
+    alert.innerHTML = `
+        ${text}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    const container = document.querySelector('.container');
+    if (container) {
+        container.insertBefore(alert, container.firstChild);
+    }
+    setTimeout(() => {
+        if (alert.parentNode) alert.remove();
+    }, 5000);
+}
+
+function openAddItemModal(subcategoryId, subcategoryName) {
+    const form = document.getElementById('itemForm');
+    if (!form) {
+        console.error("Item form not found!");
+        return;
+    }
+    form.reset();
+    form.action = '{% url "evaluations:create_template_item" %}';
+    const categoryInput = document.getElementById('item-category-id');
+    if (categoryInput) {
+        categoryInput.name = 'subcategory_id';
+        categoryInput.value = subcategoryId;
+    }
+    document.getElementById('addItemModalLabel').textContent = `Nuevo Ítem: ${subcategoryName}`;
+    document.getElementById('item-id').value = '';
+    itemOptions = [];
+    renderOptions();
+    
+    const modalEl = document.getElementById('addItemModal');
+    let modal = bootstrap.Modal.getInstance(modalEl);
+    if (!modal) {
+        modal = new bootstrap.Modal(modalEl);
+    }
+    modal.show();
+}
+
+
+// ============================
+// 1. HANDLE ADD CATEGORY FORM
+// ============================
+document.getElementById('addCategoryModal').querySelector('form').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const form = this;
+    const formData = new FormData(form);
+
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const div = document.createElement('div');
+            div.classList.add('card', 'mb-4');
+            div.id = `category-${data.id}`;
+            div.innerHTML = `
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>${data.name}</strong>
+                    <span class="text-muted ms-3">Orden: ${data.order}</span>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">No hay subcategorías.</p>
+                    <button type="button" class="btn btn-sm btn-outline-success"
+                            onclick="openAddSubcategoryModal(${data.id}, '${data.name.replace(/'/g, "\\'")}')">
+                        + Subcategoría
+                    </button>
+                </div>
+            `;
+            document.getElementById('categories-list').appendChild(div);
+
+            bootstrap.Modal.getInstance(document.getElementById('addCategoryModal')).hide();
+            form.reset();
+
+            showMessage('success', `Categoría "${data.name}" creada exitosamente.`);
+        } else {
+            alert('Error: ' + (data.error || 'Desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error al crear categoría:', error);
+        alert('Hubo un problema al conectar con el servidor.');
+    });
+});
+
+// ============================
+// 2. HANDLE EDIT CATEGORY BUTTON
+// ============================
+document.addEventListener('click', function(e) {
+    const editBtn = e.target.closest('[data-action="edit-category"]');
+    if (!editBtn) return;
+
+    e.preventDefault();
+
+    const categoryId = editBtn.getAttribute('data-category-id');
+    const categoryName = editBtn.getAttribute('data-category-name');
+    const categoryOrder = editBtn.getAttribute('data-category-order');
+
+    const form = document.getElementById('editCategoryForm');
+    const modalTitle = document.getElementById('editCategoryModalLabel');
+
+    // Populate form
+    document.getElementById('edit-category-id').value = categoryId;
+    document.getElementById('edit-category-name').value = categoryName;
+    document.getElementById('edit-category-order').value = categoryOrder || 0;
+    document.getElementById('edit-category-is-active').checked = true; // default to true
+
+    // Set form action
+    form.action = `{% url "evaluations:edit_template_category" 0 %}`.replace('0', categoryId);
+
+    // Show modal
+    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('editCategoryModal'));
+    if (modalInstance) {
+        modalInstance.show();
+    } else {
+        new bootstrap.Modal(document.getElementById('editCategoryModal')).show();
+    }
+});
+
+// ============================
+// 3. HANDLE EDIT CATEGORY FORM SUBMISSION
+// ============================
+document.getElementById('editCategoryForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const form = this;
+    const formData = new FormData(form);
+
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const categoryDiv = document.getElementById(`category-${data.id}`);
+            if (categoryDiv) {
+                const header = categoryDiv.querySelector('.card-header strong');
+                const orderSpan = categoryDiv.querySelector('.card-header .text-muted');
+
+                header.textContent = data.name;
+                orderSpan.textContent = `Orden: ${data.order}`;
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('editCategoryModal')).hide();
+            showMessage('success', `Categoría "${data.name}" actualizada exitosamente.`);
+        } else {
+            alert('Error: ' + (data.error || 'Desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error al editar categoría:', error);
+        alert('Hubo un problema al conectar con el servidor.');
+    });
+});
+
+// ============================
+// 4. HANDLE DELETE CATEGORY BUTTON
+// ============================
+document.addEventListener('click', function(e) {
+    const deleteBtn = e.target.closest('.delete-category-btn');
+    if (!deleteBtn) return;
+
+    e.preventDefault();
+
+    const categoryId = deleteBtn.getAttribute('data-category-id');
+    const categoryName = deleteBtn.getAttribute('data-category-name');
+
+    if (!confirm(`¿Eliminar la categoría "${categoryName}"? Esto eliminará todos sus ítems y no se puede deshacer.`)) return;
+
+    fetch('{% url "evaluations:delete_template_category" 0 %}'.replace('0', categoryId), {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const categoryDiv = document.getElementById(`category-${categoryId}`);
+            if (categoryDiv) categoryDiv.remove();
+            showMessage('info', `Categoría "${categoryName}" eliminada correctamente.`);
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error al eliminar categoría:', error);
+        alert('Error de red al intentar eliminar.');
+    });
+});
+
+// ====== SUBCATEGORY FUNCTIONS ======
+function openAddSubcategoryModal(categoryId, categoryName) {
+    const form = document.getElementById('subcategoryForm');
+    const modalTitle = document.getElementById('subcategoryModalLabel');
+    form.reset();
+    form.action = '{% url "evaluations:create_template_subcategory" %}';
+    document.getElementById('subcategory-id').value = '';
+    document.getElementById('subcategory-category-id').value = categoryId;
+    modalTitle.textContent = `Nueva Subcategoría en: ${categoryName}`;
+    new bootstrap.Modal(document.getElementById('addSubcategoryModal')).show();
+}
+
+// Handle subcategory form submit
+document.getElementById('subcategoryForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = this;
+    const formData = new FormData(form);
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value}
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            const container = document.querySelector(`#subcategories-${data.category_id}`);
+            if (!container) {
+                const cardBody = document.querySelector(`#category-${data.category_id} .card-body`);
+                const div = document.createElement('div');
+                div.id = `subcategories-${data.category_id}`;
+                cardBody.appendChild(div);
+                container = div;
+            }
+            const subcatDiv = document.createElement('div');
+            subcatDiv.className = 'card mb-3 border-start border-primary';
+            subcatDiv.id = `subcategory-${data.id}`;
+            subcatDiv.innerHTML = `
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <strong>${data.name}</strong>
+                        <div>
+                            <a href="#" class="btn btn-sm btn-outline-warning me-1" data-action="edit-subcategory" data-id="${data.id}" data-name="${data.name.replace(/"/g, '&quot;')}" data-order="${data.order}">Editar</a>
+                            <button type="button" class="btn btn-sm btn-outline-danger delete-subcategory-btn" data-id="${data.id}" data-name="${data.name.replace(/"/g, '&quot;')}">Borrar</button>
+                            <button type="button" class="btn btn-sm btn-outline-success ms-2" onclick="openAddItemModal(${data.id}, '${data.name.replace(/'/g, "\\'")}')">+ Ítem</button>
+                        </div>
+                    </div>
+                    <p class="text-muted mt-2 mb-0">No hay ítems.</p>
+                </div>
+            `;
+            container.appendChild(subcatDiv);
+            bootstrap.Modal.getInstance(document.getElementById('addSubcategoryModal')).hide();
+            showMessage('success', 'Subcategoría creada.');
+        } else {
+            alert('Error: ' + data.error);
+        }
+    });
+});
+
+// Edit subcategory button
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-action="edit-subcategory"]');
+    if (!btn) return;
+    e.preventDefault();
+    const id = btn.dataset.id;
+    const name = btn.dataset.name;
+    const order = btn.dataset.order;
+    const form = document.getElementById('subcategoryForm');
+    form.action = `{% url "evaluations:edit_template_subcategory" 0 %}`.replace('0', id);
+    document.getElementById('subcategory-id').value = id;
+    document.getElementById('subcategory-name').value = name;
+    document.getElementById('subcategory-order').value = order || 0;
+    document.getElementById('subcategory-is-active').checked = true;
+    new bootstrap.Modal(document.getElementById('addSubcategoryModal')).show();
+});
+
+// Delete subcategory
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.delete-subcategory-btn');
+    if (!btn) return;
+    if (!confirm(`¿Eliminar subcategoría "${btn.dataset.name}"?`)) return;
+    fetch(`{% url "evaluations:delete_template_subcategory" 0 %}`.replace('0', btn.dataset.id), {
+        method: 'DELETE',
+        headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value}
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            document.getElementById(`subcategory-${btn.dataset.id}`).remove();
+            showMessage('info', 'Subcategoría eliminada.');
+        }
+    });
+});
+
+// ====== ITEM OPTIONS UI ======
+let itemOptions = [];
+
+function renderOptions() {
+    const container = document.getElementById('options-list');
+    container.innerHTML = '';
+    itemOptions.forEach((opt, idx) => {
+        const div = document.createElement('div');
+        div.className = 'input-group mb-2';
+        div.innerHTML = `
+            <input type="text" class="form-control opt-text" placeholder="Texto a mostrar" value="${opt.display_text}" data-idx="${idx}">
+            <input type="number" step="0.1" class="form-control opt-score" placeholder="Puntaje" value="${opt.score}" data-idx="${idx}">
+            <button class="btn btn-outline-danger remove-opt" type="button" data-idx="${idx}">✕</button>
+        `;
+        container.appendChild(div);
+    });
+}
+
+document.getElementById('add-option-btn').addEventListener('click', function() {
+    itemOptions.push({display_text: '', score: 0});
+    renderOptions();
+});
+
+document.getElementById('options-list').addEventListener('input', function(e) {
+    const idx = parseInt(e.target.dataset.idx);
+    if (e.target.classList.contains('opt-text')) {
+        itemOptions[idx].display_text = e.target.value;
+    } else if (e.target.classList.contains('opt-score')) {
+        itemOptions[idx].score = parseFloat(e.target.value) || 0;
+    }
+});
+
+document.getElementById('options-list').addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-opt')) {
+        const idx = parseInt(e.target.dataset.idx);
+        itemOptions.splice(idx, 1);
+        renderOptions();
+    }
+});
+
+// When source_model changes, load dynamic options
+document.getElementById('sourceModel').addEventListener('change', function() {
+    const source = this.value;
+    const optionsContainer = document.getElementById('options-container');
+    if (!source) {
+        itemOptions = [];
+        renderOptions();
+        return;
+    }
+    fetch(`{% url 'evaluations:load_dynamic_options' %}?source_model=${encodeURIComponent(source)}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                itemOptions = data.options.map(opt => ({
+                    display_text: opt.display_text,
+                    score: opt.score
+                }));
+                renderOptions();
+            }
+        });
+});
+
+
+
+// ============================
+// 5. HANDLE EDIT ITEM BUTTON (RE-ADDED!)
+// ============================
+document.addEventListener('click', function(e) {
+    const editBtn = e.target.closest('[data-action="edit-item"]');
+    if (!editBtn) return;
+
+    e.preventDefault();
+
+    const itemId = editBtn.getAttribute('data-item-id');
+    const question = editBtn.getAttribute('data-question');
+
+    editItem(itemId, question); // This calls your existing function!
+});
+
+// ============================
+// 6. HANDLE DELETE ITEM BUTTON
+// ============================
+document.addEventListener('click', function(e) {
+    const deleteBtn = e.target.closest('.delete-item-btn');
+    if (!deleteBtn) return;
+
+    e.preventDefault();
+
+    const itemId = deleteBtn.getAttribute('data-item-id') || deleteBtn.getAttribute('data-id');
+    const question = deleteBtn.getAttribute('data-question');
+
+    if (!confirm(`¿Eliminar ítem "${question}"? Esta acción no se puede deshacer.`)) return;
+
+    fetch('{% url "evaluations:delete_template_item" 0 %}'.replace('0', itemId), {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const li = document.getElementById(`item-${itemId}`);
+            if (li) li.remove();
+            showMessage('info', 'Ítem eliminado correctamente.');
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error al eliminar ítem:', error);
+        alert('Error de red al intentar eliminar.');
+    });
+});
+
+// ============================
+// 7. HANDLE ADD/EDIT ITEM FORM SUBMISSION
+// ============================
+document.getElementById('itemForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const form = this;
+    
+    //document.getElementById('itemForm').querySelector('input[name="options"]')?.remove();
+    const optInput = document.getElementById('itemOptionsInput')
+    optInput.type = 'hidden';
+    optInput.name = 'options';
+    optInput.value = JSON.stringify(itemOptions);
+    const formData = new FormData(form);
+    this.appendChild(optInput);
+
+    fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let itemList = document.querySelector(`#items-list-${data.subcategory_id}`);
+            const isNew = !document.getElementById(`item-${data.id}`);
+
+            if (!itemList) {
+                const cardBody = document.querySelector(`#subcategory-${data.subcategory_id} .card-body`);
+                const ulDiv = document.createElement('div');
+                ulDiv.className = 'mb-3';
+                ulDiv.innerHTML = `
+                    <h6>Ítems:</h6>
+                    <ul id="items-list-${data.category_id}" class="list-group list-group-flush"></ul>
+                `;
+                cardBody.appendChild(ulDiv);
+                itemList = ulDiv.querySelector('ul');
+            }
+
+            let li = document.getElementById(`item-${data.id}`);
+            if (!li) {
+                li = document.createElement('li');
+                li.id = `item-${data.id}`;
+                li.className = 'list-group-item d-flex justify-content-between align-items-center';
+            }
+
+            li.innerHTML = `
+                <span><strong>${data.question}</strong> (${data.field_type}) - Max: ${data.max_score}</span>
+                <div>
+                    <a href="#" class="btn btn-sm btn-outline-warning me-1"
+                       data-action="edit-item"
+                       data-item-id="${data.id}"
+                       data-question="${data.question.replace(/"/g, '&quot;')}">
+                        Editar
+                    </a>
+                    <button type="button"
+                            class="btn btn-sm btn-outline-danger delete-item-btn"
+                            data-action="delete-item"
+                            data-item-id="${data.id}"
+                            data-question="${data.question.replace(/"/g, '&quot;')}">
+                        Borrar
+                    </button>
+                </div>
+            `;
+
+            if (isNew) {
+                itemList.appendChild(li);
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('addItemModal')).hide();
+            showMessage('success', `Ítem guardado correctamente.`);
+        } else {
+            alert('Error: ' + (data.error || 'Desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error al guardar ítem:', error);
+        alert('Error al conectar con el servidor.');
+    });
+});
+
+// ============================
+// 8. EDIT ITEM FUNCTION (UNCHANGED - THIS IS THE CORE!)
+// ============================
+function editItem(itemId, question) {
+    const url = `{% url "evaluations:get_template_item" 0 %}`.replace('0', itemId);
+
+    fetch(url, {
+        method: 'GET',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            const form = document.getElementById('itemForm');
+            const modalTitle = document.getElementById('addItemModalLabel');
+
+            // Set form action
+            form.action = `{% url "evaluations:edit_template_item" 0 %}`.replace('0', data.id);
+            document.getElementById('item-category-id').name = 'subcategory_id';
+            document.getElementById('item-category-id').value = data.subcategory_id;
+            currentCategoryId = data.category_id;
+
+            // Populate fields
+            document.getElementById('item-id').value = data.id;
+            document.getElementById('itemQuestion').value = data.question;
+            document.getElementById('itemFieldType').value = data.field_type;
+            document.getElementById('itemMaxScore').value = data.max_score;
+            document.getElementById('itemOptions').value = JSON.stringify(data.options || []);
+            document.getElementById('sourceModel').value = data.source_model || '';
+
+            // Update title
+            modalTitle.textContent = `Editar Ítem: ${question}`;
+
+            itemOptions = data.options || [];
+            renderOptions();
+
+            // Show modal
+            const modalInstance = bootstrap.Modal.getInstance(document.getElementById('addItemModal'));
+            if (modalInstance) {
+                modalInstance.show();
+            } else {
+                new bootstrap.Modal(document.getElementById('addItemModal')).show();
+            }
+        } else {
+            showMessage('danger', `Error: ${data.error || 'No se pudo cargar el ítem.'}`);
+        }
+    })
+    .catch(error => {
+        console.error("Error fetching template item:", error);
+        showMessage('danger', 'No se pudo cargar el ítem. Revisa la consola.');
+    });
+}
+</script>
+{% endblock %}
