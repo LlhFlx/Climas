@@ -10,7 +10,13 @@ from .models import Call
 from .forms import CallForm, SharedQuestionForm # For create_shared_question
 from proponent_forms.models import SharedQuestion
 from common.models import Status, Scale
-from proponent_forms.models import ProponentForm, ProponentFormQuestion, ProponentResponse # For setup_call
+from proponent_forms.models import (
+    ProponentForm, 
+    ProponentFormQuestion, 
+    ProponentResponse, 
+    SharedQuestionCategory, 
+    SharedQuestionOption
+) # For setup_call
 # from proponent_forms.models import ProponentForm, ProponentFormQuestion  
 from institutions.models import Institution, InstitutionType
 from thematic_axes.models import ThematicAxis
@@ -40,6 +46,7 @@ from evaluations.models import Evaluation, EvaluationResponse, EvaluationTemplat
 from cbo.models import CBORelevantRole, CBO, CBOAntecedent
 from django.db import transaction
 from collections import defaultdict
+from decimal import Decimal
 
 @login_required
 def coordinator_dashboard(request):
@@ -357,12 +364,28 @@ def create_shared_question(request):
         form = SharedQuestionForm(request.POST)
         if form.is_valid():
             question = form.save()
+            # Now handle the "options" JSON from request.POST
+            options_json = request.POST.get('options')
+            if options_json:
+                options_data = json.loads(options_json)
+                question.options_set.all().delete()
+                for opt in options_data:
+                    SharedQuestionOption.objects.create(
+                        shared_question=question,
+                        display_text=opt['display_text'],
+                        score=Decimal(str(opt['score']))
+                    )
             messages.success(request, f'Question "{question.question}" created successfully!')
             return redirect('calls:coordinator_dashboard')
-    else:
-        form = SharedQuestionForm()
+    form = SharedQuestionForm()
+    categories = SharedQuestionCategory.objects.filter(is_active=True).order_by('order', 'name')
+    print(categories)
 
-    return render(request, 'calls/create_shared_question.html', {'form': form})
+    return render(request, 'calls/create_shared_question.html', {
+        'form': form, 
+        'editing': False,
+        'categories': categories,
+    })
 
 @login_required
 def edit_shared_question(request, question_id):
@@ -377,15 +400,34 @@ def edit_shared_question(request, question_id):
         form = SharedQuestionForm(request.POST, instance=question)
         if form.is_valid():
             updated_question = form.save()
+            # Handle scored options from hidden JSON input
+            options_json = request.POST.get('options')
+            if options_json:
+                try:
+                    options_data = json.loads(options_json)
+                    # Clear existing options
+                    updated_question.options_set.all().delete()
+                    # Create new ones
+                    for opt in options_data:
+                        SharedQuestionOption.objects.create(
+                            shared_question=updated_question,
+                            display_text=opt['display_text'],
+                            score=Decimal(str(opt['score']))
+                        )
+                except (ValueError, KeyError, TypeError) as e:
+                    # Optional: log error or notify user
+                    print(f"Error parsing options on edit: {e}")
             messages.success(request, f'Question "{updated_question.question}" updated successfully!')
             return redirect('calls:coordinator_dashboard')
-    else:
-        form = SharedQuestionForm(instance=question)
+    
+    form = SharedQuestionForm(instance=question)
+    categories = SharedQuestionCategory.objects.filter(is_active=True).order_by('order', 'name')
 
     return render(request, 'calls/create_shared_question.html', {
         'form': form,
         'editing': True,  # Flag to change button text
-        'question': question
+        'question': question,
+        'categories': categories,
     })
 
 @login_required
@@ -1831,7 +1873,27 @@ def apply_proposal(request, expression_id):
         )
         proposal.save()
         created = True
-    
+    # Load ProponentForm questions for 'proposal' target
+    proposal_questions = []
+    try:
+        proponent_form = ProponentForm.objects.get(call=expression.call)
+        form_questions = ProponentFormQuestion.objects.filter(
+            form=proponent_form
+        ).select_related('shared_question').order_by('order')
+        proposal_questions = [
+            fq.shared_question for fq in form_questions
+            if fq.shared_question.target_category == 'proposal'
+        ]
+    except ProponentForm.DoesNotExist:
+        pass  # No form: no extra questions
+
+    # Load existing responses for these questions
+    existing_responses = ProponentResponse.objects.filter(
+        expression=expression,
+        shared_question__in=proposal_questions
+    )
+    response_dict = {resp.shared_question_id: resp for resp in existing_responses}
+
     # Load context data
     countries = Country.objects.all().order_by('name')
     institutions = list(
@@ -2058,6 +2120,35 @@ def apply_proposal(request, expression_id):
                 doc.delete()
             except ProposalDocument.DoesNotExist:
                 pass
+        
+        # Save SharedQuestion responses
+        for question in proposal_questions:
+            field_name = f'shared_question_{question.id}'
+            comment_name = f'shared_question_comment_{question.id}'
+
+            value = request.POST.get(field_name)
+            comment = request.POST.get(comment_name, '').strip()
+
+            # Handle value type
+            if question.field_type == 'number':
+                try:
+                    value = float(value) if value else None
+                except (TypeError, ValueError):
+                    value = None
+            # For text/radio/dropdown/dynamic_dropdown, value is string or None
+
+            # Get or create response
+            response, created = ProponentResponse.objects.update_or_create(
+                expression=expression,
+                shared_question=question,
+                defaults={'value': value, 'comment': comment}
+            )
+
+            # Auto-assign score for choice fields
+            if question.field_type in ['radio', 'dropdown']:
+                scored_opts = dict(question.get_scored_options())
+                response.score = scored_opts.get(str(value), None)
+                response.save(update_fields=['score'])
 
         # ============================
         # SAVE PROPOSAL-SPECIFIC ITEMS
@@ -2320,6 +2411,8 @@ def apply_proposal(request, expression_id):
                 'docs_by_institution': docs_by_institution,
                 'post_data': post_data,
                 'proposal_id': proposal.id,
+                'proposal_questions': proposal_questions,
+                'response_dict': response_dict,
             }
             return render(request, 'calls/apply_proposal.html', context)
 
@@ -2392,7 +2485,9 @@ def apply_proposal(request, expression_id):
         'partner_institutions': partner_institutions,
         'docs_by_institution': docs_by_institution,
         'post_data': post_data,
-        'proposal_id': proposal.id, 
+        'proposal_id': proposal.id,
+        'proposal_questions': proposal_questions,
+        'response_dict': response_dict,
     }
 
     return render(request, 'calls/apply_proposal.html', context)

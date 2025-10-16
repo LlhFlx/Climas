@@ -38,17 +38,16 @@ fi
 echo "Iniciando contenedor climas-app..."
 docker run -d \
   --name climas-app \
-  -p 8080:8000 \
+  -p 8220:8000 \
   --env-file .env \
-  --add-host=host.docker.internal:host-gateway \
   climas-app
 
-echo "Contenedor climas-app está corriendo en http://localhost:8080"
+echo "Contenedor climas-app está corriendo en http://localhost:8220"
 
 echo "Aplicando migraciones..."
 docker exec -it climas-app python manage.py migrate
 
-echo "La aplicación está disponible en: http://localhost:8080"
+echo "La aplicación está disponible en: http://localhost:8220"
 
 #docker exec -it climas-app python manage.py migrate
 #docker exec -it climas-app python manage.py createsuperuser

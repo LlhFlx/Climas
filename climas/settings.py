@@ -94,6 +94,7 @@ SESSION_COOKIE_AGE = 900  # same as AUTO_LOGOUT_DELAY
 # Save session on every request (so last_activity updates reliably)
 SESSION_SAVE_EVERY_REQUEST = True
 
+
 ROOT_URLCONF = 'climas.urls'
 
 TEMPLATES = [

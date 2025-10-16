@@ -2,12 +2,48 @@ from django.apps import apps
 from django.db import models
 from core.models import TimestampMixin
 from core.choices import SOURCE_MODEL_CHOICES, FIELD_TYPE_CHOICES
+from decimal import Decimal
+
+class SharedQuestionCategory(TimestampMixin, models.Model):
+    name = models.CharField(
+        max_length=200, 
+        verbose_name="Nombre", 
+        unique=True
+    )
+    description = models.TextField(
+        blank=True, 
+        verbose_name="Descripción"
+    )
+    is_active = models.BooleanField(
+        default=True, 
+        verbose_name="Activa"
+    )
+    order = models.PositiveIntegerField(default=0, verbose_name="Orden")
+
+    class Meta:
+        db_table = 'shared_question_category'
+        verbose_name = "Categoría de Pregunta"
+        verbose_name_plural = "Categorías de Pregunta"
+        ordering = ['order', 'name']
+
+    def __str__(self):
+        return self.name
+    
 
 class SharedQuestion(TimestampMixin, models.Model):
     TARGET_CHOICES = [
         ('expression', 'Expresion de Interes'),
         ('proposal', 'Propuesta Completa')
     ]
+    
+    category = models.ForeignKey(
+        'proponent_forms.SharedQuestionCategory',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Categoría",
+        related_name='questions'
+    )
 
     question = models.TextField(verbose_name="Pregunta")
 
@@ -53,10 +89,11 @@ class SharedQuestion(TimestampMixin, models.Model):
         db_table = 'shared_question'
         verbose_name = "Pregunta Compartida"
         verbose_name_plural = "Preguntas Compartidas"
-        ordering = ['target_category', 'question']
+        ordering = ['target_category', 'category__order', 'question']
 
     def __str__(self):
-        return f"{self.question} ({self.get_target_category_display()})"
+        cat = f" ({self.category})" if self.category else ""
+        return f"{self.question}{cat} ({self.get_target_category_display()})"
     
     # def get_options(self):
     #     if self.field_type == 'dynamic_dropdown' and self.source_model:
@@ -71,21 +108,67 @@ class SharedQuestion(TimestampMixin, models.Model):
     #     return []
 
     def get_options(self):
+        # Dynamic dropdown from source_model
         if self.field_type == 'dynamic_dropdown' and self.source_model:
             try:
                 app_label, model_name = self.source_model.split('.')
                 model = apps.get_model(app_label, model_name)
-                # Try common field names
                 for field in ['name', 'title', 'code', 'label', 'description']:
                     if hasattr(model, field):
                         return list(model.objects.values_list(field, flat=True))
-                # Fallback to str representation
                 return [str(obj) for obj in model.objects.all()[:50]]
             except (LookupError, AttributeError) as e:
                 return [f"Error loading {self.source_model}: {e}"]
-        elif self.options:
+
+        # Structured options (new system)
+        if self.options_set.exists():
+            return list(self.options_set.values_list('display_text', flat=True))
+
+        # Legacy JSON options (simple list)
+        if self.options:
             return self.options
+
         return []
+    
+    def get_scored_options(self):
+        """Return list of (display_text, score) tuples."""
+        if self.field_type == 'dynamic_dropdown':
+            # Dynamic options don’t have scores (unless you extend them)
+            return [(opt, Decimal('0.0')) for opt in self.get_options()]
+
+        if self.options_set.exists():
+            return list(self.options_set.values_list('display_text', 'score'))
+
+        # Legacy options have no scores
+        return [(opt, Decimal('0.0')) for opt in (self.options or [])]
+
+class SharedQuestionOption(TimestampMixin, models.Model):
+    shared_question = models.ForeignKey(
+        'proponent_forms.SharedQuestion',
+        on_delete=models.CASCADE,
+        related_name='options_set',
+        verbose_name='Pregunta Compartida'
+    )
+
+    display_text = models.CharField(
+        max_length=200,
+        verbose_name="Texto a mostrar"
+    )
+    
+    score = models.DecimalField(
+        max_digits=3,
+        decimal_places=1,
+        default=Decimal(0.0),
+        verbose_name="Puntuación asociada (opcional)"
+    )
+
+    class Meta:
+        verbose_name = "Opción de Pregunta Compartida"
+        verbose_name_plural = "Opciones de Pregunta Compartida"
+        ordering = ['shared_question', 'id']
+
+    def __str__(self):
+        return f"{self.display_text} ({self.score})"
 
 class ProponentForm(TimestampMixin, models.Model):
     call = models.OneToOneField(
@@ -164,6 +247,15 @@ class ProponentResponse(TimestampMixin, models.Model):
         blank=True,
         verbose_name="Valor"
     )
+
+    score = models.DecimalField(
+        max_digits=3,
+        decimal_places=1,
+        null=True,
+        blank=True,
+        verbose_name="Puntuación derivada"
+    )
+
     comment = models.TextField(
         blank=True,
         verbose_name="Comentario"

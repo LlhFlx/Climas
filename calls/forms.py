@@ -1,7 +1,7 @@
 from django import forms
 from .models import Call
 from common.models import Status
-from proponent_forms.models import SharedQuestion
+from proponent_forms.models import SharedQuestion, SharedQuestionCategory
 
 class CallForm(forms.ModelForm):
     class Meta:
@@ -26,42 +26,40 @@ class CallForm(forms.ModelForm):
 class SharedQuestionForm(forms.ModelForm):
     class Meta:
         model = SharedQuestion
-        fields = ['question', 'field_type', 'options', 'source_model', 'target_category', 'is_active', 'is_required']
+        fields = [
+            'category',
+            'question',
+            'field_type',
+            'source_model',
+            'target_category',
+            'is_active',
+            'is_required',
+        ]
         widgets = {
-            'options': forms.Textarea(attrs={
-                'placeholder': 'JSON format, e.g., ["Option 1", "Option 2"]',
-                'rows': 3
-            }),
             'question': forms.Textarea(attrs={'rows': 2}),
         }
-    
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only show active categories
+        self.fields['category'].queryset = SharedQuestionCategory.objects.filter(is_active=True).order_by('order', 'name')
+        # Make category optional in UI (though it is nullable in DB)
+        self.fields['category'].required = False
+
     def clean(self):
         cleaned_data = super().clean()
         field_type = cleaned_data.get('field_type')
-        options = cleaned_data.get('options')
         source_model = cleaned_data.get('source_model')
 
-        if field_type == 'dropdown':
-            if not options:
-                raise forms.ValidationError('For static dropdown, you must provide options in JSON format.')
-            # Clear source_model for static dropdown
-            cleaned_data['source_model'] = ''
-
-        elif field_type == 'dynamic_dropdown':
+        if field_type == 'dynamic_dropdown':
             if not source_model:
                 raise forms.ValidationError('For dynamic dropdown, you must select a source model.')
-            # Clear options for dynamic dropdown
+            # Clear legacy JSON field (not used)
             cleaned_data['options'] = None
-
-        elif field_type == 'radio':
-            if not options:
-                raise forms.ValidationError('For radio buttons, you must provide options in JSON format.')
-            # Clear source_model for radio
-            cleaned_data['source_model'] = ''
-
         else:
-            # Clear both for other types
+            # For all other types (including radio/dropdown), we use SharedQuestionOption
+            # So we don't validate the legacy 'options' field at all
+            cleaned_data['source_model'] = None
             cleaned_data['options'] = None
-            cleaned_data['source_model'] = ''
 
         return cleaned_data

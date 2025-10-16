@@ -629,6 +629,122 @@
             <button type="button" id="add-proposal-budget-btn" class="btn btn-outline-primary">+ Agregar Ítem</button>
         </div>
 
+        <!-- PROPOSAL-SPECIFIC SHARED QUESTIONS -->
+        {% if proposal_questions %}
+        <div class="mb-4">
+            <h5>Preguntas Adicionales de la Convocatoria</h5>
+            <p class="text-muted">Responda las siguientes preguntas requeridas por la convocatoria.</p>
+
+            {% for question in proposal_questions %}
+            <div class="mb-3">
+                <label class="form-label">
+                    {{ question.question }}
+                    {% if question.is_required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+
+                {% comment %}Get existing response if any{% endcomment %}
+                {% with response_dict|get_item:question.id as existing_response %}
+                    {% if question.field_type == 'text' %}
+                        <textarea name="shared_question_{{ question.id }}"
+                            class="form-control"
+                            rows="3"
+                            {% if question.is_required %}required{% endif %}
+                            >{{ existing_response.value|default:"" }}</textarea>
+
+                    {% elif question.field_type == 'short_text' %}
+                        <input type="text"
+                            name="shared_question_{{ question.id }}"
+                            class="form-control"
+                            value="{{ existing_response.value|default:"" }}"
+                            {% if question.is_required %}required{% endif %}>
+
+                    {% elif question.field_type == 'number' %}
+                        <input type="number"
+                            name="shared_question_{{ question.id }}"
+                            class="form-control"
+                            value="{{ existing_response.value|default:"" }}"
+                            {% if question.is_required %}required{% endif %}>
+
+                    {% elif question.field_type == 'radio' or question.field_type == 'dropdown' %}
+                        {% if question.options_set.exists %}
+                            {% if question.field_type == 'radio' %}
+                                {% for opt in question.get_options %}
+                                    <div class="form-check">
+                                        <input class="form-check-input"
+                                            type="radio"
+                                            name="shared_question_{{ question.id }}"
+                                            id="sq_{{ question.id }}_{{ forloop.counter0 }}"
+                                            value="{{ opt }}"
+                                            {% if existing_response.value == opt %}checked{% endif %}
+                                            {% if question.is_required %}required{% endif %}>
+                                        <label class="form-check-label" for="sq_{{ question.id }}_{{ forloop.counter0 }}">
+                                            {{ opt }}
+                                        </label>
+                                    </div>
+                                {% endfor %}
+                            {% else %} {# dropdown #}
+                                <select name="shared_question_{{ question.id }}"
+                                    class="form-select"
+                                    {% if question.is_required %}required{% endif %}>
+                                    <option value="">-- Seleccionar --</option>
+                                    {% for opt in question.get_options %}
+                                        <option value="{{ opt }}" {% if existing_response.value == opt %}selected{% endif %}>
+                                            {{ opt }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            {% endif %}
+                        {% endif %}
+
+                    {% elif question.field_type == 'dynamic_dropdown' and question.source_model %}
+                        <select name="shared_question_{{ question.id }}"
+                            class="form-select"
+                            {% if question.is_required %}required{% endif %}>
+                            <option value="">-- Cargando... --</option>
+                            <!-- Options will be populated by JS or pre-rendered -->
+                        </select>
+                        <script>
+                        fetch(`/calls/shared-question/preview/{{ question.source_model }}/`)
+                            .then(r => r.json())
+                            .then(data => {
+                                const select = document.querySelector('select[name="shared_question_{{ question.id }}"]');
+                                select.innerHTML = '<option value="">-- Seleccionar --</option>';
+                                if (data.success) {
+                                    data.items.forEach(item => {
+                                        const opt = document.createElement('option');
+                                        opt.value = item;
+                                        opt.textContent = item;
+                                        {% if existing_response.value %}
+                                            if (item === "{{ existing_response.value|escapejs }}") opt.selected = true;
+                                        {% endif %}
+                                        select.appendChild(opt);
+                                    });
+                                }
+                            });
+                        </script>
+
+                    {% else %}
+                        <input type="text"
+                            name="shared_question_{{ question.id }}"
+                            class="form-control"
+                            value="{{ existing_response.value|default:"" }}"
+                            {% if question.is_required %}required{% endif %}>
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Comment field (optional) -->
+                <div class="mt-2">
+                    <label class="form-label visually-hidden">Comentario</label>
+                    <textarea name="shared_question_comment_{{ question.id }}"
+                        class="form-control form-control-sm"
+                        placeholder="Comentario (opcional)"
+                        rows="1">{{ existing_response.comment|default:"" }}</textarea>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
         <!-- Submit Buttons -->
         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
             <a href="{% url 'calls:researcher_dashboard' %}" class="btn btn-secondary me-md-2">Cancelar</a>

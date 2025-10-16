@@ -6,14 +6,30 @@
 {% endblock %}
 
 {% block content %}
-<div class="container" style="max-width: 700px; margin: 3rem auto;">
+<div class="container" style="max-width: 800px; margin: 3rem auto;">
     <h3 class="mb-4">
         {% if editing %}Edit Question: {{ question.question }}{% else %}Create New Shared Question{% endif %}
     </h3>
     
-    <form method="post">
+    <form method="post" id="sharedQuestionForm">
         {% csrf_token %}
         
+        <!-- Category with "Add" button -->
+        <div class="mb-3">
+            <label class="form-label">Category (Optional)</label>
+            <div class="d-flex">
+                <div style="flex: 1;">
+                    {{ form.category|attr:"class:form-select" }}
+                    {% if form.category.errors %}
+                        <div class="text-danger small mt-1">{{ form.category.errors|join:", " }}</div>
+                    {% endif %}
+                </div>
+                <button type="button" class="btn btn-outline-secondary ms-2" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+                    + New
+                </button>
+            </div>
+        </div>
+
         <div class="mb-3">
             <label for="{{ form.question.id_for_label }}" class="form-label">Question Text</label>
             {{ form.question|attr:"class:form-control" }}
@@ -38,26 +54,23 @@
             {% endif %}
         </div>
 
-        <!-- Options Field -->
-        <div class="mb-3" id="optionsField">
-            <label for="{{ form.options.id_for_label }}" class="form-label">Options (JSON - for dropdown/radio)</label>
-            {{ form.options|attr:"class:form-control" }}
-            {% if form.options.errors %}
-                <div class="text-danger small mt-1">{{ form.options.errors|join:", " }}</div>
-            {% endif %}
-            <small class="form-text text-muted">Example: ["Yes", "No", "Maybe"]</small>
+        <!-- Static Options UI -->
+        <div class="mb-4" id="staticOptionsSection" style="display: none;">
+            <h6>Static Options (with optional scores)</h6>
+            <div id="options-list" class="mb-2"></div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="add-option-btn">+ Add Option</button>
+            <input type="hidden" name="options" id="optionsInput" value="[]">
         </div>
 
         <!-- Source Model Field -->
-        <div class="mb-4" id="sourceModelField">
+        <div class="mb-4" id="sourceModelField" style="display: none;">
             <label for="{{ form.source_model.id_for_label }}" class="form-label">Source Model (Dynamic Options)</label>
             {{ form.source_model|attr:"class:form-select" }}
             {% if form.source_model.errors %}
                 <div class="text-danger small mt-1">{{ form.source_model.errors|join:", " }}</div>
             {% endif %}
-            <small class="form-text text-muted">Leave blank if using static options above.</small>
+            <small class="form-text text-muted">Used only for "Dynamic Dropdown".</small>
 
-            <!-- Preview Area -->
             <div id="sourceModelPreview" class="mt-3 p-3 border rounded" style="display: none; background-color: #f8f9fa;">
                 <h6 class="mb-2">Preview (first 5 items):</h6>
                 <ul id="previewList" class="mb-0" style="max-height: 150px; overflow-y: auto;"></ul>
@@ -88,73 +101,192 @@
         </div>
     </form>
 </div>
+
+<!-- Add Category Modal -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <form id="categoryForm" method="post">
+            {% csrf_token %}
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addCategoryModalLabel">New Question Category</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Name *</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Order</label>
+                        <input type="number" name="order" class="form-control" value="0" min="0">
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="is_active" id="catActive" checked>
+                        <label class="form-check-label" for="catActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Create Category</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const fieldTypeSelect = document.querySelector('select[name="field_type"]');
-    const optionsField = document.getElementById('optionsField');
+    const form = document.getElementById('sharedQuestionForm');
+    const fieldTypeSelect = form.querySelector('select[name="field_type"]');
+    const staticOptionsSection = document.getElementById('staticOptionsSection');
     const sourceModelField = document.getElementById('sourceModelField');
-    const sourceModelSelect = document.querySelector('select[name="source_model"]');
+    const sourceModelSelect = form.querySelector('select[name="source_model"]');
     const previewDiv = document.getElementById('sourceModelPreview');
     const previewList = document.getElementById('previewList');
+    const optionsInput = document.getElementById('optionsInput');
+
+    let questionOptions = [];
+    {% if editing %}
+        {% for opt in question.options_set.all %}
+            questionOptions.push({
+                display_text: "{{ opt.display_text|escapejs }}",
+                score: {{ opt.score }}
+            });
+        {% endfor %}
+    {% endif %}
+
+    function renderOptions() {
+        const container = document.getElementById('options-list');
+        container.innerHTML = '';
+        questionOptions.forEach((opt, idx) => {
+            const div = document.createElement('div');
+            div.className = 'input-group mb-2';
+            div.innerHTML = `
+                <input type="text" class="form-control opt-text" placeholder="Option text" value="${opt.display_text}" data-idx="${idx}">
+                <input type="number" step="0.1" class="form-control opt-score" placeholder="Score" value="${opt.score}" data-idx="${idx}">
+                <button class="btn btn-outline-danger remove-opt" type="button" data-idx="${idx}">✕</button>
+            `;
+            container.appendChild(div);
+        });
+        optionsInput.value = JSON.stringify(questionOptions);
+    }
 
     function toggleFields() {
         const selectedType = fieldTypeSelect.value;
-
         if (selectedType === 'radio' || selectedType === 'dropdown') {
-            // Show options, hide source_model for static dropdown/radio
-            optionsField.style.display = 'block';
+            staticOptionsSection.style.display = 'block';
             sourceModelField.style.display = 'none';
             previewDiv.style.display = 'none';
+            renderOptions();
         } else if (selectedType === 'dynamic_dropdown') {
-            // Hide options, show source_model for dynamic dropdown
-            optionsField.style.display = 'none';
+            staticOptionsSection.style.display = 'none';
             sourceModelField.style.display = 'block';
         } else {
-            // Hide both for other types
-            optionsField.style.display = 'none';
+            staticOptionsSection.style.display = 'none';
             sourceModelField.style.display = 'none';
             previewDiv.style.display = 'none';
         }
     }
 
-    // Initialize on page load
+    // Options management
+    document.getElementById('add-option-btn')?.addEventListener('click', function() {
+        questionOptions.push({ display_text: '', score: 0.0 });
+        renderOptions();
+    });
+
+    document.getElementById('options-list')?.addEventListener('input', function(e) {
+        const idx = parseInt(e.target.dataset.idx);
+        if (e.target.classList.contains('opt-text')) {
+            questionOptions[idx].display_text = e.target.value;
+        } else if (e.target.classList.contains('opt-score')) {
+            questionOptions[idx].score = parseFloat(e.target.value) || 0.0;
+        }
+        optionsInput.value = JSON.stringify(questionOptions);
+    });
+
+    document.getElementById('options-list')?.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-opt')) {
+            const idx = parseInt(e.target.dataset.idx);
+            questionOptions.splice(idx, 1);
+            renderOptions();
+        }
+    });
+
     if (fieldTypeSelect) {
-        toggleFields(); // Set initial state
-        fieldTypeSelect.addEventListener('change', toggleFields); // Attach event listener
+        toggleFields();
+        fieldTypeSelect.addEventListener('change', toggleFields);
     }
 
-    // Preview functionality
     if (sourceModelSelect) {
         sourceModelSelect.addEventListener('change', function() {
             const selectedValue = this.value;
-
             if (!selectedValue) {
                 previewDiv.style.display = 'none';
                 return;
             }
-
-            // Show loading
             previewList.innerHTML = '<li>Loading...</li>';
             previewDiv.style.display = 'block';
 
             fetch(`/calls/shared-question/preview/${selectedValue}/`)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success && data.items.length > 0) {
-                        previewList.innerHTML = data.items.map(item => 
-                            `<li>${item}</li>`
-                        ).join('');
+                    if (data.success && data.items?.length > 0) {
+                        previewList.innerHTML = data.items.map(item => `<li>${item}</li>`).join('');
                     } else {
-                        previewList.innerHTML = '<li class="text-muted">No data found or model has no "name" field.</li>';
+                        previewList.innerHTML = '<li class="text-muted">No data found.</li>';
                     }
                 })
-                .catch(error => {
-                    console.error('Error fetching preview:', error);
+                .catch(() => {
                     previewList.innerHTML = '<li class="text-danger">Error loading preview.</li>';
                 });
+        });
+    }
+
+    renderOptions();
+
+    // ===== CATEGORY MODAL HANDLING =====
+    const categoryForm = document.getElementById('categoryForm');
+    const categorySelect = form.querySelector('select[name="category"]');
+
+    if (categoryForm) {
+        categoryForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            fetch('{% url "proponent_forms:create_shared_question_category" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Add new option to select
+                    const option = document.createElement('option');
+                    option.value = data.id;
+                    option.textContent = data.name;
+                    categorySelect.appendChild(option);
+                    categorySelect.value = data.id;
+
+                    // Close modal
+                    bootstrap.Modal.getInstance(document.getElementById('addCategoryModal')).hide();
+                    this.reset();
+                    document.getElementById('catActive').checked = true;
+                } else {
+                    alert('Error creating category: ' + (data.error || 'Unknown'));
+                }
+            })
+            .catch(() => {
+                alert('Network error. Please try again.');
+            });
         });
     }
 });
