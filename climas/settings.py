@@ -190,9 +190,12 @@ LOGIN_URL = 'accounts:login'
 LOGOUT_REDIRECT_URL = 'accounts:login'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [BASE_DIR / "static"]
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:8080",
-]
+# CSRF_TRUSTED_ORIGINS = [
+#     "http://localhost:8080",
+# ]
+CSRF_TRUSTED_ORIGINS = os.environ['CSRF_TRUSTED_ORIGINS'].split(',')
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in CSRF_TRUSTED_ORIGINS if origin.strip()]
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
