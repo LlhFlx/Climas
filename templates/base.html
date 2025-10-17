@@ -13,9 +13,6 @@
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
 
-    <!-- Alpine.js -->
-    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
-
     <style>
         body.dark {
             background-color: #1a1a1a;
@@ -238,6 +235,24 @@
         .suggestions-list .list-group-item:hover {
             background-color: #f8f9fa !important;
         }
+
+        /* Force dropdowns to follow Bootstrap's .show behavior */
+            .dropdown-menu {
+            display: none !important; /* default hidden */
+        }
+
+        .dropdown-menu.show {
+            display: block !important; /* visible when toggled */
+            position: absolute !important;
+            z-index: 2000 !important;
+        }
+/* 
+        .dropdown-menu {
+            position: absolute !important;
+            z-index: 2000 !important;
+            display: block !important;
+            background: white !important;
+        } */
     </style>
 </head>
 <body :class="{ 'dark': darkMode }" class="alpinejs">
@@ -281,7 +296,7 @@
 
                 <!-- User Dropdown -->
                 {% if user.is_authenticated %}
-                    <div class="dropdown">
+                    <div class="dropdown" data-bs-display="static">
                         <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
                             {{ user.username }}
                         </button>
@@ -323,10 +338,21 @@
     </footer>
 
     <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Alpine.js -->
+    <!-- <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script> -->
+    <script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
     
     {% block extra_js %}
     <script>
+    document.addEventListener('alpine:init', () => {
+    // run after Alpine boot
+    document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach(el => {
+        // make sure there is only one instance (avoid duplicate)
+        if (!bootstrap.Dropdown.getInstance(el)) new bootstrap.Dropdown(el);
+    });
+    });
     document.addEventListener('DOMContentLoaded', function() {
         const urlParams = new URLSearchParams(window.location.search);
         const tab = urlParams.get('tab');
