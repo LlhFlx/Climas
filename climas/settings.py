@@ -29,6 +29,11 @@ SECRET_KEY = os.environ['SECRET_KEY']
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
+# Explicit environment
+DJANGO_ENV = os.getenv('DJANGO_ENV', 'development').lower()
+IS_DEV = DJANGO_ENV == 'development'
+IS_PROD = DJANGO_ENV == 'production'
+
 ALLOWED_HOSTS = os.environ['ALLOWED_HOSTS'].split(',')
 ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS if host.strip()]
 
@@ -182,9 +187,18 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
-FORCE_SCRIPT_NAME = '/climas'
-STATIC_URL = '/climas/static/'
-LOGIN_REDIRECT_URL = '/climas/accounts/profile/'
+
+
+# Static & URL settings
+if IS_PROD:
+    FORCE_SCRIPT_NAME = '/climas'
+    STATIC_URL = '/climas/static/'
+    LOGIN_REDIRECT_URL = '/climas/accounts/profile/'
+else:
+    FORCE_SCRIPT_NAME = None
+    STATIC_URL = 'static/'
+    LOGIN_REDIRECT_URL = '/accounts/profile/'
+
 # named URL 
 LOGIN_URL = 'accounts:login'
 LOGOUT_REDIRECT_URL = 'accounts:login'

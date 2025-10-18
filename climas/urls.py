@@ -25,7 +25,7 @@ urlpatterns = [
     path('proposals/', include('proposals.urls', namespace='proposals')),
     path('evaluations/', include('evaluations.urls', namespace='evaluations')),
     path('proponent_forms/', include('proponent_forms.urls', namespace='proponent_forms')),
-    path('', RedirectView.as_view(url='/accounts/login/', permanent=False), name='home'),
+    path('', RedirectView.as_view(pattern_name='accounts:login', permanent=False), name='home'),
     path('captcha/', include('captcha.urls')),
 
     #path('institutions/', include('institutions.urls'))
