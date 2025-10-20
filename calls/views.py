@@ -2188,39 +2188,59 @@ def apply_proposal(request, expression_id):
                 if effect_ids:
                     product.strategic_effects.set(StrategicEffect.objects.filter(id__in=effect_ids))
 
-        # Budget Items (separate relation)
-        ProposalBudgetItem.objects.filter(proposal=proposal).delete()
-        budget_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('proposal_budget_category_'))
-        total_budget = 0
-        for idx in budget_indices:
-            cat_id = request.POST.get(f'proposal_budget_category_{idx}')
-            period_id = request.POST.get(f'proposal_budget_period_{idx}')
-            amount_str = request.POST.get(f'proposal_budget_amount_{idx}', '').strip()
-            notes = request.POST.get(f'proposal_budget_notes_{idx}', '').strip()
+        # Plain budget
+        total_budget_str = request.POST.get('total_requested_budget', '').strip()
+        total_requested_budget = None
 
-            if not cat_id or not period_id or not amount_str:
-                continue
-
+        if total_budget_str:
             try:
-                amount = float(amount_str)
-                if amount <= 0:
-                    raise ValueError()
+                total_requested_budget = float(total_budget_str)
+                if total_requested_budget > 900_000_000:
+                    messages.error(request, "El presupuesto total no puede exceder 900,000,000 COP.")
+                    has_word_errors = True  # reuse your flag or create a new one
+                elif total_requested_budget <= 0:
+                    messages.error(request, "El presupuesto total debe ser mayor a 0 COP.")
+                    has_word_errors = True
+            except (ValueError, TypeError):
+                messages.error(request, "Ingrese un valor numérico válido para el presupuesto.")
+                has_word_errors = True
+        else:
+            messages.error(request, "El campo 'Presupuesto Total Solicitado' es obligatorio.")
+            has_word_errors = True
 
-                category = BudgetCategory.objects.get(id=cat_id)
-                period = BudgetPeriod.objects.get(id=period_id)
+        # Budget Items (separate relation)
+        # ProposalBudgetItem.objects.filter(proposal=proposal).delete()
+        # budget_indices = set(k.split('_')[-1] for k in request.POST.keys() if k.startswith('proposal_budget_category_'))
+        # total_budget = 0
+        # for idx in budget_indices:
+        #     cat_id = request.POST.get(f'proposal_budget_category_{idx}')
+        #     period_id = request.POST.get(f'proposal_budget_period_{idx}')
+        #     amount_str = request.POST.get(f'proposal_budget_amount_{idx}', '').strip()
+        #     notes = request.POST.get(f'proposal_budget_notes_{idx}', '').strip()
 
-                item = ProposalBudgetItem.objects.create(
-                    proposal=proposal,
-                    category=category,
-                    period=period,
-                    amount=amount,
-                    notes=notes
-                )
-                total_budget += amount
-            except Exception:
-                messages.warning(request, f"Ítem de presupuesto inválido: {idx}")
+        #     if not cat_id or not period_id or not amount_str:
+        #         continue
 
-        proposal.total_requested_budget = total_budget
+        #     try:
+        #         amount = float(amount_str)
+        #         if amount <= 0:
+        #             raise ValueError()
+
+        #         category = BudgetCategory.objects.get(id=cat_id)
+        #         period = BudgetPeriod.objects.get(id=period_id)
+
+        #         item = ProposalBudgetItem.objects.create(
+        #             proposal=proposal,
+        #             category=category,
+        #             period=period,
+        #             amount=amount,
+        #             notes=notes
+        #         )
+        #         total_budget += amount
+        #     except Exception:
+        #         messages.warning(request, f"Ítem de presupuesto inválido: {idx}")
+
+        # proposal.total_requested_budget = total_budget
 
         # Team Members (separate from Expression)
         ProposalTeamMember.objects.filter(proposal=proposal).delete()

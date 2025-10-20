@@ -556,7 +556,20 @@
 
         <!-- 15. Budget -->
         <div class="mb-3">
-            <label class="form-label">Presupuesto *</label>
+            <label class="form-label">Presupuesto Total Solicitado (COP) *</label>
+            <input type="number"
+                name="total_requested_budget"
+                class="form-control"
+                step="1000"
+                min="0"
+                max="900000000"
+                value="{{ proposal.total_requested_budget|floatformat:2 }}"
+                required>
+            <small class="form-text text-muted">Máximo 900,000,000 COP. Solo números.</small>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Documento de Presupuesto *</label>
             <div class="input-group">
                 <input type="file" name="budget_document" class="form-control" accept=".xlsx, .pdf,.docx">
                 {% if proposal.budget_document %}
@@ -572,6 +585,7 @@
         </div>
 
         <!-- BUDGET ITEMS -->
+        {% comment "Budget section paused per request" %}
         <div class="mb-4">
             <h5>Presupuesto Detallado</h5>
             <p class="text-muted">Defina el presupuesto para esta propuesta.</p>
@@ -628,6 +642,7 @@
             </div>
             <button type="button" id="add-proposal-budget-btn" class="btn btn-outline-primary">+ Agregar Ítem</button>
         </div>
+        {% endcomment %}
 
         <!-- PROPOSAL-SPECIFIC SHARED QUESTIONS -->
         {% if proposal_questions %}
