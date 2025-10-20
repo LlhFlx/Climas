@@ -2006,8 +2006,9 @@ def apply_proposal(request, expression_id):
             'principal_investigator_title': request.POST.get('principal_investigator_title', '').strip(),
             'principal_investigator_position': request.POST.get('principal_investigator_position', '').strip(),
             'primary_institution_id': request.POST.get('primary_institution_id'),
+            'total_requested_budget': request.POST.get('total_requested_budget', '').strip(),
         }
-
+        
         # Update Proposal fields
         proposal.project_title_override = post_data['project_title_override']
         proposal.general_objective_override = post_data['general_objective_override']
@@ -2189,7 +2190,7 @@ def apply_proposal(request, expression_id):
                     product.strategic_effects.set(StrategicEffect.objects.filter(id__in=effect_ids))
 
         # Plain budget
-        total_budget_str = request.POST.get('total_requested_budget', '').strip()
+        total_budget_str = post_data['total_requested_budget']
         total_requested_budget = None
 
         if total_budget_str:
@@ -2437,7 +2438,7 @@ def apply_proposal(request, expression_id):
             return render(request, 'calls/apply_proposal.html', context)
 
         #  ALL VALIDATIONS PASSED, THEN SAVE PROPOSAL
-
+        proposal.total_requested_budget = total_requested_budget
         # Save
         proposal.save()
 
