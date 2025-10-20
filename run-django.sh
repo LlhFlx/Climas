@@ -34,12 +34,15 @@ if [ "$(docker ps -aq -f name=climas-app)" ]; then
     docker rm climas-app || true
 fi
 
+# Create volume
+docker create volume climashub
 # Run the container
 echo "Iniciando contenedor climas-app..."
 docker run -d \
   --name climas-app \
   -p 8220:8000 \
   --env-file .env \
+  -v climashub:/app/static:ro \
   climas-app
 
 echo "Contenedor climas-app está corriendo en http://localhost:8220"
