@@ -30,6 +30,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy project
 COPY . .
 
+# Create writable directory for static files and declare volume
+RUN mkdir -p /app/static && chown -R app:app /app/static
+VOLUME ["/app/static"]
+
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash app && \
     chown -R app:app /app

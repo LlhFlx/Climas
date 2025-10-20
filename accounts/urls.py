@@ -10,6 +10,7 @@ urlpatterns = [
     path('register/', views.register_view, name='register'),
     path('login/', views.login_view, name='login'),
     path('logout/', auth_views.LogoutView.as_view(next_page='home'), name='logout'),
+    path('document-types/<int:country_id>/', views.get_document_types_by_country, name='document_types_by_country'),
     
 
     # Profile Management

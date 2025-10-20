@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 from django.core.validators import RegexValidator
 from ..models import CustomUser
-from geo.models import DocumentType
+from geo.models import DocumentType, Country
 from people.models import Person
 
 from django.core.exceptions import ValidationError
@@ -29,9 +29,17 @@ class ResearcherRegistrationForm(UserCreationForm):
         help_text="Optional. Format: +57(601)1234444 or +1 555-123-4567"
     )
 
+    country = forms.ModelChoiceField(
+        queryset=Country.objects.all(),
+        empty_label="Select country",
+        label="País",
+        widget=forms.Select(attrs={'id': 'id_country'})
+    )
+
     document_type = forms.ChoiceField(
         choices=[], # poblado en __init__
-        label = "Tipo de Documento"
+        label = "Tipo de Documento",
+        widget=forms.Select(attrs={'id': 'id_document_type'})
     )
 
     document_number = forms.CharField(max_length=50, label="Numero de Documento")
@@ -56,13 +64,39 @@ class ResearcherRegistrationForm(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['document_type'].choices = [
-            (dt.id, dt.name) for dt in DocumentType.objects.all()
-        ]
-        # Add CSS classes if using Bootstrap or custom styling
-        for field in self.fields:
-            self.fields[field].widget.attrs.update({'class': 'form-control'})
-            self.fields[field].widget.attrs.update({'class': 'u-full-width'})
+
+        # Get Colombia (handle case where it might not exist)
+        try:
+            colombia = Country.objects.get(name="Colombia")  # or use ISO code if more reliable
+            self.fields['country'].initial = colombia.id
+            default_country_id = colombia.id
+        except Country.DoesNotExist:
+            default_country_id = None
+            self.fields['country'].initial = None
+
+        # Populate document_type based on country (POST or default)
+        if 'country' in self.data:
+            try:
+                country_id = int(self.data.get('country'))
+                doc_types = DocumentType.objects.filter(country_id=country_id)
+            except (ValueError, TypeError):
+                doc_types = DocumentType.objects.none()
+        else:
+            # Use default country (Colombia) if available
+            if default_country_id:
+                doc_types = DocumentType.objects.filter(country_id=default_country_id)
+            else:
+                doc_types = DocumentType.objects.none()
+
+        # Set choices for document_type
+        if doc_types.exists():
+            self.fields['document_type'].choices = [(dt.id, dt.name) for dt in doc_types]
+        else:
+            self.fields['document_type'].choices = [('', 'Select country first')]
+
+        # Apply CSS classes
+        for field in self.fields.values():
+            field.widget.attrs.update({'class': 'form-control u-full-width'})
 
     def clean_email(self):
         email = self.cleaned_data.get('email')

@@ -10,6 +10,8 @@ from django.contrib.auth.decorators import login_required
 from .models import CustomUser, Role
 from .forms.forms import ResearcherRegistrationForm, ProfileForm, LoginForm
 from django.http import HttpResponse
+from django.http import JsonResponse
+from geo.models import DocumentType, Country
 
 
 # def register_view(request):
@@ -180,3 +182,7 @@ def request_evaluator_access(request):
         return redirect('accounts:profile')
     
     return render(request, 'accounts/request_evaluator.html')
+
+def get_document_types_by_country(request, country_id):
+    doc_types = DocumentType.objects.filter(country_id=country_id).values('id', 'name')
+    return JsonResponse(list(doc_types), safe=False)

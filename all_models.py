@@ -109,6 +109,12 @@ class Proposal(Expression):
         verbose_name="Título del Proyecto"
     )
 
+    general_objective_override = models.TextField(
+        blank=True,
+        null = True,
+        help_text="Si se especifica, sobrescribe el objetivo general de la expresión.",
+    )
+
     thematic_axis_override = models.ForeignKey(
         'thematic_axes.ThematicAxis',
         on_delete=models.SET_NULL,
@@ -408,12 +414,48 @@ from django.apps import apps
 from django.db import models
 from core.models import TimestampMixin
 from core.choices import SOURCE_MODEL_CHOICES, FIELD_TYPE_CHOICES
+from decimal import Decimal
+
+class SharedQuestionCategory(TimestampMixin, models.Model):
+    name = models.CharField(
+        max_length=200, 
+        verbose_name="Nombre", 
+        unique=True
+    )
+    description = models.TextField(
+        blank=True, 
+        verbose_name="Descripción"
+    )
+    is_active = models.BooleanField(
+        default=True, 
+        verbose_name="Activa"
+    )
+    order = models.PositiveIntegerField(default=0, verbose_name="Orden")
+
+    class Meta:
+        db_table = 'shared_question_category'
+        verbose_name = "Categoría de Pregunta"
+        verbose_name_plural = "Categorías de Pregunta"
+        ordering = ['order', 'name']
+
+    def __str__(self):
+        return self.name
+    
 
 class SharedQuestion(TimestampMixin, models.Model):
     TARGET_CHOICES = [
         ('expression', 'Expresion de Interes'),
         ('proposal', 'Propuesta Completa')
     ]
+    
+    category = models.ForeignKey(
+        'proponent_forms.SharedQuestionCategory',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Categoría",
+        related_name='questions'
+    )
 
     question = models.TextField(verbose_name="Pregunta")
 
@@ -459,10 +501,11 @@ class SharedQuestion(TimestampMixin, models.Model):
         db_table = 'shared_question'
         verbose_name = "Pregunta Compartida"
         verbose_name_plural = "Preguntas Compartidas"
-        ordering = ['target_category', 'question']
+        ordering = ['target_category', 'category__order', 'question']
 
     def __str__(self):
-        return f"{self.question} ({self.get_target_category_display()})"
+        cat = f" ({self.category})" if self.category else ""
+        return f"{self.question}{cat} ({self.get_target_category_display()})"
     
     # def get_options(self):
     #     if self.field_type == 'dynamic_dropdown' and self.source_model:
@@ -477,21 +520,67 @@ class SharedQuestion(TimestampMixin, models.Model):
     #     return []
 
     def get_options(self):
+        # Dynamic dropdown from source_model
         if self.field_type == 'dynamic_dropdown' and self.source_model:
             try:
                 app_label, model_name = self.source_model.split('.')
                 model = apps.get_model(app_label, model_name)
-                # Try common field names
                 for field in ['name', 'title', 'code', 'label', 'description']:
                     if hasattr(model, field):
                         return list(model.objects.values_list(field, flat=True))
-                # Fallback to str representation
                 return [str(obj) for obj in model.objects.all()[:50]]
             except (LookupError, AttributeError) as e:
                 return [f"Error loading {self.source_model}: {e}"]
-        elif self.options:
+
+        # Structured options (new system)
+        if self.options_set.exists():
+            return list(self.options_set.values_list('display_text', flat=True))
+
+        # Legacy JSON options (simple list)
+        if self.options:
             return self.options
+
         return []
+    
+    def get_scored_options(self):
+        """Return list of (display_text, score) tuples."""
+        if self.field_type == 'dynamic_dropdown':
+            # Dynamic options don’t have scores (unless you extend them)
+            return [(opt, Decimal('0.0')) for opt in self.get_options()]
+
+        if self.options_set.exists():
+            return list(self.options_set.values_list('display_text', 'score'))
+
+        # Legacy options have no scores
+        return [(opt, Decimal('0.0')) for opt in (self.options or [])]
+
+class SharedQuestionOption(TimestampMixin, models.Model):
+    shared_question = models.ForeignKey(
+        'proponent_forms.SharedQuestion',
+        on_delete=models.CASCADE,
+        related_name='options_set',
+        verbose_name='Pregunta Compartida'
+    )
+
+    display_text = models.CharField(
+        max_length=200,
+        verbose_name="Texto a mostrar"
+    )
+    
+    score = models.DecimalField(
+        max_digits=3,
+        decimal_places=1,
+        default=Decimal(0.0),
+        verbose_name="Puntuación asociada (opcional)"
+    )
+
+    class Meta:
+        verbose_name = "Opción de Pregunta Compartida"
+        verbose_name_plural = "Opciones de Pregunta Compartida"
+        ordering = ['shared_question', 'id']
+
+    def __str__(self):
+        return f"{self.display_text} ({self.score})"
 
 class ProponentForm(TimestampMixin, models.Model):
     call = models.OneToOneField(
@@ -570,6 +659,15 @@ class ProponentResponse(TimestampMixin, models.Model):
         blank=True,
         verbose_name="Valor"
     )
+
+    score = models.DecimalField(
+        max_digits=3,
+        decimal_places=1,
+        null=True,
+        blank=True,
+        verbose_name="Puntuación derivada"
+    )
+
     comment = models.TextField(
         blank=True,
         verbose_name="Comentario"
@@ -1955,7 +2053,7 @@ class EvaluationTemplate(TimestampMixin, CreatedByMixin, models.Model):
     def get_total_max_score(self):
         """Calculate the sum of max_score from all items."""
         return self.categories.aggregate(
-            total=models.Sum('items__max_score')
+            total=models.Sum('subcategories__items__max_score')
         )['total'] or 0
 
     def save(self, *args, **kwargs):
@@ -2019,7 +2117,7 @@ class TemplateCategory(TimestampMixin, models.Model):
     )
 
     name = models.CharField(
-        max_length=100, 
+        max_length=400, 
         verbose_name="Nombre"
     )
 
@@ -2045,6 +2143,25 @@ class TemplateCategory(TimestampMixin, models.Model):
 
     def __str__(self):
         return self.name
+
+class TemplateSubcategory(TimestampMixin, models.Model):
+    category = models.ForeignKey(
+        TemplateCategory, 
+        on_delete=models.CASCADE, 
+        related_name='subcategories', 
+        verbose_name="Categoría"
+    )
+    name = models.CharField(max_length=400, verbose_name="Nombre")
+    order = models.PositiveIntegerField(default=0, verbose_name="Orden")
+    is_active = models.BooleanField(default=True, verbose_name='Activa')
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = "Subcategoría de Plantilla"
+        verbose_name_plural = "Subcategorías de Plantilla"
+
+    def __str__(self):
+        return f"{self.category.name}: {self.name}"
     
 class TemplateItem(TimestampMixin, models.Model):
     """
@@ -2052,58 +2169,30 @@ class TemplateItem(TimestampMixin, models.Model):
     Define el tipo de entrada esperado.
     """
 
-    # FIELD_TYPE_CHOICES = [
-    #     ('text', 'Texto largo'),
-    #     ('short_text', 'Texto corto'),
-    #     ('number', 'Número'),
-    #     ('boolean', 'Sí/No'),
-    #     ('dropdown', 'Desplegable'),
-    #     ('radio', 'Opción múltiple'),
-    # ]
-
-    # SOURCE_MODEL_CHOICES = [
-    #     ('geo.Country', 'Pais'),
-    #     ('common.Status', 'Estado'),
-    #     ('thematic_axes.ThematicAxis', 'Eje Tematico')
-    # ]
-
-    category = models.ForeignKey(
-        TemplateCategory,
-        on_delete=models.CASCADE,
-        related_name='items',
-        verbose_name="Categoría"
+    subcategory = models.ForeignKey(
+        TemplateSubcategory, 
+        on_delete=models.CASCADE, 
+        related_name='items', 
+        verbose_name="Subcategoría"
     )
-
     question = models.TextField(verbose_name="Pregunta")
-
     field_type = models.CharField(
-        max_length=20,
-        choices=FIELD_TYPE_CHOICES,
-        default='text',
+        max_length=20, 
+        choices=FIELD_TYPE_CHOICES, 
+        default='text', 
         verbose_name="Tipo de Campo"
     )
-    # Static Options
-    options = models.JSONField(
-        blank=True,
-        null=True,
-        help_text="Opciones para dropdown o radio (ej: ['Sí', 'No', 'Parcialmente'])",
-        verbose_name="Opciones Estaticas"
-    )
-
-    # Dynamic model reference
     source_model = models.CharField(
-        max_length=100,
-        choices=SOURCE_MODEL_CHOICES,
-        blank=True,
-        null=True,
-        help_text="Si se selecciona, carga opciones desde este modelo. (Ignorar para 'Opciones Estaticas')",
+        max_length=100, 
+        choices=SOURCE_MODEL_CHOICES, 
+        blank=True, 
+        null=True, 
         verbose_name="Modelo de Origen"
     )
-
     max_score = models.DecimalField(
-        max_digits=3,
-        decimal_places=1,
-        default=5.0,
+        max_digits=3, 
+        decimal_places=1, 
+        default=5.0, 
         verbose_name="Puntuación Máxima"
     )
     order = models.PositiveIntegerField(default=0, verbose_name="Orden")
@@ -2114,35 +2203,36 @@ class TemplateItem(TimestampMixin, models.Model):
         verbose_name_plural = "Ítems de Plantilla"
 
     def __str__(self):
-        return f"{self.category.name}: {self.question}"
+        return f"{self.subcategory}: {self.question}"
     
-    # def get_options(self):
-    #     """
-    #     Retorna una lista de opciones para este item.
-    #     Prioriza 'source_model' sobre 'opciones'.
-    #     """
-    #     if self.source_model:
-    #         try:
-    #             app_label, model_name = self.source_model.split('.')
-    #             model = apps.get_model(app_label, model_name)
-    #             return list(model.objects.values_list('name', flat=True))
-    #         except (LookupError, AttributeError) as e:
-    #             return [f"Error loading {self.source_model}: {e}"]
-    #     elif self.options:
-    #         return self.options
-    #     return []
+    def calculate_max_score_from_options(self):
+        """Return the highest score among this item's options, or None if no options."""
+        if self.options.exists():
+            result = self.options.aggregate(max_score=models.Max('score'))['max_score']
+            return result
+        return None
     
-    # def get_options(self):
-    #     if self.field_type == 'dynamic_dropdown' and self.source_model:
-    #         try:
-    #             app_label, model_name = self.source_model.split('.')
-    #             model = apps.get_model(app_label, model_name)
-    #             return list(model.objects.values_list('name', flat=True))
-    #         except (LookupError, AttributeError) as e:
-    #             return [f"Error loading {self.source_model}: {e}"]
-    #     elif self.options:
-    #         return self.options
-    #     return []
+    def sync_max_score(self):
+        """Update max_score from options and save if changed."""
+        new_max = self.calculate_max_score_from_options()
+        if new_max is not None and self.max_score != new_max:
+            self.max_score = new_max
+            self.save(update_fields=['max_score'])
+
+    def get_dynamic_options(self):
+        """Fetch display values from source_model (for UI prefill)."""
+        if self.field_type == 'dynamic_dropdown' and self.source_model:
+            try:
+                app_label, model_name = self.source_model.split('.')
+                model = apps.get_model(app_label, model_name)
+                for field in ['name', 'title', 'code', 'label', 'description']:
+                    if hasattr(model, field):
+                        return list(model.objects.values_list('id', field))
+                return [(obj.pk, str(obj)) for obj in model.objects.all()[:50]]
+            except Exception:
+                return []
+        return []
+
     def get_options(self):
         if self.field_type == 'dynamic_dropdown' and self.source_model:
             try:
@@ -2163,6 +2253,36 @@ class TemplateItem(TimestampMixin, models.Model):
             return self.options
         return []
 
+class TemplateItemOption(TimestampMixin, models.Model):
+    item = models.ForeignKey(
+        TemplateItem, 
+        on_delete=models.CASCADE, 
+        related_name='options', 
+        verbose_name="Ítem"
+    )
+    display_text = models.CharField(
+        max_length=200, 
+        verbose_name="Texto a mostrar"
+    )
+    score = models.DecimalField(
+        max_digits=3, 
+        decimal_places=1, 
+        default=0.0, 
+        verbose_name="Puntuación asociada"
+    )
+    source_object_id = models.PositiveIntegerField(
+        null=True, 
+        blank=True, 
+        help_text="ID del objeto si proviene de source_model"
+    )
+
+    class Meta:
+        verbose_name = "Opción de Ítem"
+        verbose_name_plural = "Opciones de Ítem"
+        ordering = ['item', 'id']
+
+    def __str__(self):
+        return f"{self.display_text}: {self.score}"
 
 class Evaluation(TimestampMixin, CreatedByMixin, models.Model):
     """

@@ -72,8 +72,17 @@
                     </div>
 
                     <!-- === Right Column: Personal Information === -->
+                    
                     <div class="col-md-6">
                         <h5 class="mb-3">Personal Information</h5>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.country.id_for_label }}" class="form-label">País</label>
+                            {{ form.country|attr:"class:form-control u-full-width" }}
+                            {% if form.country.errors %}
+                                <div class="text-danger small mt-1">{{ form.country.errors.0 }}</div>
+                            {% endif %}
+                        </div>
 
                         <div class="mb-3">
                             <label for="{{ form.document_type.id_for_label }}" class="form-label">Document Type</label>
@@ -161,3 +170,43 @@
     </div>
 </div>
 {% endblock content %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const countrySelect = document.getElementById('id_country');
+    const docTypeSelect = document.getElementById('id_document_type');
+
+    function updateDocumentTypes(countryId) {
+        if (!countryId) {
+            docTypeSelect.innerHTML = '<option value="">Select country first</option>';
+            return;
+        }
+
+        fetch(`/accounts/document-types/${countryId}/`)
+            .then(response => response.json())
+            .then(data => {
+                docTypeSelect.innerHTML = '<option value="">Select document type</option>';
+                data.forEach(item => {
+                    const option = document.createElement('option');
+                    option.value = item.id;
+                    option.textContent = item.name;
+                    docTypeSelect.appendChild(option);
+                });
+            })
+            .catch(err => {
+                console.error('Failed to load document types:', err);
+                docTypeSelect.innerHTML = '<option value="">Error loading types</option>';
+            });
+    }
+
+    // Initialize if country is pre-selected (e.g., form error reload)
+    if (countrySelect.value) {
+        updateDocumentTypes(countrySelect.value);
+    }
+
+    countrySelect.addEventListener('change', function () {
+        updateDocumentTypes(this.value);
+    });
+});
+</script>
+{% endblock %}
