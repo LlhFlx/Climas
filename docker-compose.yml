@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: climas-app
+    command: gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 120 climas.wsgi:application
+    env_file:
+      - .env
+    volumes:
+      - static_data:/app/static
+      - media_data:/app/media
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.25
+    container_name: climas-nginx
+    depends_on:
+      - web
+    ports:
+      - "8220:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - static_data:/app/static:ro
+      - media_data:/app/media:ro
+    restart: unless-stopped
+  # proxy:
+  #   image: nginx:1.25
+  #   container_name: climas-proxy
+  #   depends_on:
+  #     - nginx
+  #   ports:
+  #     - "8080:80"
+  #   volumes:
+  #     - ./proxy.conf:/etc/nginx/nginx.conf:ro
+  #   restart: unless-stopped
+
+volumes:
+  static_data:
+  media_data:
