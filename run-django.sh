@@ -42,7 +42,7 @@ docker run -d \
   --name climas-app \
   -p 8220:8000 \
   --env-file .env \
-  -v climashub:/app/static:ro \
+  -v climashub:/app/static:rw \
   climas-app
 
 echo "Contenedor climas-app está corriendo en http://localhost:8220"
