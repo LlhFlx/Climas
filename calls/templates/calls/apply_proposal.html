@@ -21,38 +21,39 @@
         <input type="hidden" name="proposal_id" value="{{ proposal.id }}">
 
         <!-- Expression Fields (READ-ONLY) -->
-        <div class="card mb-4">
-            <div class="card-header bg-light">
-                <h5 class="mb-0">Información de la Expresión de Interés</h5>
+        <div class="card mb-4 shadow-sm expression-fields-card">
+            <div class="card-header bg-light py-3">
+                <h5 class="mb-0 fw-bold text-body">Información de la Expresión de Interés</h5>
             </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label">Título del Proyecto</label>
-                    <p class="form-control-plaintext">{{ expression.project_title }}</p>
+            <div class="card-body p-0">
+                <!-- No mb-3 here — spacing handled by .field-row -->
+                <div class="field-row">
+                    <span class="field-label">Título del Proyecto:</span>
+                    <span class="field-value text-break">{{ expression.project_title }}</span>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Eje Temático</label>
-                    <p class="form-control-plaintext">{{ expression.thematic_axis.name }}</p>
+                <div class="field-row">
+                    <span class="field-label">Eje Temático:</span>
+                    <span class="field-value text-break">{{ expression.thematic_axis.name }}</span>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">País de Implementación</label>
-                    <p class="form-control-plaintext">{{ expression.implementation_country.name }}</p>
+                <div class="field-row">
+                    <span class="field-label">País de Implementación:</span>
+                    <span class="field-value text-break">{{ expression.implementation_country.name }}</span>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Institución Principal</label>
-                    <p class="form-control-plaintext">{{ expression.primary_institution.name }}</p>
+                <div class="field-row">
+                    <span class="field-label">Institución Principal:</span>
+                    <span class="field-value text-break">{{ expression.primary_institution.name }}</span>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Descripción del Problema</label>
-                    <p class="form-control-plaintext">{{ expression.problem|linebreaks }}</p>
+                <div class="field-row">
+                    <span class="field-label">Descripción del Problema:</span>
+                    <span class="field-value text-break">{{ expression.problem|linebreaksbr }}</span>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Objetivo General</label>
-                    <p class="form-control-plaintext">{{ expression.general_objective|linebreaks }}</p>
+                <div class="field-row">
+                    <span class="field-label">Objetivo General:</span>
+                    <span class="field-value text-break">{{ expression.general_objective|linebreaksbr }}</span>
                 </div>
-                <div class="mb-3">
-                    <label class="form-label">Metodología</label>
-                    <p class="form-control-plaintext">{{ expression.methodology|linebreaks }}</p>
+                <div class="field-row">
+                    <span class="field-label">Metodología:</span>
+                    <span class="field-value text-break">{{ expression.methodology|linebreaksbr }}</span>
                 </div>
             </div>
         </div>
@@ -61,7 +62,7 @@
         <h4 class="mb-4">Información de la Propuesta Formal</h4>
 
         <!-- 0.1. Project Title Override -->
-        <div class="mb-3">
+        <!-- <div class="mb-3">
             <label class="form-label">Título del Proyecto (Opcional)</label>
             <input type="text"
                 name="project_title_override"
@@ -69,21 +70,10 @@
                 value="{{ post_data.project_title_override|default:proposal.project_title_override|default:'' }}"
                 placeholder="Puede sobrescribir el título anterior">
             <small class="form-text text-muted">Máximo 50 palabras</small>
-        </div>
+        </div> -->
 
-        
-        <!-- 0.1. General Objective Override -->
-        <div class="mb-3">
-            <label class="form-label">Objetivo General del Proyecto (Opcional)</label>
-            <input type="text"
-                name="general_objective_override"
-                class="form-control"
-                value="{{ post_data.general_objective_override|default:proposal.general_objective_override|default:'' }}"
-                placeholder="Puede sobrescribir el objetivo general anterior">
-            <small class="form-text text-muted">Máximo 50 palabras</small>
-        </div>
         <!-- 0.2. Thematic Axis Override -->
-        <div class="mb-3">
+        <!-- <div class="mb-3">
             <label class="form-label">Eje Temático</label>
             <select name="thematic_axis_override" class="form-select">
                 <option value="">-- Mantener eje de expresión --</option>
@@ -93,7 +83,26 @@
                     </option>
                 {% endfor %}
             </select>
-        </div>
+        </div> -->
+        
+        <!-- 0.4. Primary Institution (Proposal Level) -->
+        <!-- <div class="mb-3">
+            <label class="form-label">Institución Principal *</label>
+            <div class="input-group">
+                <input type="text"
+                    name="primary_institution_search"
+                    class="form-control institution-search-primary"
+                    placeholder="Buscar..."
+                    value="{% if proposal.primary_institution %}{{ proposal.primary_institution.name }}{% endif %}">
+                <input type="hidden"
+                    name="primary_institution_id"
+                    value="{% if proposal.primary_institution %}{{ proposal.primary_institution.id }}{% endif %}">
+            </div>
+            <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=primary_institution_id"
+            target="_blank"
+            class="btn btn-outline-primary mt-2">+ Crear</a>
+            <small class="form-text text-muted">Seleccione o cree una nueva.</small>
+        </div> -->
 
         <!-- 0.3. Principal Investigator Role & Title -->
         <div class="row mb-3">
@@ -113,238 +122,11 @@
             </div>
         </div>
 
-        <!-- 0.4. Primary Institution (Proposal Level) -->
-        <div class="mb-3">
-            <label class="form-label">Institución Principal *</label>
-            <div class="input-group">
-                <input type="text"
-                    name="primary_institution_search"
-                    class="form-control institution-search-primary"
-                    placeholder="Buscar..."
-                    value="{% if proposal.primary_institution %}{{ proposal.primary_institution.name }}{% endif %}">
-                <input type="hidden"
-                    name="primary_institution_id"
-                    value="{% if proposal.primary_institution %}{{ proposal.primary_institution.id }}{% endif %}">
-            </div>
-            <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=primary_institution_id"
-            target="_blank"
-            class="btn btn-outline-primary mt-2">+ Crear</a>
-            <small class="form-text text-muted">Seleccione o cree una nueva.</small>
-        </div>
         <!-- 1. Principal Research Experience -->
         <div class="mb-3">
             <label class="form-label">Experiencia en investigación del Investigador/a Principal *</label>
             <textarea name="principal_research_experience" class="form-control" rows="4" maxlength="1000" required>{{ proposal.principal_research_experience }}</textarea>
             <small class="form-text text-muted">Máximo 250 palabras (≈1000 caracteres)</small>
-        </div>
-
-        <!-- 2. Partner Institutions & Commitment Letters (GROUPED) -->
-        <div class="mb-4">
-            <h5>Instituciones Aliadas y Cartas de Compromiso</h5>
-            <p class="text-muted">Seleccione instituciones y cargue una carta de compromiso por cada una.</p>
-
-            <!-- Institution Search -->
-            <div class="input-group mb-3">
-                <input type="text"
-                    name="partner_institution_search"
-                    class="form-control institution-search-partner"
-                    placeholder="Buscar institución..."
-                    aria-label="Buscar institución"
-                    value=""
-                >
-                <button type="button" class="btn btn-outline-primary add-institution" disabled>Agregar</button>
-            </div>
-            <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=primary_institution_id"
-            target="_blank"
-            class="btn btn-outline-primary mt-2">+ Crear</a>
-            <small class="form-text text-muted">Seleccione o cree una nueva.</small>
-
-            <!-- Selected Institutions List -->
-            <div id="partner-institutions-list" class="mb-3">
-                {% for inst in proposal.partner_institutions.all %}
-                    <div class="d-flex align-items-center mb-2 p-2 bg-light rounded" data-institution-id="{{ inst.id }}">
-                        <span class="me-2">{{ inst.name }}</span>
-                        <button type="button" class="btn btn-sm btn-outline-danger remove-institution" data-institution-id="{{ inst.id }}">Eliminar</button>
-                    </div>
-                {% endfor %}
-            </div>
-
-            <!-- Commitment Letters Section -->
-            <div id="commitment-documents-container">
-                {% for inst in proposal.partner_institutions.all %}
-                    <div class="card mb-3 p-3 commitment-doc-section" data-institution-id="{{ inst.id }}">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="mb-0">Carta de Compromiso: {{ inst.name }}</h6>
-                            <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-section" data-institution-id="{{ inst.id }}">Eliminar</button>
-                        </div>
-
-                        <!-- Show ONLY docs linked to this institution -->
-                        {% if docs_by_institution %}
-                            {% with docs=docs_by_institution|get_item:inst %}
-                                {% if docs %}
-                                    {% for doc in docs %}
-                                        <div class="d-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded">
-                                            <span class="flex-grow-1">{{ doc.name }}</span>
-                                            <a href="{% url 'proposals:download_proposal_document' doc.id %}"
-                                            target="_blank"
-                                            class="btn btn-sm btn-outline-secondary me-2">Ver</a>
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-danger remove-commitment-doc"
-                                                    data-doc-id="{{ doc.id }}">Borrar</button>
-                                        </div>
-                                    {% endfor %}
-                                {% else %}
-                                    <p class="text-muted small">No hay cartas cargadas.</p>
-                                {% endif %}
-                            {% endwith %}
-                        {% endif %}
-
-                        <!-- Upload form for this institution -->
-                        <div class="input-group mb-2">
-                            <input type="file" name="commitment_document" class="form-control" accept=".xlsx, .pdf,.docx">
-                            <button type="button" class="btn btn-outline-primary upload-commitment" data-institution-id="{{ inst.id }}">Cargar</button>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-
-            <!-- Hidden field to store selected institution IDs -->
-            <!-- <input type="hidden" name="partner_institution_ids" value="{% for inst in proposal.partner_institutions.all %}{{ inst.id }},{% endfor %}"> -->
-        </div>
-
-        <!-- 3. Community Country + Description -->
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <label class="form-label">País de la Comunidad</label>
-                <select name="community_country" class="form-select">
-                    <option value="">-- Seleccionar País --</option>
-                    {% for country in countries %}
-                        <option value="{{ country.id }}" {% if proposal.community_country_id == country.id %}selected{% endif %}>
-                            {{ country.name }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-6">
-                <label class="form-label">Descripción de la Comunidad</label>
-                <input type="text" name="community_description" class="form-control" value="{{ proposal.community_description }}">
-            </div>
-        </div>
-
-        <!-- 4. Project Location -->
-        <div class="mb-3">
-            <label class="form-label">País donde se desarrollará el proyecto *</label>
-            <select name="project_location" class="form-select" required>
-                <option value="">-- Seleccionar País --</option>
-                {% for country in countries %}
-                    <option value="{{ country.id }}" {% if proposal.project_location_id == country.id %}selected{% endif %}>
-                        {{ country.name }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <!-- 5. Duration -->
-        <div class="mb-3">
-            <label class="form-label">Duración del proyecto (meses) *</label>
-            <input type="number" name="duration_months" class="form-control" min="1" value="{{ proposal.duration_months|default:12 }}" required>
-        </div>
-
-        <!-- 6. Summary -->
-        <div class="mb-3">
-            <label class="form-label">Resumen *</label>
-            <textarea name="summary" class="form-control" rows="4" maxlength="1000" required>{{ proposal.summary }}</textarea>
-            <small class="form-text text-muted">Máximo 250 palabras</small>
-        </div>
-
-        <!-- 7. Context, Problem & Justification -->
-        <div class="mb-3">
-            <label class="form-label">Contexto, problema y justificación *</label>
-            <textarea name="context_problem_justification" class="form-control" rows="5" maxlength="1600" required>{{ proposal.context_problem_justification }}</textarea>
-            <small class="form-text text-muted">Máximo 400 palabras</small>
-        </div>
-
-        <!-- 8. Specific Objectives -->
-        <div class="mb-3">
-            <label class="form-label">Objetivos Específicos</label>
-            <p class="text-muted">Agregue objetivos específicos adicionales o modificados.</p>
-            <div id="specific-objectives-container">
-                {% for obj in proposal.specific_objectives.all %}
-                    <div class="card mb-3 p-3 objective-entry">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="mb-0">Objetivo {{ forloop.counter }}</h6>
-                            <button type="button" class="btn btn-sm btn-outline-danger remove-objective">Eliminar</button>
-                        </div>
-                        <div class="mb-3">
-                            <label>Título *</label>
-                            <input type="text" name="objective_title_{{ forloop.counter0 }}" class="form-control" value="{{ obj.title }}" required>
-                        </div>
-                        <div class="mb-3">
-                            <label>Descripción</label>
-                            <textarea name="objective_description_{{ forloop.counter0 }}" class="form-control" rows="3">{{ obj.description }}</textarea>
-                        </div>
-                    </div>
-                {% empty %}
-                    <div class="alert alert-info">No hay objetivos específicos definidos.</div>
-                {% endfor %}
-            </div>
-            <button type="button" id="add-objective-btn" class="btn btn-outline-secondary">+ Agregar Objetivo</button>
-            <small class="form-text text-muted">Máximo 200 palabras por objetivo</small>
-        </div>
-
-        <!-- 8.5. Products -->
-        <div class="mb-4">
-            <h5>Productos Esperados</h5>
-            <p class="text-muted">Defina los productos derivados de esta propuesta.</p>
-            <div id="proposal-products-container"
-                data-initial-count="{{ existing_proposal_products|length }}"
-                data-strategic-effects='{{ strategic_effects_json|safe }}'>
-                {% for prod in existing_proposal_products %}
-                    <div class="card mb-3 p-3 product-entry">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="mb-0">Producto {{ forloop.counter }}</h6>
-                            <button type="button" class="btn btn-sm btn-outline-danger remove-product">Eliminar</button>
-                        </div>
-                        <div class="mb-3">
-                            <label>Título *</label>
-                            <input type="text" name="proposal_product_title_{{ forloop.counter0 }}" class="form-control" value="{{ prod.title }}" required>
-                        </div>
-                        <div class="mb-3">
-                            <label>Descripción</label>
-                            <textarea name="proposal_product_description_{{ forloop.counter0 }}" class="form-control" rows="2">{{ prod.description }}</textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label>Resultado o Impacto</label>
-                            <textarea name="proposal_product_outcome_{{ forloop.counter0 }}" class="form-control" rows="2">{{ prod.outcome }}</textarea>
-                        </div>
-                        <!-- <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label>Fecha de Inicio</label>
-                                <input type="date" name="proposal_product_start_date_{{ forloop.counter0 }}" class="form-control" value="{{ prod.start_date|date:'Y-m-d' }}">
-                            </div>
-                            <div class="col-md-6">
-                                <label>Fecha de Finalización</label>
-                                <input type="date" name="proposal_product_end_date_{{ forloop.counter0 }}" class="form-control" value="{{ prod.end_date|date:'Y-m-d' }}">
-                            </div>
-                        </div> -->
-                        <div class="mb-3">
-                            <label>Efectos Estratégicos</label>
-                            <select name="proposal_product_strategic_effects_{{ forloop.counter0 }}" 
-                                class="form-select product-strategic-effects"    
-                                multiple>
-                                {% for effect in strategic_effects %}
-                                    <option value="{{ effect.id }}" {% if effect in prod.strategic_effects.all %}selected{% endif %}>
-                                        {{ effect.name }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                {% empty %}
-                    <div class="alert alert-info">No hay productos definidos.</div>
-                {% endfor %}
-            </div>
-            <button type="button" id="add-proposal-product-btn" class="btn btn-outline-primary">+ Agregar Producto</button>
         </div>
 
         <!-- 8.6. Team Members -->
@@ -432,8 +214,8 @@
 
         <!-- COMMUNITY-BASED ORGANIZATIONS -->
         <div class="mb-4">
-            <h5>Organizaciones Comunitarias (CBOs)</h5>
-            <p class="text-muted">Agregue organizaciones con sus roles y antecedentes.</p>
+            <h5>Organización Comunitaria (OBC)</h5>
+            <p class="text-muted">Agregue una organización con sus roles y antecedentes.</p>
             <div id="cbo-container">
                 {% for cbo in proposal.community_organizations.all %}
                     <div class="card mb-4 p-3 cbo-entry">
@@ -496,10 +278,177 @@
                         </div>
                     </div>
                 {% empty %}
-                    <div class="alert alert-info">No hay CBOs definidas.</div>
+                    <div class="alert alert-info">No hay OBC definida.</div>
                 {% endfor %}
             </div>
             <button type="button" id="add-cbo-btn" class="btn btn-outline-primary">+ Agregar CBO</button>
+        </div>
+
+        <!-- 3. Community Country + Description -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">País de la Comunidad</label>
+                <select name="community_country" class="form-select">
+                    <option value="">-- Seleccionar País --</option>
+                    {% for country in countries %}
+                        <option value="{{ country.id }}" {% if proposal.community_country_id == country.id %}selected{% endif %}>
+                            {{ country.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Descripción de la Comunidad</label>
+                <input type="text" name="community_description" class="form-control" value="{{ proposal.community_description }}">
+            </div>
+        </div>
+
+        <!-- 2. Partner Institutions & Commitment Letters (GROUPED) -->
+        <div class="mb-4">
+            <h5>Instituciones Aliadas y Cartas de Compromiso</h5>
+            <p class="text-muted">Seleccione instituciones y cargue una carta de compromiso por cada una.</p>
+
+            <!-- Institution Search -->
+            <div class="input-group mb-3">
+                <input type="text"
+                    name="partner_institution_search"
+                    class="form-control institution-search-partner"
+                    placeholder="Buscar institución..."
+                    aria-label="Buscar institución"
+                    value=""
+                >
+                <button type="button" class="btn btn-outline-primary add-institution" disabled>Agregar</button>
+            </div>
+            <a href="{% url 'calls:create_institution_page' %}?return_url={{ request.get_full_path }}&field_name=primary_institution_id"
+            target="_blank"
+            class="btn btn-outline-primary mt-2">+ Crear</a>
+            <small class="form-text text-muted">Seleccione o cree una nueva.</small>
+
+            <!-- Selected Institutions List -->
+            <div id="partner-institutions-list" class="mb-3">
+                {% for inst in proposal.partner_institutions.all %}
+                    <div class="d-flex align-items-center mb-2 p-2 bg-light rounded" data-institution-id="{{ inst.id }}">
+                        <span class="me-2">{{ inst.name }}</span>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-institution" data-institution-id="{{ inst.id }}">Eliminar</button>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Commitment Letters Section -->
+            <div id="commitment-documents-container">
+                {% for inst in proposal.partner_institutions.all %}
+                    <div class="card mb-3 p-3 commitment-doc-section" data-institution-id="{{ inst.id }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Carta de Compromiso: {{ inst.name }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-commitment-section" data-institution-id="{{ inst.id }}">Eliminar</button>
+                        </div>
+
+                        <!-- Show ONLY docs linked to this institution -->
+                        {% if docs_by_institution %}
+                            {% with docs=docs_by_institution|get_item:inst %}
+                                {% if docs %}
+                                    {% for doc in docs %}
+                                        <div class="d-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded">
+                                            <span class="flex-grow-1">{{ doc.name }}</span>
+                                            <a href="{% url 'proposals:download_proposal_document' doc.id %}"
+                                            target="_blank"
+                                            class="btn btn-sm btn-outline-secondary me-2">Ver</a>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger remove-commitment-doc"
+                                                    data-doc-id="{{ doc.id }}">Borrar</button>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-muted small">No hay cartas cargadas.</p>
+                                {% endif %}
+                            {% endwith %}
+                        {% endif %}
+
+                        <!-- Upload form for this institution -->
+                        <div class="input-group mb-2">
+                            <input type="file" name="commitment_document" class="form-control" accept=".xlsx, .pdf,.docx">
+                            <button type="button" class="btn btn-outline-primary upload-commitment" data-institution-id="{{ inst.id }}">Cargar</button>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <!-- Hidden field to store selected institution IDs -->
+            <!-- <input type="hidden" name="partner_institution_ids" value="{% for inst in proposal.partner_institutions.all %}{{ inst.id }},{% endfor %}"> -->
+        </div>
+
+        
+
+        <!-- 4. Project Location -->
+        <!-- <div class="mb-3">
+            <label class="form-label">País donde se desarrollará el proyecto *</label>
+            <select name="project_location" class="form-select" required>
+                <option value="">-- Seleccionar País --</option>
+                {% for country in countries %}
+                    <option value="{{ country.id }}" {% if proposal.project_location_id == country.id %}selected{% endif %}>
+                        {{ country.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div> -->
+
+        <!-- 5. Duration -->
+        <div class="mb-3">
+            <label class="form-label">Duración del proyecto (meses) *</label>
+            <input type="number" name="duration_months" class="form-control" min="1" value="{{ proposal.duration_months|default:12 }}" required>
+        </div>
+
+        <!-- 6. Summary -->
+        <div class="mb-3">
+            <label class="form-label">Resumen *</label>
+            <textarea name="summary" class="form-control" rows="4" maxlength="1000" required>{{ proposal.summary }}</textarea>
+            <small class="form-text text-muted">Máximo 250 palabras</small>
+        </div>
+
+        <!-- 0.1. General Objective Override -->
+        <div class="mb-3">
+            <label class="form-label">Objetivo General del Proyecto (Opcional)</label>
+            <input type="text"
+                name="general_objective_override"
+                class="form-control"
+                value="{{ post_data.general_objective_override|default:proposal.general_objective_override|default:'' }}"
+                placeholder="Puede sobrescribir el objetivo general anterior">
+            <small class="form-text text-muted">Máximo 50 palabras</small>
+        </div>   
+        
+        <!-- 8. Specific Objectives -->
+        <div class="mb-3">
+            <label class="form-label">Objetivos Específicos</label>
+            <p class="text-muted">Agregue objetivos específicos adicionales o modificados.</p>
+            <div id="specific-objectives-container">
+                {% for obj in proposal.specific_objectives.all %}
+                    <div class="card mb-3 p-3 objective-entry">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Objetivo {{ forloop.counter }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-objective">Eliminar</button>
+                        </div>
+                        <div class="mb-3">
+                            <label>Título *</label>
+                            <input type="text" name="objective_title_{{ forloop.counter0 }}" class="form-control" value="{{ obj.title }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Descripción</label>
+                            <textarea name="objective_description_{{ forloop.counter0 }}" class="form-control" rows="3">{{ obj.description }}</textarea>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="alert alert-info">No hay objetivos específicos definidos.</div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-objective-btn" class="btn btn-outline-secondary">+ Agregar Objetivo</button>
+            <small class="form-text text-muted">Máximo 200 palabras por objetivo</small>
+        </div>
+
+        <!-- 7. Context, Problem & Justification -->
+        <div class="mb-3">
+            <label class="form-label">Contexto, problema y justificación *</label>
+            <textarea name="context_problem_justification" class="form-control" rows="5" maxlength="1600" required>{{ proposal.context_problem_justification }}</textarea>
+            <small class="form-text text-muted">Máximo 400 palabras</small>
         </div>
 
         <!-- 9. Methodology, Analytical Plan & Ethics -->
@@ -507,6 +456,61 @@
             <label class="form-label">Metodología, planeamiento analítico y aspectos éticos *</label>
             <textarea name="methodology_analytical_plan_ethics" class="form-control" rows="8" maxlength="6000" required>{{ proposal.methodology_analytical_plan_ethics }}</textarea>
             <small class="form-text text-muted">Máximo 1500 palabras</small>
+        </div>
+
+        <!-- 8.5. Products -->
+        <div class="mb-4">
+            <h5>Productos Esperados</h5>
+            <p class="text-muted">Defina los productos derivados de esta propuesta.</p>
+            <div id="proposal-products-container"
+                data-initial-count="{{ existing_proposal_products|length }}"
+                data-strategic-effects='{{ strategic_effects_json|safe }}'>
+                {% for prod in existing_proposal_products %}
+                    <div class="card mb-3 p-3 product-entry">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Producto {{ forloop.counter }}</h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-product">Eliminar</button>
+                        </div>
+                        <div class="mb-3">
+                            <label>Título *</label>
+                            <input type="text" name="proposal_product_title_{{ forloop.counter0 }}" class="form-control" value="{{ prod.title }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label>Descripción</label>
+                            <textarea name="proposal_product_description_{{ forloop.counter0 }}" class="form-control" rows="2">{{ prod.description }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label>Resultado o Impacto</label>
+                            <textarea name="proposal_product_outcome_{{ forloop.counter0 }}" class="form-control" rows="2">{{ prod.outcome }}</textarea>
+                        </div>
+                        <!-- <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>Fecha de Inicio</label>
+                                <input type="date" name="proposal_product_start_date_{{ forloop.counter0 }}" class="form-control" value="{{ prod.start_date|date:'Y-m-d' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label>Fecha de Finalización</label>
+                                <input type="date" name="proposal_product_end_date_{{ forloop.counter0 }}" class="form-control" value="{{ prod.end_date|date:'Y-m-d' }}">
+                            </div>
+                        </div> -->
+                        <div class="mb-3">
+                            <label>Efectos Estratégicos</label>
+                            <select name="proposal_product_strategic_effects_{{ forloop.counter0 }}" 
+                                class="form-select product-strategic-effects"    
+                                multiple>
+                                {% for effect in strategic_effects %}
+                                    <option value="{{ effect.id }}" {% if effect in prod.strategic_effects.all %}selected{% endif %}>
+                                        {{ effect.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="alert alert-info">No hay productos definidos.</div>
+                {% endfor %}
+            </div>
+            <button type="button" id="add-proposal-product-btn" class="btn btn-outline-primary">+ Agregar Producto</button>
         </div>
 
         <!-- 10. Equity, Gender, Intersectionality -->
@@ -548,11 +552,11 @@
         </div>
 
         <!-- 14. Research Team -->
-        <div class="mb-3">
+        <!-- <div class="mb-3">
             <label class="form-label">Equipo de investigación *</label>
             <textarea name="research_team" class="form-control" rows="8" maxlength="3600" required>{{ proposal.research_team }}</textarea>
             <small class="form-text text-muted">Máximo 900 palabras</small>
-        </div>
+        </div> -->
 
         <!-- 15. Budget -->
         <div class="mb-3">

@@ -219,3 +219,21 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 RECAPTCHA_PUBLIC_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'
 RECAPTCHA_PRIVATE_KEY = '6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe'
 RECAPTCHA_DISABLE = False  # Set to True in production to disable
+
+# Email Settings
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() == 'true'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+# Frontend URL used in emails or redirects
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:8220')
+
+if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
+    print("Advertencia: Las credenciales de correo electrónico no están configuradas. El envío de correo fallará.")
+
+print(EMAIL_HOST_USER)
+print(EMAIL_HOST_PASSWORD)
+print("Config is done!")

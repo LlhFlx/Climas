@@ -211,12 +211,12 @@ class Proposal(Expression):
     )
 
     # 14. Research Team (max 900 words)
-    research_team = models.TextField(
-        verbose_name="Equipo de investigación",
-        help_text="Máximo 900 palabras",
-        max_length=3600,
-        blank=True,
-    )
+    # research_team = models.TextField(
+    #     verbose_name="Equipo de investigación",
+    #     help_text="Máximo 900 palabras",
+    #     max_length=3600,
+    #     blank=True,
+    # )
 
     # 15. Budget (file upload)
     budget_document = models.ForeignKey(

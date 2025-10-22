@@ -11,6 +11,12 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.forms import AuthenticationForm
 from captcha.fields import CaptchaField
 
+from django.core.mail import send_mail
+from django.conf import settings
+from django.urls import reverse
+from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes
+from django.contrib.auth.tokens import default_token_generator
 
 class ResearcherRegistrationForm(UserCreationForm):
     email = forms.EmailField(required=True)
@@ -112,6 +118,7 @@ class ResearcherRegistrationForm(UserCreationForm):
         user.email = self.cleaned_data['email']
         user.first_name = self.cleaned_data['first_name']
         user.last_name = self.cleaned_data['first_last_name']
+        user.is_active = False  # Require email confirmation
         if commit:
             user.save()
             print(f"DEBUG: User saved: {user.username}")
@@ -154,8 +161,38 @@ class ResearcherRegistrationForm(UserCreationForm):
         if commit:
             custom_user.save()  # Save again to update the person FK
             print("DEBUG: CustomUser updated with person link")
-
+        
+        if commit:
+            self._send_confirmation_email(user)
+    
         return user
+    
+    def _send_confirmation_email(self, user):
+        token = default_token_generator.make_token(user)
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        confirm_url = reverse('accounts:confirm_email', kwargs={'uidb64': uid, 'token': token})
+        full_url = f"{settings.FRONTEND_URL or 'http://localhost:8220'}{confirm_url}"
+
+        subject = "Confirma tu registro en [Nombre de la Plataforma]"
+        message = f"""
+        ¡Hola {user.first_name}!
+
+        Gracias por registrarte. Por favor confirma tu correo haciendo clic en el siguiente enlace:
+
+        {full_url}
+
+        Si no solicitaste esta cuenta, ignora este mensaje.
+
+        Saludos,
+        El equipo de [Plataforma]
+        """
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
 
 
 

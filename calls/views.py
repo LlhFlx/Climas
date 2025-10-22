@@ -1866,7 +1866,7 @@ def apply_proposal(request, expression_id):
             equity_inclusion='',
             communication_strategy='',
             risk_analysis_mitigation='',
-            research_team='',
+            #research_team='',
             proposal_status=draft_status,
             #user_id=expression.user_id,
             #call_id=expression.call_id,
@@ -2000,7 +2000,7 @@ def apply_proposal(request, expression_id):
             'equity_inclusion': request.POST.get('equity_inclusion', '').strip(),
             'communication_strategy': request.POST.get('communication_strategy', '').strip(),
             'risk_analysis_mitigation': request.POST.get('risk_analysis_mitigation', '').strip(),
-            'research_team': request.POST.get('research_team', '').strip(),
+            #'research_team': request.POST.get('research_team', '').strip(),
             'community_country': request.POST.get('community_country'),
             'project_location': request.POST.get('project_location'),
             'principal_investigator_title': request.POST.get('principal_investigator_title', '').strip(),
@@ -2023,7 +2023,7 @@ def apply_proposal(request, expression_id):
         proposal.equity_inclusion = post_data['equity_inclusion']
         proposal.communication_strategy = post_data['communication_strategy']
         proposal.risk_analysis_mitigation = post_data['risk_analysis_mitigation']
-        proposal.research_team = post_data['research_team']
+        #proposal.research_team = post_data['research_team']
         proposal.principal_investigator_title = post_data['principal_investigator_title']
         proposal.principal_investigator_position = post_data['principal_investigator_position']
 
@@ -2355,7 +2355,7 @@ def apply_proposal(request, expression_id):
             ('equity_inclusion', 250, "Equidad, género, interseccionalidad e inclusión"),
             ('communication_strategy', 100, "Estrategia de comunicación"),
             ('risk_analysis_mitigation', 200, "Riesgos y plan de mitigación"),
-            ('research_team', 900, "Equipo de investigación"),
+            #('research_team', 900, "Equipo de investigación"),
             ('community_description', 150, "Descripción de la Comunidad"),
         ]
 

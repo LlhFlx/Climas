@@ -246,6 +246,57 @@
             position: absolute !important;
             z-index: 2000 !important;
         }
+
+        /* Expression detail card styling */
+        .expression-fields-card .field-row {
+            display: flex;
+            align-items: flex-start;
+            padding: 0.5rem 0;
+            margin: 0;
+        }
+
+        .expression-fields-card .field-label {
+            flex: 0 0 240px; /* Adjust based on your longest label */
+            font-weight: 600;
+            padding-right: 1rem;
+            line-height: 1.4;
+        }
+
+        .expression-fields-card .field-value {
+            flex: 1;
+            text-align: justify;
+            line-height: 1.5;
+        }
+
+        /* Zebra striping: alternate background */
+        .expression-fields-card .field-row:nth-child(even) {
+            background-color: rgba(0, 0, 0, 0.03);
+        }
+
+        /* Constrain and center the field content slightly */
+        .expression-fields-card .card-body {
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* Dark mode support */
+        body.dark .expression-fields-card .field-row:nth-child(even) {
+            background-color: rgba(255, 255, 255, 0.03);
+        }
+
+        /* Mobile: stack vertically */
+        @media (max-width: 576px) {
+            .expression-fields-card .field-row {
+                flex-direction: column;
+            }
+            .expression-fields-card .field-label {
+                flex: 0 0 auto;
+                margin-bottom: 0.25rem;
+                padding-right: 0;
+            }
+        }
 /* 
         .dropdown-menu {
             position: absolute !important;
@@ -289,10 +340,10 @@
                 </ul>
                 
                 <!-- Dark Mode Toggle -->
-                <div class="form-check form-switch me-3">
+                <!-- <div class="form-check form-switch me-3">
                     <input class="form-check-input" type="checkbox" role="switch" id="darkModeToggle" x-model="darkMode">
                     <label class="form-check-label" for="darkModeToggle">Dark Mode</label>
-                </div>
+                </div> -->
 
                 <!-- User Dropdown -->
                 {% if user.is_authenticated %}
