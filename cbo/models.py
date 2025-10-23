@@ -1,5 +1,6 @@
 from django.db import models
 from core.models import TimestampMixin
+import os
 
 from django.core.validators import RegexValidator
 
@@ -140,3 +141,45 @@ class CBORelevantRole(TimestampMixin, models.Model):
             raise ValidationError("Debe seleccionar un rol predefinido o ingresar uno personalizado.")
         if self.predefined_role and self.custom_role:
             raise ValidationError("No puede seleccionar un rol predefinido y uno personalizado al mismo tiempo.")
+        
+
+class CBODocument(TimestampMixin, models.Model):
+    """
+    Document associated with a CBO (e.g., legal registration, proof of operation).
+    """
+    cbo = models.ForeignKey(
+        'cbo.CBO',
+        on_delete=models.CASCADE,
+        related_name='documents',
+        verbose_name="CBO"
+    )
+    file = models.FileField(
+        upload_to='cbo_documents/%Y/%m/%d/',
+        verbose_name="Archivo",
+        help_text="Suba documentos como acta de constitución, RUT, etc. Máximo 10MB."
+    )
+    name = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Nombre del archivo"
+    )
+    uploaded_by = models.ForeignKey(
+        'accounts.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name="Cargado por"
+    )
+
+    class Meta:
+        db_table = 'cbo_document'
+        verbose_name = "Documento de CBO"
+        verbose_name_plural = "Documentos de CBO"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name or self.file.name} ({self.cbo.name})"
+
+    def save(self, *args, **kwargs):
+        if not self.name and self.file:
+            self.name = os.path.basename(self.file.name)
+        super().save(*args, **kwargs)

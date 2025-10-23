@@ -68,14 +68,6 @@ class Proposal(Expression):
         verbose_name="Cargo actual del Investigador Principal"
     )
 
-    # Community-based organizations
-    community_organizations = models.ManyToManyField(
-        'cbo.CBO',
-        verbose_name="Organizaciones Comunitarias (CBO)",
-        blank=True,
-        related_name='proposals'
-    )
-
     # Total_requested_budget (auto-calculated)
     total_requested_budget = models.DecimalField(
         max_digits=12,

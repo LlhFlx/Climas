@@ -205,6 +205,73 @@
             </div>
         {% endfor %}
         <hr>
+        <!-- COMMUNITY-BASED ORGANIZATION -->
+        <div id="cbo-section" class="mb-4">
+            <h5>Organización Comunitaria (CBO)</h5>
+            <p class="text-muted">Opcional. Solo una organización permitida.</p>
+
+            <div class="card p-3">
+                <div class="mb-3">
+                    <label class="form-label">Nombre de la CBO *</label>
+                    <input type="text" name="cbo_name" class="form-control"
+                        value="{{ expression.community_organization.name|default:'' }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Descripción *</label>
+                    <textarea name="cbo_description" class="form-control" rows="3" required>{{ expression.community_organization.description|default:'' }}</textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Número de Miembros *</label>
+                    <input type="number" name="cbo_number_of_members" class="form-control"
+                        value="{{ expression.community_organization.number_of_members|default:'' }}" min="1" required>
+                </div>
+
+                <!-- Roles Section -->
+                <div class="mb-3">
+                    <label class="form-label">Roles Relevantes</label>
+                    <div class="roles-container">
+                        {% if expression.community_organization %}
+                            {% for role in expression.community_organization.roles.all %}
+                                <div class="role-entry card mb-2 p-2">
+                                    <div class="d-flex justify-content-between">
+                                        <h6 class="fs-6 mb-2">Rol {{ forloop.counter }}</h6>
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-role">Eliminar</button>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label>Nombre de la Persona *</label>
+                                        <input type="text" name="cbo_role_person_name_{{ forloop.counter0 }}" class="form-control" value="{{ role.person_name }}" required>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label>Rol</label>
+                                        <select name="cbo_role_predefined_{{ forloop.counter0 }}" class="form-select">
+                                            <option value="">-- Rol personalizado --</option>
+                                            {% for key, val in cbo_role_choices %}
+                                                <option value="{{ key }}" {% if role.predefined_role == key %}selected{% endif %}>{{ val }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <input type="text" name="cbo_role_custom_{{ forloop.counter0 }}" class="form-control mt-1"
+                                            placeholder="O ingrese un rol personalizado"
+                                            value="{{ role.custom_role }}">
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <label>Teléfono</label>
+                                            <input type="text" name="cbo_role_phone_{{ forloop.counter0 }}" class="form-control" value="{{ role.contact_phone }}">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label>Correo</label>
+                                            <input type="email" name="cbo_role_email_{{ forloop.counter0 }}" class="form-control" value="{{ role.contact_email }}">
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary add-role">+ Agregar Rol</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Products Section -->
         <h4 class="mb-3">Productos del Proyecto</h4>
         <p class="text-muted">Definir los entregables y su relación con los efectos esratégicos.</p>
@@ -1043,7 +1110,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 teamMemberCount--;
             });
         });
-
+        
         // ============================
         // 3. BUDGET ITEMS
         // ============================
@@ -1301,6 +1368,66 @@ document.addEventListener('DOMContentLoaded', function() {
 
         console.log("Team Members initialized.");
     }
+
+    // ============================
+    // CBO ROLES (SINGLE CBO)
+    // ============================
+    const cboContainer = document.querySelector('#cbo-section');
+    if (cboContainer) {
+        const rolesContainer = cboContainer.querySelector('.roles-container');
+        let roleCount = {{ expression.community_organization.roles.count|default:0 }};
+
+        // Add role button
+        const addRoleBtn = cboContainer.querySelector('.add-role');
+        if (addRoleBtn) {
+            addRoleBtn.addEventListener('click', function() {
+                const roleDiv = document.createElement('div');
+                roleDiv.className = 'role-entry card mb-2 p-2';
+                roleDiv.innerHTML = `
+                    <div class="d-flex justify-content-between">
+                        <h6 class="fs-6 mb-2">Rol</h6>
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-role">Eliminar</button>
+                    </div>
+                    <div class="mb-2">
+                        <label>Nombre de la Persona *</label>
+                        <input type="text" name="cbo_role_person_name_${roleCount}" class="form-control" required>
+                    </div>
+                    <div class="mb-2">
+                        <label>Rol</label>
+                        <select name="cbo_role_predefined_${roleCount}" class="form-select">
+                            <option value="">-- Rol personalizado --</option>
+                            {% for key, val in cbo_role_choices %}
+                                <option value="{{ key }}">{{ val }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="text" name="cbo_role_custom_${roleCount}" class="form-control mt-1" placeholder="O ingrese un rol personalizado">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label>Teléfono</label>
+                            <input type="text" name="cbo_role_phone_${roleCount}" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label>Correo</label>
+                            <input type="email" name="cbo_role_email_${roleCount}" class="form-control">
+                        </div>
+                    </div>
+                `;
+                rolesContainer.appendChild(roleDiv);
+                roleCount++;
+            });
+        }
+
+        // Remove role (event delegation)
+        if (rolesContainer) {
+            rolesContainer.addEventListener('click', function(e) {
+                if (e.target.classList.contains('remove-role')) {
+                    e.target.closest('.role-entry').remove();
+                }
+            });
+        }
+    }
+
     console.log("Form initialization complete.");
 
     document.querySelector('form').addEventListener('submit', function(e) {
@@ -1309,7 +1436,6 @@ document.addEventListener('DOMContentLoaded', function() {
         // e.preventDefault();
         // console.log("Form data:", new FormData(this));
     });
-
 
 });
 </script>

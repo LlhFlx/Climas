@@ -137,14 +137,6 @@ class Proposal(Expression):
         verbose_name="Cargo actual del Investigador Principal"
     )
 
-    # Community-based organizations
-    community_organizations = models.ManyToManyField(
-        'cbo.CBO',
-        verbose_name="Organizaciones Comunitarias (CBO)",
-        blank=True,
-        related_name='proposals'
-    )
-
     # Total_requested_budget (auto-calculated)
     total_requested_budget = models.DecimalField(
         max_digits=12,
@@ -280,12 +272,12 @@ class Proposal(Expression):
     )
 
     # 14. Research Team (max 900 words)
-    research_team = models.TextField(
-        verbose_name="Equipo de investigación",
-        help_text="Máximo 900 palabras",
-        max_length=3600,
-        blank=True,
-    )
+    # research_team = models.TextField(
+    #     verbose_name="Equipo de investigación",
+    #     help_text="Máximo 900 palabras",
+    #     max_length=3600,
+    #     blank=True,
+    # )
 
     # 15. Budget (file upload)
     budget_document = models.ForeignKey(
@@ -942,6 +934,15 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
         blank=True,
         related_name='expressions',
         verbose_name="Ámbitos de Interseccionalidad"
+    )
+
+    community_organization = models.ForeignKey(
+        'cbo.CBO',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Organización Comunitaria (CBO)",
+        related_name='proposals'  # now each CBO can be linked to many proposals
     )
     
     evaluations = GenericRelation(

@@ -90,6 +90,15 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
         related_name='expressions',
         verbose_name="Ámbitos de Interseccionalidad"
     )
+
+    community_organization = models.ForeignKey(
+        'cbo.CBO',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Organización Comunitaria (CBO)",
+        related_name='expressions'  
+    )
     
     evaluations = GenericRelation(
         'evaluations.Evaluation',

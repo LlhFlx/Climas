@@ -7,6 +7,9 @@ from .models import ProposalDocument
 from accounts.models import CustomUser
 from .models import Proposal
 from institutions.models import Institution
+from cbo.models import CBODocument
+from expressions.models import Expression
+import mimetypes
 
 @login_required
 def download_proposal_document(request, doc_id):
@@ -40,6 +43,38 @@ def download_proposal_document(request, doc_id):
         response['Content-Disposition'] = f'inline; filename="{doc.name}"'
     else:
         # Force download for other file types
+        response['Content-Disposition'] = f'attachment; filename="{doc.name}"'
+
+    return response
+
+@login_required
+def download_cbo_document(request, doc_id):
+    """
+    Securely serve CBO documents only to the researcher who owns the linked Expression.
+    """    
+    try:
+        doc = CBODocument.objects.select_related(
+            'cbo', 'uploaded_by'
+        ).get(id=doc_id)
+
+        # Ensure the user owns the Expression that references this CBO
+        expression = Expression.objects.get(
+            community_organization=doc.cbo,
+            user=request.user.customuser
+        )
+    except (CBODocument.DoesNotExist, Expression.DoesNotExist):
+        raise Http404("Documento de CBO no encontrado o acceso denegado.")
+
+    mime_type, _ = mimetypes.guess_type(doc.file.name)
+    if not mime_type:
+        mime_type = 'application/octet-stream'
+
+    file_handle = doc.file.open()
+    response = FileResponse(file_handle, content_type=mime_type)
+
+    if mime_type in ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg']:
+        response['Content-Disposition'] = f'inline; filename="{doc.name}"'
+    else:
         response['Content-Disposition'] = f'attachment; filename="{doc.name}"'
 
     return response

@@ -43,7 +43,8 @@ from project_team.models import (
 from intersectionality.models import IntersectionalityScope
 from budgets.models import BudgetCategory, BudgetItem, BudgetPeriod
 from evaluations.models import Evaluation, EvaluationResponse, EvaluationTemplate, TemplateCategory, TemplateItem
-from cbo.models import CBORelevantRole, CBO, CBOAntecedent
+from cbo.models import CBORelevantRole, CBO, CBOAntecedent, CBODocument
+from cbo.forms import CBODocumentForm
 from django.db import transaction
 from collections import defaultdict
 from decimal import Decimal
@@ -1174,7 +1175,7 @@ def apply_call(request, call_pk):
     if not default_axis or not default_country or not default_status:
         messages.error(
             request,
-            "System configuration incomplete: missing thematic axis, country, or status."
+            "Configuración del sistema incompleta: faltan eje temático, país o estado."
         )
         return redirect('home')
 
@@ -1210,16 +1211,24 @@ def apply_call(request, call_pk):
     institution_types = InstitutionType.objects.filter(is_active=True).order_by('name')
     people = Person.objects.filter(created_by__isnull=False).order_by('first_name', 'first_last_name')
     scale_choices = Scale.objects.filter(is_active=True).order_by('name')
-
+    all_cbos = CBO.objects.filter(is_active=True).order_by('name')
+    cbo_role_choices = CBORelevantRole.PREDEFINED_ROLE_CHOICES
+    
+    
     # Initialize post_data here - always exists, even on GET
-    post_data = {}
     doc_form = ExpressionDocumentForm()
+    # cbo_doc_form = CBODocumentForm()
+
     # print("Check documents")
     if documents.exists():
         # print("Check documents... They exist.")
         doc_form.fields['file'].required = False
         # print(doc_form.fields['file'].required )
 
+    # if expression.community_organization and expression.community_organization.documents.exists():
+    #     cbo_doc_form.fields['file'].required = False
+
+    post_data = {}
     if request.method == 'POST':
         #print(request.POST)
         # print('remove_document' in request.POST)
@@ -1242,6 +1251,9 @@ def apply_call(request, call_pk):
             'methodology': request.POST.get('methodology', '').strip(),
             'funding_eligibility_acceptance': request.POST.get('funding_eligibility_acceptance') == 'on',
             'primary_institution_id': request.POST.get('primary_institution_id'),
+            'cbo_name': request.POST.get('cbo_name', '').strip(),
+            'cbo_description': request.POST.get('cbo_description', '').strip(),
+            'cbo_number_of_members': request.POST.get('cbo_number_of_members', '').strip(),
         }
 
         # Populate Expression from POST
@@ -1278,14 +1290,15 @@ def apply_call(request, call_pk):
         #     messages.error(request, "Please fill in all required fields marked with *.")
         # else:
         #     expression.save()
+        # Validate required core fields
         required_fields = {
-            "Project title": expression.project_title,
-            "Thematic axis": expression.thematic_axis_id,
-            "Implementation country": expression.implementation_country_id,
-            "Problem": expression.problem,
-            "General objective": expression.general_objective,
-            "Methodology": expression.methodology,
-            "Primary institution": expression.primary_institution_id,
+            "Título del Proyecto": expression.project_title,
+            "Eje Temático": expression.thematic_axis_id,
+            "País de Implementación": expression.implementation_country_id,
+            "Descripción del Problema": expression.problem,
+            "Objetivo General": expression.general_objective,
+            "Metodología": expression.methodology,
+            "Institución Principal": expression.primary_institution_id,
         }
 
         has_errors = False
@@ -1294,7 +1307,7 @@ def apply_call(request, call_pk):
         if missing:
             has_errors = True
             for field in missing:
-                messages.error(request, f"The field '{field}' is required.")
+                messages.error(request, f"El campo '{field}' es obligatorio.")
 
         if not has_errors:
             expression.save()
@@ -1466,8 +1479,74 @@ def apply_call(request, call_pk):
                 if scale_name and scale_name in ['S', 'M', 'B']:
                     expression.scale = Scale.objects.get(name=scale_name)
 
-                # Documents
-                #print('Documents', request.POST)
+                cbo_name = post_data['cbo_name']
+                if cbo_name:
+                    description = post_data['cbo_description']
+                    members_str = post_data['cbo_number_of_members']
+                    if not members_str.isdigit():
+                        messages.warning(request, "Número de miembros inválido.")
+                    else:
+                        try:
+                            cbo, _ = CBO.objects.get_or_create(
+                                name=cbo_name,
+                                defaults={
+                                    'description': description,
+                                    'number_of_members': int(members_str),
+                                    'is_active': True
+                                }
+                            )
+                            if cbo.description != description or cbo.number_of_members != int(members_str):
+                                cbo.description = description
+                                cbo.number_of_members = int(members_str)
+                                cbo.save()
+                            expression.community_organization = cbo
+
+                            # Save CBO roles
+                            if expression.community_organization:
+                                CBORelevantRole.objects.filter(cbo=expression.community_organization).delete()
+                                role_indices = [k.split('_')[-1] for k in request.POST.keys() if k.startswith('cbo_role_person_name_')]
+                                for r_idx in role_indices:
+                                    person_name = request.POST.get(f'cbo_role_person_name_{r_idx}', '').strip()
+                                    if not person_name:
+                                        continue
+                                    predefined = request.POST.get(f'cbo_role_predefined_{r_idx}')
+                                    custom = request.POST.get(f'cbo_role_custom_{r_idx}', '').strip()
+                                    phone = request.POST.get(f'cbo_role_phone_{r_idx}', '').strip()
+                                    email = request.POST.get(f'cbo_role_email_{r_idx}', '').strip()
+
+                                    CBORelevantRole.objects.create(
+                                        cbo=expression.community_organization,
+                                        predefined_role=predefined if predefined else None,
+                                        custom_role=custom,
+                                        person_name=person_name,
+                                        contact_phone=phone,
+                                        contact_email=email
+                                    )
+                                
+                                # Save CBO document
+                                # if 'cbo_document_file' in request.FILES:
+                                #     cbo_doc_form = CBODocumentForm(request.POST, request.FILES)
+                                #     if expression.community_organization.documents.exists():
+                                #         cbo_doc_form.fields['file'].required = False
+                                #     if cbo_doc_form.is_valid():
+                                #         doc = cbo_doc_form.save(commit=False)
+                                #         doc.cbo = expression.community_organization
+                                #         doc.uploaded_by = request.user.customuser
+                                #         if not doc.file.name.lower().endswith(('.pdf', '.docx', '.jpg', '.png')):
+                                #             messages.error(request, "Solo se permiten PDF, DOCX, JPG o PNG para documentos de CBO.")
+                                #         else:
+                                #             doc.save()
+                                #             messages.success(request, "Documento de CBO cargado.")
+                                #     else:
+                                #         for error in cbo_doc_form.non_field_errors():
+                                #             messages.error(request, f"Error en documento de CBO: {error}")
+                        except Exception as e:
+                            messages.warning(request, f"Error al guardar CBO: {str(e)}")
+                else:
+                    expression.community_organization = None
+                expression.save()
+
+                # Save main expression document
                 if 'file' in request.FILES:
                     print("Got to doc branch")
                     print(f"doc existence {documents.exists()}")
@@ -1658,15 +1737,17 @@ def apply_call(request, call_pk):
                         expression.status = submitted_status
                         expression.submission_datetime = timezone.now()
                         expression.save()
-                        messages.success(request, 'Your application has been submitted successfully!')
-                    messages.success(request, 'Your application has been submitted successfully!')
+                        messages.success(request, '¡Expresión de interés enviada con éxito!')
+                    #messages.success(request, '¡Expresión de interés enviada con éxito!')
+                    return redirect('calls:researcher_dashboard')
                 elif 'save_draft' in request.POST:
                     submitted_status, _ = Status.objects.get_or_create(name='Borrador')
                     expression.status = submitted_status
                     expression.submission_datetime = timezone.now()
                     expression.save()
-                    print('Your application has been saved as a draft.')
-                    messages.success(request, 'Your application has been saved as a draft.')
+                    print('Expresión guardada como borrador.')
+                    messages.success(request, 'Expresión guardada como borrador.')
+                    return redirect('calls:researcher_dashboard')
                 else:
                     print("Something wrong")
 
@@ -1675,7 +1756,8 @@ def apply_call(request, call_pk):
         'thematic_axis',
         'implementation_country',
         'user',
-        'call'
+        'call',
+        'community_organization'
     ).prefetch_related(
         'documents',
         'intersectionality_scopes'
@@ -1733,6 +1815,9 @@ def apply_call(request, call_pk):
         'documents': documents,
         'document_form': doc_form,
         'intersectionality_scopes': IntersectionalityScope.objects.filter(is_active=True).order_by('name'),
+        'all_cbos': CBO.objects.filter(is_active=True).order_by('name'),
+        'cbo_role_choices': CBORelevantRole.PREDEFINED_ROLE_CHOICES,
+        # 'cbo_doc_form': cbo_doc_form,
         # ALWAYS pass post_data - even on GET
         'post_data': post_data,
     }
@@ -1871,8 +1956,9 @@ def apply_proposal(request, expression_id):
             #user_id=expression.user_id,
             #call_id=expression.call_id,
         )
-        proposal.save()
         created = True
+        proposal.save()        
+
     # Load ProponentForm questions for 'proposal' target
     proposal_questions = []
     try:
@@ -1907,8 +1993,8 @@ def apply_proposal(request, expression_id):
     strategic_effects = StrategicEffect.objects.filter(is_active=True).order_by('name')
     budget_categories = BudgetCategory.objects.filter(is_active=True).order_by('name')
     budget_periods = BudgetPeriod.objects.all().order_by('order', 'name')
-    all_cbos = CBO.objects.filter(is_active=True).order_by('name')
-    cbo_role_choices =  CBORelevantRole.PREDEFINED_ROLE_CHOICES
+    # all_cbos = CBO.objects.filter(is_active=True).order_by('name')
+    # cbo_role_choices =  CBORelevantRole.PREDEFINED_ROLE_CHOICES
 
     # Load existing Proposal-specific related data: mirrored from apply_call structure
     existing_products = ProposalProduct.objects.filter(proposal=proposal).prefetch_related('strategic_effects')
@@ -2287,55 +2373,84 @@ def apply_proposal(request, expression_id):
 
         # CBOs: Handle as dynamic form
         # Clear existing
-        proposal.community_organizations.clear()
-        cbo_indices = {k.split('_')[-1] for k in request.POST.keys() if k.startswith('cbo_name_')}
-        for idx in cbo_indices:
-            name = request.POST.get(f'cbo_name_{idx}', '').strip()
-            if not name:
-                continue
-            description = request.POST.get(f'cbo_description_{idx}', '').strip()
-            members = request.POST.get(f'cbo_number_of_members_{idx}', '').strip()
-            if not members.isdigit():
-                messages.warning(request, f"CBO '{name}': número de miembros inválido.")
-                continue
-            try:
-                cbo, _ = CBO.objects.get_or_create(
-                    name=name,
-                    defaults={
-                        'description': description,
-                        'number_of_members': int(members),
-                        'is_active': True
-                    }
-                )
-                # Update if exists but changed
-                if cbo.description != description or cbo.number_of_members != int(members):
-                    cbo.description = description
-                    cbo.number_of_members = int(members)
-                    cbo.save()
-                proposal.community_organizations.add(cbo)
+        # proposal.community_organizations.clear()
+        # cbo_indices = {k.split('_')[-1] for k in request.POST.keys() if k.startswith('cbo_name_')}
+        # for idx in cbo_indices:
+        #     name = request.POST.get(f'cbo_name_{idx}', '').strip()
+        #     if not name:
+        #         continue
+        #     description = request.POST.get(f'cbo_description_{idx}', '').strip()
+        #     members = request.POST.get(f'cbo_number_of_members_{idx}', '').strip()
+        #     if not members.isdigit():
+        #         messages.warning(request, f"CBO '{name}': número de miembros inválido.")
+        #         continue
+        #     try:
+        #         cbo, _ = CBO.objects.get_or_create(
+        #             name=name,
+        #             defaults={
+        #                 'description': description,
+        #                 'number_of_members': int(members),
+        #                 'is_active': True
+        #             }
+        #         )
+        #         # Update if exists but changed
+        #         if cbo.description != description or cbo.number_of_members != int(members):
+        #             cbo.description = description
+        #             cbo.number_of_members = int(members)
+        #             cbo.save()
+        #         proposal.community_organizations.add(cbo)
 
-                # Save roles for this CBO
-                role_indices = {k.split('_')[-1] for k in request.POST.keys() if k.startswith(f'cbo_role_person_name_{idx}_')}
-                CBORelevantRole.objects.filter(cbo=cbo).delete()
-                for r_idx in role_indices:
-                    person_name = request.POST.get(f'cbo_role_person_name_{idx}_{r_idx}', '').strip()
-                    if not person_name:
-                        continue
-                    predefined = request.POST.get(f'cbo_role_predefined_{idx}_{r_idx}')
-                    custom = request.POST.get(f'cbo_role_custom_{idx}_{r_idx}', '').strip()
-                    phone = request.POST.get(f'cbo_role_phone_{idx}_{r_idx}', '').strip()
-                    email = request.POST.get(f'cbo_role_email_{idx}_{r_idx}', '').strip()
-                    CBORelevantRole.objects.create(
-                        cbo=cbo,
-                        predefined_role=predefined if predefined else None,
-                        custom_role=custom,
-                        person_name=person_name,
-                        contact_phone=phone,
-                        contact_email=email
+        #         # Save roles for this CBO
+        #         role_indices = {k.split('_')[-1] for k in request.POST.keys() if k.startswith(f'cbo_role_person_name_{idx}_')}
+        #         CBORelevantRole.objects.filter(cbo=cbo).delete()
+        #         for r_idx in role_indices:
+        #             person_name = request.POST.get(f'cbo_role_person_name_{idx}_{r_idx}', '').strip()
+        #             if not person_name:
+        #                 continue
+        #             predefined = request.POST.get(f'cbo_role_predefined_{idx}_{r_idx}')
+        #             custom = request.POST.get(f'cbo_role_custom_{idx}_{r_idx}', '').strip()
+        #             phone = request.POST.get(f'cbo_role_phone_{idx}_{r_idx}', '').strip()
+        #             email = request.POST.get(f'cbo_role_email_{idx}_{r_idx}', '').strip()
+        #             CBORelevantRole.objects.create(
+        #                 cbo=cbo,
+        #                 predefined_role=predefined if predefined else None,
+        #                 custom_role=custom,
+        #                 person_name=person_name,
+        #                 contact_phone=phone,
+        #                 contact_email=email
+        #             )
+
+        #     except Exception as e:
+        #         messages.warning(request, f"Error al guardar CBO: {str(e)}")
+
+        # Handle CBO Document Upload or Deletion
+        if expression.community_organization:
+            existing_cbo_doc = expression.community_organization.documents.first()
+
+            # Upload new CBO document
+            if 'cbo_document_file' in request.FILES:
+                file = request.FILES['cbo_document_file']
+                # Validate file type
+                ext = file.name.split('.')[-1].lower()
+                if ext not in ['pdf', 'docx']:
+                    messages.error(request, "Solo se permiten PDF o DOCX para documentos de CBO.")
+                else:
+                    # Delete existing if any
+                    if existing_cbo_doc:
+                        existing_cbo_doc.delete()
+                    # Create new
+                    
+                    CBODocument.objects.create(
+                        cbo=expression.community_organization,
+                        file=file,
+                        uploaded_by=request.user.customuser
                     )
+                    messages.success(request, "Documento de CBO cargado.")
 
-            except Exception as e:
-                messages.warning(request, f"Error al guardar CBO: {str(e)}")
+            # Delete existing CBO document
+            elif request.POST.get('remove_cbo_document') and existing_cbo_doc:
+                existing_cbo_doc.delete()
+                messages.success(request, "Documento de CBO eliminado.")
 
         # -------------------------------
         # FINAL WORD COUNT VALIDATION BLOCK
@@ -2420,8 +2535,10 @@ def apply_proposal(request, expression_id):
                         ],
                 'budget_categories': budget_categories,
                 'budget_periods': budget_periods,
-                'all_cbos': all_cbos,
-                'cbo_role_choices': cbo_role_choices,
+                # 'all_cbos': all_cbos,
+                # 'cbo_role_choices': cbo_role_choices,
+                'cbo': expression.community_organization,
+                'existing_cbo_doc': expression.community_organization.documents.first() if expression.community_organization else None,
                 'commitment_docs': commitment_docs,
                 'timeline_doc': timeline_doc,
                 'budget_doc': budget_doc,
@@ -2495,8 +2612,10 @@ def apply_proposal(request, expression_id):
                         ],
         'budget_categories': budget_categories,
         'budget_periods': budget_periods,
-        'all_cbos': all_cbos,
-        'cbo_role_choices': cbo_role_choices,
+        # 'all_cbos': all_cbos,
+        # 'cbo_role_choices': cbo_role_choices,
+        'cbo': expression.community_organization,
+        'existing_cbo_doc': expression.community_organization.documents.first() if expression.community_organization else None,
         'commitment_docs': commitment_docs,
         'timeline_doc': timeline_doc,
         'budget_doc': budget_doc,

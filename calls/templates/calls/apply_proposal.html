@@ -55,6 +55,42 @@
                     <span class="field-label">Metodología:</span>
                     <span class="field-value text-break">{{ expression.methodology|linebreaksbr }}</span>
                 </div>
+                <!-- <div class="field-row">
+                    <span class="field-label">Organización Comunitaria:</span>
+                    <span class="field-value text-break">
+                        {% if expression.community_organization %}
+                            {{ expression.community_organization.name }}
+                        {% else %}
+                            <em>No especificada</em>
+                        {% endif %}
+                    </span>
+                </div> -->
+                {% if expression.community_organization %}
+                    <div class="field-row">
+                        <span class="field-label">CBO - Descripción:</span>
+                        <span class="field-value text-break">{{ expression.community_organization.description|linebreaksbr }}</span>
+                    </div>
+                    <div class="field-row">
+                        <span class="field-label">CBO - Número de Miembros:</span>
+                        <span class="field-value text-break">{{ expression.community_organization.number_of_members }}</span>
+                    </div>
+                    <div class="field-row">
+                        <span class="field-label">CBO - Roles Relevantes:</span>
+                        <span class="field-value text-break">
+                            <ul class="mb-0">
+                                {% for role in expression.community_organization.roles.all %}
+                                    <li>{{ role.get_role_display }}: {{ role.person_name }}
+                                        {% if role.contact_phone or role.contact_email %}
+                                            ({{ role.contact_phone }}{% if role.contact_email %}, {{ role.contact_email }}{% endif %})
+                                        {% endif %}
+                                    </li>
+                                {% empty %}
+                                    <li><em>Sin roles definidos</em></li>
+                                {% endfor %}
+                            </ul>
+                        </span>
+                    </div>
+                {% endif %}
             </div>
         </div>
 
@@ -211,7 +247,7 @@
             </div>
             <button type="button" id="add-proposal-team-member-btn" class="btn btn-outline-primary">+ Agregar Colaborador</button>
         </div>
-
+        {% comment "CBO moved to expression" %}
         <!-- COMMUNITY-BASED ORGANIZATIONS -->
         <div class="mb-4">
             <h5>Organización Comunitaria (OBC)</h5>
@@ -283,7 +319,7 @@
             </div>
             <button type="button" id="add-cbo-btn" class="btn btn-outline-primary">+ Agregar CBO</button>
         </div>
-
+        {% endcomment %}
         <!-- 3. Community Country + Description -->
         <div class="row mb-3">
             <div class="col-md-6">
@@ -647,6 +683,29 @@
             <button type="button" id="add-proposal-budget-btn" class="btn btn-outline-primary">+ Agregar Ítem</button>
         </div>
         {% endcomment %}
+
+        <!-- CBO Document Upload -->
+        {% if expression.community_organization %}
+        <div class="mb-4">
+            <h5>Documento de la Organización Comunitaria (CBO)</h5>
+            <p class="text-muted">Suba un documento de respaldo (acta, RUT, etc.). Solo PDF, DOCX, JPG o PNG. Máx. 10 MB.</p>
+            <div class="input-group">
+                <input type="file" name="cbo_document_file" class="form-control" accept=".pdf,.docx,.jpg,.png">
+                {% if existing_cbo_doc %}
+                    <a href="{% url 'proposals:download_cbo_document' existing_cbo_doc.id %}"
+                        target="_blank" 
+                        class="btn btn-outline-secondary">
+                            Ver documento actual
+                    </a>
+                    <!-- <a href="{{ existing_cbo_doc.file.url }}" target="_blank" class="btn btn-outline-secondary">Ver actual</a> -->
+                    <button type="submit" name="remove_cbo_document" value="1" class="btn btn-outline-danger">Borrar</button>
+                {% endif %}
+            </div>
+            {% if existing_cbo_doc %}
+                <small class="form-text text-muted">Documento actual: {{ existing_cbo_doc.name }}</small>
+            {% endif %}
+        </div>
+        {% endif %}
 
         <!-- PROPOSAL-SPECIFIC SHARED QUESTIONS -->
         {% if proposal_questions %}
@@ -1527,127 +1586,127 @@ document.addEventListener('DOMContentLoaded', function() {
     // ============================
     // CBOs
     // ============================
-    const addCboBtn = document.getElementById('add-cbo-btn');
-    const cboContainer = document.getElementById('cbo-container');
-    let cboCount = {{ proposal.community_organizations.count }};
+    // const addCboBtn = document.getElementById('add-cbo-btn');
+    // const cboContainer = document.getElementById('cbo-container');
+    // let cboCount = {{ proposal.community_organizations.count }};
 
-    if (addCboBtn) {
-        addCboBtn.addEventListener('click', () => {
-            const entry = createCboEntry(cboCount);
-            cboContainer.appendChild(entry);
-            entry.querySelector('.remove-cbo').addEventListener('click', () => {
-                entry.remove();
-                cboCount--;
-            });
-            cboCount++;
-        });
-    }
+    // if (addCboBtn) {
+    //     addCboBtn.addEventListener('click', () => {
+    //         const entry = createCboEntry(cboCount);
+    //         cboContainer.appendChild(entry);
+    //         entry.querySelector('.remove-cbo').addEventListener('click', () => {
+    //             entry.remove();
+    //             cboCount--;
+    //         });
+    //         cboCount++;
+    //     });
+    // }
 
-    // Handle removal AND renumbering
-    cboContainer?.addEventListener('click', (e) => {
-        if (e.target.classList.contains('remove-cbo')) {
-            const entry = e.target.closest('.cbo-entry');
-            if (entry) {
-                entry.remove();
-                renumberCBOs(); // Critical: renumber after removal
-            }
-        }
-    });
+    // // Handle removal AND renumbering
+    // cboContainer?.addEventListener('click', (e) => {
+    //     if (e.target.classList.contains('remove-cbo')) {
+    //         const entry = e.target.closest('.cbo-entry');
+    //         if (entry) {
+    //             entry.remove();
+    //             renumberCBOs(); // Critical: renumber after removal
+    //         }
+    //     }
+    // });
 
-    function renumberCBOs() {
-        document.querySelectorAll('.cbo-entry').forEach((entry, i) => {
-            entry.querySelector('h6').textContent = `CBO ${i + 1}`;
-            entry.querySelectorAll('[name]').forEach(input => {
-                // Replace top-level CBO fields
-                if (input.name.startsWith('cbo_') && !input.name.includes('role')) {
-                    input.name = input.name.replace(/cbo_\w+_\d+/, match => {
-                        return match.replace(/\d+$/, i);
-                    });
-                }
-            });
-            // Renumber roles inside this CBO
-            entry.querySelectorAll('.role-entry').forEach((roleEntry, j) => {
-                roleEntry.querySelectorAll('[name]').forEach(input => {
-                    if (input.name.includes('role')) {
-                        input.name = input.name.replace(/cbo_role_\w+_\d+_\d+/, 
-                            `cbo_role_${input.name.split('_')[2]}_${i}_${j}`);
-                    }
-                });
-            });
-        });
-    }
+    // function renumberCBOs() {
+    //     document.querySelectorAll('.cbo-entry').forEach((entry, i) => {
+    //         entry.querySelector('h6').textContent = `CBO ${i + 1}`;
+    //         entry.querySelectorAll('[name]').forEach(input => {
+    //             // Replace top-level CBO fields
+    //             if (input.name.startsWith('cbo_') && !input.name.includes('role')) {
+    //                 input.name = input.name.replace(/cbo_\w+_\d+/, match => {
+    //                     return match.replace(/\d+$/, i);
+    //                 });
+    //             }
+    //         });
+    //         // Renumber roles inside this CBO
+    //         entry.querySelectorAll('.role-entry').forEach((roleEntry, j) => {
+    //             roleEntry.querySelectorAll('[name]').forEach(input => {
+    //                 if (input.name.includes('role')) {
+    //                     input.name = input.name.replace(/cbo_role_\w+_\d+_\d+/, 
+    //                         `cbo_role_${input.name.split('_')[2]}_${i}_${j}`);
+    //                 }
+    //             });
+    //         });
+    //     });
+    // }
 
-    function createCboEntry(index) {
-        const div = document.createElement('div');
-        div.className = 'card mb-4 p-3 cbo-entry';
-        div.innerHTML = `
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="mb-0">CBO ${index + 1}</h6>
-                <button type="button" class="btn btn-sm btn-outline-danger remove-cbo">Eliminar</button>
-            </div>
-            <div class="mb-3">
-                <label>Nombre *</label>
-                <input type="text" name="cbo_name_${index}" class="form-control" required>
-            </div>
-            <div class="mb-3">
-                <label>Descripción (trabajo previo, reconocimiento, etc.) *</label>
-                <textarea name="cbo_description_${index}" class="form-control" rows="3" required></textarea>
-            </div>
-            <div class="mb-3">
-                <label>Número de Miembros *</label>
-                <input type="number" name="cbo_number_of_members_${index}" class="form-control" min="1" required>
-            </div>
-            <div class="mb-3">
-                <label>Roles Relevantes</label>
-                <div class="roles-container"></div>
-                <button type="button" class="btn btn-sm btn-outline-secondary add-role">+ Agregar Rol</button>
-            </div>
-        `;
-        return div;
-    }
+    // function createCboEntry(index) {
+    //     const div = document.createElement('div');
+    //     div.className = 'card mb-4 p-3 cbo-entry';
+    //     div.innerHTML = `
+    //         <div class="d-flex justify-content-between align-items-center mb-3">
+    //             <h6 class="mb-0">CBO ${index + 1}</h6>
+    //             <button type="button" class="btn btn-sm btn-outline-danger remove-cbo">Eliminar</button>
+    //         </div>
+    //         <div class="mb-3">
+    //             <label>Nombre *</label>
+    //             <input type="text" name="cbo_name_${index}" class="form-control" required>
+    //         </div>
+    //         <div class="mb-3">
+    //             <label>Descripción (trabajo previo, reconocimiento, etc.) *</label>
+    //             <textarea name="cbo_description_${index}" class="form-control" rows="3" required></textarea>
+    //         </div>
+    //         <div class="mb-3">
+    //             <label>Número de Miembros *</label>
+    //             <input type="number" name="cbo_number_of_members_${index}" class="form-control" min="1" required>
+    //         </div>
+    //         <div class="mb-3">
+    //             <label>Roles Relevantes</label>
+    //             <div class="roles-container"></div>
+    //             <button type="button" class="btn btn-sm btn-outline-secondary add-role">+ Agregar Rol</button>
+    //         </div>
+    //     `;
+    //     return div;
+    // }
 
-    cboContainer?.addEventListener('click', (e) => {
-        if (e.target.classList.contains('add-role')) {
-            const container = e.target.closest('.cbo-entry').querySelector('.roles-container');
-            const cboIdx = cboCount - 1;
-            const roleIdx = container.children.length;
-            const roleDiv = document.createElement('div');
-            roleDiv.className = 'role-entry card mb-2 p-2';
-            roleDiv.innerHTML = `
-                <div class="d-flex justify-content-between">
-                    <h6 class="fs-6 mb-2">Rol</h6>
-                    <button type="button" class="btn btn-sm btn-outline-danger remove-role">Eliminar</button>
-                </div>
-                <div class="mb-2">
-                    <label>Nombre de la Persona *</label>
-                    <input type="text" name="cbo_role_person_name_${cboIdx}_${roleIdx}" class="form-control" required>
-                </div>
-                <div class="mb-2">
-                    <label>Rol</label>
-                    <select name="cbo_role_predefined_${cboIdx}_${roleIdx}" class="form-select">
-                        <option value="">-- Rol personalizado --</option>
-                        {% for key, val in cbo_role_choices %}
-                            <option value="{{ key }}">{{ val }}</option>
-                        {% endfor %}
-                    </select>
-                    <input type="text" name="cbo_role_custom_${cboIdx}_${roleIdx}" class="form-control mt-1" placeholder="O ingrese un rol personalizado">
-                </div>
-                <div class="row">
-                    <div class="col-md-6">
-                        <label>Teléfono</label>
-                        <input type="text" name="cbo_role_phone_${cboIdx}_${roleIdx}" class="form-control">
-                    </div>
-                    <div class="col-md-6">
-                        <label>Correo</label>
-                        <input type="email" name="cbo_role_email_${cboIdx}_${roleIdx}" class="form-control">
-                    </div>
-                </div>
-            `;
-            container.appendChild(roleDiv);
-        } else if (e.target.classList.contains('remove-role')) {
-            e.target.closest('.role-entry').remove();
-        }
-    });
+    // cboContainer?.addEventListener('click', (e) => {
+    //     if (e.target.classList.contains('add-role')) {
+    //         const container = e.target.closest('.cbo-entry').querySelector('.roles-container');
+    //         const cboIdx = cboCount - 1;
+    //         const roleIdx = container.children.length;
+    //         const roleDiv = document.createElement('div');
+    //         roleDiv.className = 'role-entry card mb-2 p-2';
+    //         roleDiv.innerHTML = `
+    //             <div class="d-flex justify-content-between">
+    //                 <h6 class="fs-6 mb-2">Rol</h6>
+    //                 <button type="button" class="btn btn-sm btn-outline-danger remove-role">Eliminar</button>
+    //             </div>
+    //             <div class="mb-2">
+    //                 <label>Nombre de la Persona *</label>
+    //                 <input type="text" name="cbo_role_person_name_${cboIdx}_${roleIdx}" class="form-control" required>
+    //             </div>
+    //             <div class="mb-2">
+    //                 <label>Rol</label>
+    //                 <select name="cbo_role_predefined_${cboIdx}_${roleIdx}" class="form-select">
+    //                     <option value="">-- Rol personalizado --</option>
+    //                     {% for key, val in cbo_role_choices %}
+    //                         <option value="{{ key }}">{{ val }}</option>
+    //                     {% endfor %}
+    //                 </select>
+    //                 <input type="text" name="cbo_role_custom_${cboIdx}_${roleIdx}" class="form-control mt-1" placeholder="O ingrese un rol personalizado">
+    //             </div>
+    //             <div class="row">
+    //                 <div class="col-md-6">
+    //                     <label>Teléfono</label>
+    //                     <input type="text" name="cbo_role_phone_${cboIdx}_${roleIdx}" class="form-control">
+    //                 </div>
+    //                 <div class="col-md-6">
+    //                     <label>Correo</label>
+    //                     <input type="email" name="cbo_role_email_${cboIdx}_${roleIdx}" class="form-control">
+    //                 </div>
+    //             </div>
+    //         `;
+    //         container.appendChild(roleDiv);
+    //     } else if (e.target.classList.contains('remove-role')) {
+    //         e.target.closest('.role-entry').remove();
+    //     }
+    // });
 
     // -------------------------------
     // COMMITMENT DOCUMENTS
