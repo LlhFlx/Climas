@@ -155,7 +155,7 @@
         {% endif %}
         <hr>
         <!-- Dynamic Questions -->
-        <h4 class="mb-3">Preguntas Adicionales</h4>
+        <h4 class="mb-3">Rúbrica de Proponentes</h4>
         {% for fq in form_questions %}
             <div class="mb-3">
                 <label class="form-label">
@@ -171,36 +171,68 @@
                 {% elif fq.shared_question.field_type == 'boolean' %}
                     <select name="question_{{ fq.shared_question.id }}" class="form-select">
                         <option value="">-- Seleccionar --</option>
-                        <option value="true" {% if existing_responses|get_item:fq.shared_question.id == 'true' %}selected{% endif %}>Yes</option>
+                        <option value="true" {% if existing_responses|get_item:fq.shared_question.id == 'true' %}selected{% endif %}>Sí</option>
                         <option value="false" {% if existing_responses|get_item:fq.shared_question.id == 'false' %}selected{% endif %}>No</option>
                     </select>
                 {% elif fq.shared_question.field_type == 'dropdown' %}
                     <select name="question_{{ fq.shared_question.id }}" class="form-select">
                         <option value="">-- Seleccionar --</option>
-                        {% for option in fq.shared_question.options %}
-                            <option value="{{ option }}" {% if existing_responses|get_item:fq.shared_question.id == option %}selected{% endif %}>
-                                {{ option }}
+                        {% for option in fq.shared_question.options_set.all %}
+                            <option value="{{ option.display_text }}" {% if existing_responses|get_item:fq.shared_question.id == option.display_text %}selected{% endif %}>
+                                {{ option.display_text }}
                             </option>
-                        {% endfor %}
-                    </select>
-                {% elif fq.shared_question.field_type == 'dynamic_dropdown' %}
-                    <select name="question_{{ fq.shared_question.id }}" class="form-select">
-                        <option value="">-- Seleccionar --</option>
-                        {% for option in fq.shared_question.get_options %}
-                            <option value="{{ option }}" {% if existing_responses|get_item:fq.shared_question.id == option %}selected{% endif %}>
-                                {{ option }}
-                            </option>
+                        {% empty %}
+                            <option disabled>Sin opciones disponibles</option>
                         {% endfor %}
                     </select>
                 {% elif fq.shared_question.field_type == 'radio' %}
-                    {% for option in fq.shared_question.options %}
+                    {% for option in fq.shared_question.options_set.all %}
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" name="question_{{ fq.shared_question.id }}" id="radio_{{ fq.shared_question.id }}_{{ forloop.counter }}" value="{{ option }}" {% if existing_responses|get_item:fq.shared_question.id == option %}checked{% endif %}>
+                            <input class="form-check-input"
+                                type="radio"
+                                name="question_{{ fq.shared_question.id }}"
+                                id="radio_{{ fq.shared_question.id }}_{{ forloop.counter }}"
+                                value="{{ option.display_text }}"
+                                {% if existing_responses|get_item:fq.shared_question.id == option.display_text %}checked{% endif %}>
                             <label class="form-check-label" for="radio_{{ fq.shared_question.id }}_{{ forloop.counter }}">
-                                {{ option }}
+                                {{ option.display_text }}
                             </label>
                         </div>
+                    {% empty %}
+                        <div class="text-muted">No hay opciones definidas para esta pregunta.</div>
                     {% endfor %}
+                {% elif fq.shared_question.field_type == 'dynamic_dropdown' and fq.shared_question.source_model %}
+                    <select name="question_{{ fq.shared_question.id }}" class="form-select">
+                        <option value="">-- Cargando... --</option>
+                    </select>
+                    <script>
+                    fetch(`/calls/shared-question/preview/{{ fq.shared_question.source_model }}/`)
+                        .then(r => r.json())
+                        .then(data => {
+                            const select = document.querySelector('select[name="question_{{ fq.shared_question.id }}"]');
+                            select.innerHTML = '<option value="">-- Seleccionar --</option>';
+                            if (data.success) {
+                                data.items.forEach(item => {
+                                    const opt = document.createElement('option');
+                                    opt.value = item;
+                                    opt.textContent = item;
+                                    {% if existing_responses|get_item:fq.shared_question.id %}
+                                        if (item === "{{ existing_responses|get_item:fq.shared_question.id|escapejs }}") {
+                                            opt.selected = true;
+                                        }
+                                    {% endif %}
+                                    select.appendChild(opt);
+                                });
+                            }
+                        })
+                        .catch(() => {
+                            const select = document.querySelector('select[name="question_{{ fq.shared_question.id }}"]');
+                            select.innerHTML = '<option value="">Error al cargar opciones</option>';
+                        });
+                    </script>
+                {% else %}
+                    <!-- Fallback for unknown or legacy types -->
+                    <input type="text" name="question_{{ fq.shared_question.id }}" class="form-control" value="{{ existing_responses|get_item:fq.shared_question.id }}">
                 {% endif %}
             </div>
         {% endfor %}

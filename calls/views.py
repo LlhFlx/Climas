@@ -1196,7 +1196,13 @@ def apply_call(request, call_pk):
     # Get ProponentForm for this call
     try:
         proponent_form = ProponentForm.objects.get(call=call)
-        form_questions = proponent_form.form_questions.select_related('shared_question').order_by('order')
+        form_questions = ProponentFormQuestion.objects.filter(
+            form=proponent_form
+        ).select_related(
+            'shared_question', 'shared_question__category'
+        ).prefetch_related(
+            'shared_question__options_set'
+        ).order_by('order')
     except ProponentForm.DoesNotExist:
         form_questions = []
 
