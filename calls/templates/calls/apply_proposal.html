@@ -247,6 +247,30 @@
             </div>
             <button type="button" id="add-proposal-team-member-btn" class="btn btn-outline-primary">+ Agregar Colaborador</button>
         </div>
+
+        <!-- CBO Document Upload -->
+        {% if expression.community_organization %}
+        <div class="mb-4">
+            <h5>Documento de la Organización Comunitaria (CBO)</h5>
+            <p class="text-muted">Suba un documento de respaldo (acta, RUT, etc.). Solo PDF, DOCX, JPG o PNG. Máx. 10 MB.</p>
+            <div class="input-group">
+                <input type="file" name="cbo_document_file" class="form-control" accept=".pdf,.docx,.jpg,.png">
+                {% if existing_cbo_doc %}
+                    <a href="{% url 'proposals:download_cbo_document' existing_cbo_doc.id %}"
+                        target="_blank" 
+                        class="btn btn-outline-secondary">
+                            Ver documento actual
+                    </a>
+                    <!-- <a href="{{ existing_cbo_doc.file.url }}" target="_blank" class="btn btn-outline-secondary">Ver actual</a> -->
+                    <button type="submit" name="remove_cbo_document" value="1" class="btn btn-outline-danger">Borrar</button>
+                {% endif %}
+            </div>
+            {% if existing_cbo_doc %}
+                <small class="form-text text-muted">Documento actual: {{ existing_cbo_doc.name }}</small>
+            {% endif %}
+        </div>
+        {% endif %}
+        
         {% comment "CBO moved to expression" %}
         <!-- COMMUNITY-BASED ORGANIZATIONS -->
         <div class="mb-4">
@@ -683,29 +707,6 @@
             <button type="button" id="add-proposal-budget-btn" class="btn btn-outline-primary">+ Agregar Ítem</button>
         </div>
         {% endcomment %}
-
-        <!-- CBO Document Upload -->
-        {% if expression.community_organization %}
-        <div class="mb-4">
-            <h5>Documento de la Organización Comunitaria (CBO)</h5>
-            <p class="text-muted">Suba un documento de respaldo (acta, RUT, etc.). Solo PDF, DOCX, JPG o PNG. Máx. 10 MB.</p>
-            <div class="input-group">
-                <input type="file" name="cbo_document_file" class="form-control" accept=".pdf,.docx,.jpg,.png">
-                {% if existing_cbo_doc %}
-                    <a href="{% url 'proposals:download_cbo_document' existing_cbo_doc.id %}"
-                        target="_blank" 
-                        class="btn btn-outline-secondary">
-                            Ver documento actual
-                    </a>
-                    <!-- <a href="{{ existing_cbo_doc.file.url }}" target="_blank" class="btn btn-outline-secondary">Ver actual</a> -->
-                    <button type="submit" name="remove_cbo_document" value="1" class="btn btn-outline-danger">Borrar</button>
-                {% endif %}
-            </div>
-            {% if existing_cbo_doc %}
-                <small class="form-text text-muted">Documento actual: {{ existing_cbo_doc.name }}</small>
-            {% endif %}
-        </div>
-        {% endif %}
 
         <!-- PROPOSAL-SPECIFIC SHARED QUESTIONS -->
         {% if proposal_questions %}
