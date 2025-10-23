@@ -48,6 +48,7 @@ docker run -d \
 echo "Contenedor climas-app está corriendo en http://localhost:8220"
 
 echo "Aplicando migraciones..."
+docker exec -it climas-app python manage.py makemigrations
 docker exec -it climas-app python manage.py migrate
 
 echo "La aplicación está disponible en: http://localhost:8220"
