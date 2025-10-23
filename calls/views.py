@@ -2458,6 +2458,15 @@ def apply_proposal(request, expression_id):
 
         has_word_errors = False
 
+        # Validate number of partner institutions
+        partner_institutions_count = proposal.partner_institutions.count()
+        if partner_institutions_count < 1:
+            messages.error(request, "Debe seleccionar al menos una institución aliada.")
+            has_word_errors = True
+        elif partner_institutions_count > 2:
+            messages.error(request, "No puede seleccionar más de dos instituciones aliadas.")
+            has_word_errors = True
+            
         def count_words(text):
             return len([w for w in text.strip().split() if w])
 
