@@ -6,7 +6,7 @@ from decimal import Decimal
 from collections import defaultdict
 
 from geo.models import Country
-from accounts.models import Role
+from accounts.models import Role, CustomUser
 from budgets.models import BudgetCategory, BudgetPeriod
 from common.models import Scale
 from common.models import Status
@@ -505,7 +505,7 @@ class Command(BaseCommand):
         )
         created_questions.append(sq6)
 
-        self.stdout.write(self.style.SUCCESS("Created 6 proponent questions with their options."))
+        self.stdout.write(self.style.SUCCESS(f"Created {len(created_questions)} proponent questions with their options."))
 
         # Create and link call
         call_title = "Convocatoria CLIMAS 2025"
@@ -519,31 +519,57 @@ class Command(BaseCommand):
                 defaults={
                     'status': status_abierta,
                     'description': 'Convocatoria creada automáticamente para cargar preguntas de ejemplo.',
-                    'start_date': timezone.now().date(),
-                    'end_date': timezone.now().date() + timezone.timedelta(days=30),
+                    'opening_datetime': timezone.now(),
+                    'closing_datetime': timezone.now() + timezone.timedelta(days=30),
                 }
             )
             if created:
-                self.stdout.write(self.style.SUCCESS(f"Se ha creado la convocatoria: '{call.title}'"))
+                self.stdout.write(self.style.SUCCESS(f"Se ha creado la convocatoria: '{call.title}'"))                
             else:
                 self.stdout.write(self.style.WARNING(f"La convocatoria '{call.title}' ya existía. Reutilizando..."))
+
+            try:
+                coordinator_role = Role.objects.get(name="Coordinator")
+                coordinator = CustomUser.objects.filter(role=coordinator_role).first()
+                
+                if coordinator:
+                    call.coordinator = coordinator
+                    call.save(update_fields=['coordinator'])
+                    self.stdout.write(
+                        self.style.SUCCESS(f"Convocatoria '{call.title}' asignada al usuario {coordinator}.")
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.WARNING("No se encontró un Coordinador. La convocatoria permanece sin asignar.")
+                    )
+            except Role.DoesNotExist:
+                self.stdout.write(self.style.ERROR("¡Rol 'Coordinator' faltante!"))
         
             # Create or get ProponentForm for this call
-            form, _ = ProponentForm.objects.get_or_create(
+            form, form_created = ProponentForm.objects.get_or_create(
                 call=call,
                 defaults={'title': f'Formulario para {call.title}'}
             )
+            if form_created:
+                self.stdout.write(self.style.SUCCESS(f"Se ha creado el formulario: '{form.title}'"))
+            else:
+                self.stdout.write(self.style.WARNING(f"El formulario'{form.title}' ya existía. Reutilizando..."))
 
             # Link ONLY the 6 created questions
             for order, sq in enumerate(created_questions, start=1):
-                ProponentFormQuestion.objects.get_or_create(
+                proponent_form_question, _ = ProponentFormQuestion.objects.update_or_create(
                     form=form,
                     shared_question=sq,
                     defaults={'order': order}
                 )
+                if proponent_form_question:
+                    self.stdout.write(self.style.SUCCESS(f"Pregunta {order} creada con éxito."))
+                else:
+                    self.stdout.write(self.style.WARNING(f"Hubo un error creando la pregunta {order}"))
+
 
             self.stdout.write(
-                self.style.SUCCESS(f"✓ Linked {len(created_questions)} specific SharedQuestions to call: {call.title}")
+                self.style.SUCCESS(f"Linked {len(created_questions)} specific SharedQuestions to call: {call.title}")
             )
 
         # ===================================
