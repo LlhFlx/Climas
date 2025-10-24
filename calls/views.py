@@ -1203,6 +1203,10 @@ def apply_call(request, call_pk):
         ).prefetch_related(
             'shared_question__options_set'
         ).order_by('order')
+        form_questions = [
+                fq.shared_question for fq in form_questions
+                if fq.shared_question.target_category == 'expression'
+            ]
     except ProponentForm.DoesNotExist:
         form_questions = []
 
@@ -1970,8 +1974,12 @@ def apply_proposal(request, expression_id):
     try:
         proponent_form = ProponentForm.objects.get(call=expression.call)
         form_questions = ProponentFormQuestion.objects.filter(
-            form=proponent_form
-        ).select_related('shared_question').order_by('order')
+            form=proponent_form,
+        ).select_related(
+            'shared_question', 'shared_question__category'
+        ).prefetch_related(
+            'shared_question__options_set'
+        ).order_by('order')
         proposal_questions = [
             fq.shared_question for fq in form_questions
             if fq.shared_question.target_category == 'proposal'
