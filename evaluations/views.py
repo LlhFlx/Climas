@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.utils import timezone
 from django.http import HttpResponseForbidden, JsonResponse, FileResponse, Http404
 from django.core.serializers import serialize
+import re
 from .models import (
     EvaluationTemplate, TemplateCategory, TemplateSubcategory,
     TemplateItem, TemplateItemOption, Evaluation, EvaluationResponse
@@ -1198,3 +1199,49 @@ def get_document_url(request, evaluation_id, doc_type):
         'secure_url': secure_url,
         'filename': doc_field.name
     })
+
+@login_required
+def download_evaluation_document(request, evaluation_id, doc_type):
+    """
+    Securely download an XLSX document (timeline or budget) associated with an evaluation.
+    Only the assigned evaluator can access it.
+    """
+    evaluation = get_object_or_404(Evaluation, id=evaluation_id)
+
+    # Ensure user is the evaluator
+    if request.user.customuser != evaluation.evaluator:
+        raise PermissionDenied("No permission to access this document.")
+
+    target = evaluation.target
+
+    # Map doc_type to file field
+    if doc_type == 'timeline':
+        doc_field = getattr(target, 'timeline_document', None)
+        doc_name = 'cronograma.xlsx'
+    elif doc_type == 'budget':
+        doc_field = getattr(target, 'budget_document', None)
+        doc_name = 'presupuesto.xlsx'
+    else:
+        raise Http404("Invalid document type.")
+
+    if not doc_field or not doc_field.file:
+        raise Http404("Document not found.")
+
+    # Get project title safely
+    project_title = evaluation.project_title or "Documento"
+    
+    # Make it filename-safe: keep letters, numbers, spaces, hyphens, underscores; replace rest with underscores
+    safe_title = re.sub(r'[^\w\s-]', '_', project_title.strip())
+    # Collapse multiple spaces/underscores
+    safe_title = re.sub(r'[-_\s]+', '_', safe_title).strip('_')
+
+    # Final filename
+    filename = f"{safe_title}_{doc_name}"
+
+    # Open file and prepare response
+    response = FileResponse(
+        doc_field.file.open('rb'),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response

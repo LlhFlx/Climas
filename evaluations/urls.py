@@ -95,6 +95,12 @@ urlpatterns = [
         views.serve_pdf, 
         name='serve_pdf'),
 
+    path(
+        'download-evaluation-document/<int:evaluation_id>/<str:doc_type>/',
+        views.download_evaluation_document,
+        name='download_evaluation_document'
+        ),
+
     path('get-document-url/<int:evaluation_id>/<str:doc_type>/', 
         views.get_document_url, 
         name='get_document_url'),
