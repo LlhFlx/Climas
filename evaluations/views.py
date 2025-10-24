@@ -755,7 +755,7 @@ def evaluate_expression(request, evaluation_id):
             'equity_inclusion': target.equity_inclusion,
             'communication_strategy': target.communication_strategy,
             'risk_analysis_mitigation': target.risk_analysis_mitigation,
-            'research_team': target.research_team,
+            #'research_team': target.research_team,
             'timeline_document': target.timeline_document,
             'budget_document': target.budget_document,
             'partner_institutions': target.partner_institutions.all(),
