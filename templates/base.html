@@ -251,12 +251,13 @@
         .expression-fields-card .field-row {
             display: flex;
             align-items: flex-start;
-            padding: 0.5rem 0;
+            padding: 0.5rem 1rem;
             margin: 0;
+            width: 100%;
         }
 
         .expression-fields-card .field-label {
-            flex: 0 0 240px; /* Adjust based on your longest label */
+            flex: 0 0 240px;
             font-weight: 600;
             padding-right: 1rem;
             line-height: 1.4;
@@ -270,20 +271,20 @@
 
         /* Zebra striping: alternate background */
         .expression-fields-card .field-row:nth-child(even) {
-            background-color: rgba(0, 0, 0, 0.03);
+            background-color: rgba(76, 174, 189, 0.30);
+        }
+
+        /* Dark mode: softer blue-gray */
+        body.dark .expression-fields-card .field-row:nth-child(even) {
+            background-color: rgba(76, 174, 189, 0.35);/* Slightly more visible in dark mode */
         }
 
         /* Constrain and center the field content slightly */
         .expression-fields-card .card-body {
-            padding-left: 2rem !important;
-            padding-right: 2rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
             max-width: 900px;
             margin: 0 auto;
-        }
-
-        /* Dark mode support */
-        body.dark .expression-fields-card .field-row:nth-child(even) {
-            background-color: rgba(255, 255, 255, 0.03);
         }
 
         /* Mobile: stack vertically */
