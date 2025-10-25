@@ -7,7 +7,7 @@
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-md-8" style="margin-top: 5rem;"> <!-- Wider container for two columns -->
-            <h4 class="text-center mb-4">Register as Researcher</h4>
+            <h4 class="text-center mb-4">Regístrate como Investigador/a</h4>
             
             {% if messages %}
                 {% for message in messages %}
@@ -23,11 +23,11 @@
 
                 <div class="row">
                     <!-- === Left Column: Account Information === -->
-                    <div class="col-md-6">
-                        <h5 class="mb-3">Account Information</h5>
+                    <div class="col-md-6 pe-md-4">
+                        <h5 class="mb-3">Información de la Cuenta</h5>
 
                         <div class="mb-3">
-                            <label for="{{ form.username.id_for_label }}" class="form-label">Username</label>
+                            <label for="{{ form.username.id_for_label }}" class="form-label">Nombre de Usuario</label>
                             {{ form.username|attr:"class:form-control" }}
                             {% if form.username.errors %}
                                 <div class="text-danger small">{{ form.username.errors.0 }}</div>
@@ -46,7 +46,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="{{ form.phone_number.id_for_label }}" class="form-label">Phone Number (Optional)</label>
+                            <label for="{{ form.phone_number.id_for_label }}" class="form-label">Número de Teléfono (Opcional)</label>
                             {{ form.phone_number|attr:"class:form-control" }}
                             <small class="form-text text-muted">Format: +57(601)1234444 or +1 555-123-4567</small>
                             {% if form.phone_number.errors %}
@@ -55,7 +55,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="{{ form.password1.id_for_label }}" class="form-label">Password</label>
+                            <label for="{{ form.password1.id_for_label }}" class="form-label">Contraseña</label>
                             {{ form.password1|attr:"class:form-control" }}
                             {% if form.password1.errors %}
                                 <div class="text-danger small">{{ form.password1.errors.0 }}</div>
@@ -63,7 +63,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="{{ form.password2.id_for_label }}" class="form-label">Confirm Password</label>
+                            <label for="{{ form.password2.id_for_label }}" class="form-label">Confirmar Contraseña</label>
                             {{ form.password2|attr:"class:form-control" }}
                             {% if form.password2.errors %}
                                 <div class="text-danger small">{{ form.password2.errors.0 }}</div>
@@ -73,8 +73,8 @@
 
                     <!-- === Right Column: Personal Information === -->
                     
-                    <div class="col-md-6">
-                        <h5 class="mb-3">Personal Information</h5>
+                    <div class="col-md-6 ps-md-4">
+                        <h5 class="mb-3">Información Personal</h5>
                         
                         <div class="mb-3">
                             <label for="{{ form.country.id_for_label }}" class="form-label">País</label>
@@ -85,7 +85,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="{{ form.document_type.id_for_label }}" class="form-label">Document Type</label>
+                            <label for="{{ form.document_type.id_for_label }}" class="form-label">Tipo de Documento</label>
                             {{ form.document_type|attr:"class:form-select" }}
                             {% if form.document_type.errors %}
                                 <div class="text-danger small">{{ form.document_type.errors.0 }}</div>
@@ -93,7 +93,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="{{ form.document_number.id_for_label }}" class="form-label">Document Number</label>
+                            <label for="{{ form.document_number.id_for_label }}" class="form-label">Número de Documento</label>
                             {{ form.document_number|attr:"class:form-control" }}
                             {% if form.document_number.errors %}
                                 <div class="text-danger small">{{ form.document_number.errors.0 }}</div>
@@ -101,7 +101,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="{{ form.first_name.id_for_label }}" class="form-label">First Name</label>
+                            <label for="{{ form.first_name.id_for_label }}" class="form-label">Primer Nombre</label>
                             {{ form.first_name|attr:"class:form-control" }}
                             {% if form.first_name.errors %}
                                 <div class="text-danger small">{{ form.first_name.errors.0 }}</div>
@@ -109,7 +109,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="{{ form.second_name.id_for_label }}" class="form-label">Second Name (Optional)</label>
+                            <label for="{{ form.second_name.id_for_label }}" class="form-label">Segundo Nombre (Opcional)</label>
                             {{ form.second_name|attr:"class:form-control" }}
                             {% if form.second_name.errors %}
                                 <div class="text-danger small">{{ form.second_name.errors.0 }}</div>
@@ -117,7 +117,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="{{ form.first_last_name.id_for_label }}" class="form-label">First Last Name</label>
+                            <label for="{{ form.first_last_name.id_for_label }}" class="form-label">Primer Apellido</label>
                             {{ form.first_last_name|attr:"class:form-control" }}
                             {% if form.first_last_name.errors %}
                                 <div class="text-danger small">{{ form.first_last_name.errors.0 }}</div>
@@ -125,7 +125,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="{{ form.second_last_name.id_for_label }}" class="form-label">Second Last Name (Optional)</label>
+                            <label for="{{ form.second_last_name.id_for_label }}" class="form-label">Segundo Apellido</label>
                             {{ form.second_last_name|attr:"class:form-control" }}
                             {% if form.second_last_name.errors %}
                                 <div class="text-danger small">{{ form.second_last_name.errors.0 }}</div>
@@ -133,7 +133,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label for="{{ form.gender.id_for_label }}" class="form-label">Gender</label>
+                            <label for="{{ form.gender.id_for_label }}" class="form-label">Género</label>
                             {{ form.gender|attr:"class:form-select" }}
                             {% if form.gender.errors %}
                                 <div class="text-danger small">{{ form.gender.errors.0 }}</div>
@@ -155,17 +155,17 @@
                 </div>
 
                 <div class="text-center mt-4">
-                    <button type="submit" class="btn btn-primary px-5">Register</button>
+                    <button type="submit" class="btn btn-primary px-5">Registrar</button>
                 </div>
             </form>
  
             <p class="mt-3 text-center">
-                Already have an account? <a href="{% url 'accounts:login' %}">Login here</a>
+                ¿Ya tienes una cuenta? <a href="{% url 'accounts:login' %}">Inicia sesión aquí</a>
             </p>
             
             <hr>
-            <p class="text-center"><strong>Need Coordinator or Evaluator Access?</strong></p>
-            <p class="text-muted text-center">These roles require approval. First register as a researcher, then request elevated access from your profile.</p>
+            <p class="text-center"><strong>¿Necesitas acceso de Coordinador o Evaluador?</strong></p>
+            <p class="text-muted text-center">Esos roles requieren aprobación. Primero regístrate como Investigador (usando este formulario), luego solicita acceso elevado para tu perfil a un administrador.</p>
         </div>
     </div>
 </div>
