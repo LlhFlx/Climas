@@ -628,7 +628,7 @@ class Command(BaseCommand):
         
         # Helper function to create a question + options
         def create_eval_question(subcat, question_text, options_with_scores):
-            item = TemplateItem.objects.create(
+            item, _ = TemplateItem.objects.get_or_create(
                 subcategory=subcat,
                 question=question_text,
                 field_type='dropdown',
@@ -725,8 +725,11 @@ class Command(BaseCommand):
         all_items = []
 
         for subcat, q_text, opts in cat1_questions + cat2_questions + cat3_questions:
-            item = create_eval_question(subcat, q_text, opts)
-            all_items.append(item)
+            try:
+                item = create_eval_question(subcat, q_text, opts)
+                all_items.append(item)
+            except:
+                self.stdout.write(self.style.WARNING(f"Esta pregunta ya se encontraba registrada."))
 
         # Set correct order within each subcategory
         

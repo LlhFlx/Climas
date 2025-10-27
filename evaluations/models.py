@@ -203,6 +203,7 @@ class TemplateItem(TimestampMixin, models.Model):
         ordering = ['order']
         verbose_name = "Ítem de Plantilla"
         verbose_name_plural = "Ítems de Plantilla"
+        unique_together = ('subcategory', 'question')
 
     def __str__(self):
         return f"{self.subcategory}: {self.question}"

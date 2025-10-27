@@ -1264,6 +1264,7 @@ def apply_call(request, call_pk):
             'cbo_name': request.POST.get('cbo_name', '').strip(),
             'cbo_description': request.POST.get('cbo_description', '').strip(),
             'cbo_number_of_members': request.POST.get('cbo_number_of_members', '').strip(),
+            'past_projects_summary': request.POST.get('past_projects_summary', '').strip(),
         }
 
         # Populate Expression from POST
@@ -1274,6 +1275,8 @@ def apply_call(request, call_pk):
         expression.general_objective = post_data['general_objective']
         expression.methodology = post_data['methodology']
         expression.funding_eligibility_acceptance = post_data['funding_eligibility_acceptance']
+        expression.past_projects_summary = post_data['past_projects_summary']
+        print(expression.past_projects_summary)
         
         # Graceful handling for missing primary institution
         inst_id = post_data['primary_institution_id']
@@ -1674,6 +1677,14 @@ def apply_call(request, call_pk):
                             request,
                             f"{human_names[field_name]} no debe exceder {max_words} palabras ({word_count} detectadas)."
                         )
+                        has_errors = True
+                
+                # === 6. Past Projects Summary (max 180 words) ===
+                past_projects = request.POST.get('past_projects_summary', '').strip()
+                if past_projects:
+                    word_count = len([w for w in past_projects.split() if w])
+                    if word_count > 180:
+                        messages.error(request, f"La sección de proyectos anteriores no debe exceder 180 palabras ({word_count} detectadas).")
                         has_errors = True
 
                 # If any word count fails, stop here

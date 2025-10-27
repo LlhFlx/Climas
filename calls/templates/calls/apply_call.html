@@ -572,6 +572,29 @@
             <input type="hidden" name="scale" value="{{ expression.scale.name|default:'' }}">
         </div>
 
+        <div class="mb-3">
+            <label for="id_past_projects_summary" class="form-label">
+                Proyectos anteriores de la institución líder (últimos 10 años)
+                <span class="text-muted d-block small mt-1">
+                    Hasta tres proyectos. Por cada uno: nombre, descripción, objetivo/logros, rol institucional, 
+                    monto total, monto administrado, financiador. Máximo 60 palabras por proyecto (180 total).
+                </span>
+            </label>
+            <textarea 
+                name="past_projects_summary"
+                id="id_past_projects_summary"
+                class="form-control"
+                rows="6"
+            >{{ expression.past_projects_summary }}</textarea>
+            {% if messages %}
+                {% for message in messages %}
+                    {% if 'proyectos anteriores' in message|safe %}
+                        <div class="text-danger small mt-1">{{ message }}</div>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        </div>
+
         <hr>
         <div class="d-grid gap-2 d-md-flex justify-content-md-end">
             <a href="{% url 'calls:researcher_dashboard' %}" class="btn btn-secondary me-md-2">Cancelar</a>

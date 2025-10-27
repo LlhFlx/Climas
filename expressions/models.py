@@ -99,6 +99,12 @@ class Expression(TimestampMixin, CreatedByMixin, models.Model):
         verbose_name="Organización Comunitaria (CBO)",
         related_name='expressions'  
     )
+
+    past_projects_summary = models.TextField(
+        blank=True,
+        verbose_name="Proyectos anteriores de la institución",
+        help_text="Hasta tres proyectos de los últimos 10 años. Máximo 60 palabras por proyecto (180 total)."
+    )
     
     evaluations = GenericRelation(
         'evaluations.Evaluation',
