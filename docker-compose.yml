@@ -29,21 +29,21 @@ services:
       - media_data:/app/media:ro
     restart: unless-stopped
   
-  migrate:
-    build: .
-    container_name: app-migrate
-    command: >
-      sh -c "python manage.py makemigrations && python manage.py migrate"
-    env_file:
-      - .env
-    depends_on:
-      - web
-    volumes:
-      - static_data:/app/static
-      - media_data:/app/media
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: "no"
+  # migrate:
+  #   build: .
+  #   container_name: app-migrate
+  #   command: >
+  #     sh -c "python manage.py makemigrations && python manage.py migrate"
+  #   env_file:
+  #     - .env
+  #   depends_on:
+  #     - web
+  #   volumes:
+  #     - static_data:/app/static
+  #     - media_data:/app/media
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   restart: "no"
   # proxy:
   #   image: nginx:1.25
   #   container_name: climas-proxy
