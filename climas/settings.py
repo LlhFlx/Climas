@@ -192,7 +192,7 @@ print(f"IS_PROD? {IS_PROD}")
 # Static & URL settings
 if IS_PROD:
     FORCE_SCRIPT_NAME = '/climas'
-    STATIC_URL = '/static/'
+    STATIC_URL = '/climas/static/'
     MEDIA_URL = '/media/'
     LOGIN_REDIRECT_URL = '/accounts/profile/'
     STATICFILES_DIRS = []
