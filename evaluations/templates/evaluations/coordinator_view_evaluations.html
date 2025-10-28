@@ -151,8 +151,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const modalTitle = document.getElementById('evaluationDetailLabel');
 
         modalBody.innerHTML = '<p>Cargando datos...</p>';
-
-        fetch(`/evaluations/evaluation/${evaluationId}/detail-json/`)
+        // SUBPATH MARKER
+        fetch(`/climas/evaluations/evaluation/${evaluationId}/detail-json/`)
             .then(response => response.json())
             .then(data => {
                 if (!data.success) {

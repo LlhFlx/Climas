@@ -206,7 +206,8 @@
                         <option value="">-- Cargando... --</option>
                     </select>
                     <script>
-                    fetch(`/calls/shared-question/preview/{{ fq.shared_question.source_model }}/`)
+                    // SUBPATH MARKER
+                    fetch(`/climas/calls/shared-question/preview/{{ fq.shared_question.source_model }}/`)
                         .then(r => r.json())
                         .then(data => {
                             const select = document.querySelector('select[name="question_{{ fq.shared_question.id }}"]');

@@ -188,22 +188,27 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-
+print(f"IS_PROD? {IS_PROD}")
 # Static & URL settings
 if IS_PROD:
     FORCE_SCRIPT_NAME = '/climas'
-    STATIC_URL = '/climas/static/'
-    LOGIN_REDIRECT_URL = '/climas/accounts/profile/'
+    STATIC_URL = '/static/'
+    MEDIA_URL = '/media/'
+    LOGIN_REDIRECT_URL = '/accounts/profile/'
+    STATICFILES_DIRS = []
 else:
     FORCE_SCRIPT_NAME = None
     STATIC_URL = 'static/'
+    MEDIA_URL = '/media/'
     LOGIN_REDIRECT_URL = '/accounts/profile/'
+    STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # named URL 
 LOGIN_URL = 'accounts:login'
 LOGOUT_REDIRECT_URL = 'accounts:login'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
 # CSRF_TRUSTED_ORIGINS = [
 #     "http://localhost:8080",
 # ]
@@ -234,6 +239,4 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:8220')
 if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
     print("Advertencia: Las credenciales de correo electrónico no están configuradas. El envío de correo fallará.")
 
-print(EMAIL_HOST_USER)
-print(EMAIL_HOST_PASSWORD)
 print("Config is done!")

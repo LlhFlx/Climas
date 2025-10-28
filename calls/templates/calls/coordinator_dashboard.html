@@ -138,8 +138,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             previewList.innerHTML = '<li>Loading...</li>';
             previewDiv.style.display = 'block';
-
-            fetch(`/calls/shared-question/preview/${selectedValue}/`)
+            // SUBPATH MARKER
+            fetch(`/climas/calls/shared-question/preview/${selectedValue}/`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success && data.items.length > 0) {

@@ -181,11 +181,11 @@ document.addEventListener('DOMContentLoaded', function () {
             docTypeSelect.innerHTML = '<option value="">Select country first</option>';
             return;
         }
-
-        fetch(`/accounts/document-types/${countryId}/`)
+        // SUBPATH MARKER
+        fetch(`/climas/accounts/document-types/${countryId}/`)
             .then(response => response.json())
             .then(data => {
-                docTypeSelect.innerHTML = '<option value="">Select document type</option>';
+                docTypeSelect.innerHTML = '<option value="">Seleccionar tipo de documento</option>';
                 data.forEach(item => {
                     const option = document.createElement('option');
                     option.value = item.id;
