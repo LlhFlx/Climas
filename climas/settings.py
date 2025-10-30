@@ -201,7 +201,7 @@ else:
     STATIC_URL = 'static/'
     MEDIA_URL = '/media/'
     LOGIN_REDIRECT_URL = '/accounts/profile/'
-    STATICFILES_DIRS = [BASE_DIR / "static"]
+    STATICFILES_DIRS = []
 
 # named URL 
 LOGIN_URL = 'accounts:login'
@@ -240,3 +240,53 @@ if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
     print("Advertencia: Las credenciales de correo electrónico no están configuradas. El envío de correo fallará.")
 
 print("Config is done!")
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        # Optional: write to a file inside the container (requires volume)
+        # 'file': {
+        #     'class': 'logging.FileHandler',
+        #     'filename': '/app/logs/django.log',
+        #     'formatter': 'verbose',
+        # },
+    },
+    # 'root': {
+    #     'handlers': ['console'],
+    # },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'),
+            'propagate': True,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'climas': {  # your app logs
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}
+
+import logging
+logging.captureWarnings(True)

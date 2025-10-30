@@ -118,7 +118,7 @@ class ResearcherRegistrationForm(UserCreationForm):
         user.email = self.cleaned_data['email']
         user.first_name = self.cleaned_data['first_name']
         user.last_name = self.cleaned_data['first_last_name']
-        user.is_active = False  # Require email confirmation
+        user.is_active = True  # Set to false to require email confirmation
         if commit:
             user.save()
             print(f"DEBUG: User saved: {user.username}")
@@ -162,8 +162,8 @@ class ResearcherRegistrationForm(UserCreationForm):
             custom_user.save()  # Save again to update the person FK
             print("DEBUG: CustomUser updated with person link")
         
-        if commit:
-            self._send_confirmation_email(user)
+        # if commit:
+        #     self._send_confirmation_email(user)
     
         return user
     

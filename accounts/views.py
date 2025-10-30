@@ -74,24 +74,35 @@ def register_view(request):
 def login_view(request):
     if request.method == 'POST':
         form = LoginForm(request, data=request.POST)
+        print(1)
         if form.is_valid():
             username = form.cleaned_data.get('username')
             password = form.cleaned_data.get('password')
             user = authenticate(username=username, password=password)
+            print(2)
             if user is not None:
                 login(request, user)
+                print(3)
                 # Redirect based on user role
                 try:
                     custom_user = user.customuser
                     if custom_user.role and custom_user.role.name == 'Coordinator':
+                        print(4)
                         return redirect('calls:coordinator_dashboard')
                     elif custom_user.role and custom_user.role.name == 'Evaluator':
+                        print(5)
                         return redirect('evaluations:evaluator_dashboard')
                     else:  # Researcher or no role
+                        print(6)
                         return redirect('calls:researcher_dashboard')
                 except CustomUser.DoesNotExist:
+                    print(7)
                     return redirect('home')
+        else:
+            messages.error(request, f"Login failed: {form.errors.as_json()}")
+            print("Form errors:", form.errors.as_json())
     else:
+        print("Captcha not working?")
         form = LoginForm()
     
     return render(request, 'accounts/login.html', {'form': form})

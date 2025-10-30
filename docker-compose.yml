@@ -4,7 +4,7 @@ services:
   web:
     build: .
     container_name: climas-app
-    command: gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 120 climas.wsgi:application
+    command: gunicorn --bind 0.0.0.0:8000 --workers 3 --timeout 120 --access-logfile - --error-logfile - --log-level debug climas.wsgi:application
     env_file:
       - .env
     volumes:
